@@ -60,6 +60,15 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
       return res.status(400).json({ error: "Les informations de facturation essentielles sont requises." });
     }
 
+    // Verify patient belongs to the user's clinic (prevent IDOR)
+    const patient = await getAsync(
+      "SELECT first_name, last_name FROM patients WHERE id = ? AND clinic_id = ?",
+      [patientId, req.user.clinicId]
+    );
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé dans cette clinique." });
+    }
+
     const itemsJson = JSON.stringify(items);
     const result = await runAsync(
       `INSERT INTO payments (clinic_id, patient_id, user_id, amount_total, payment_method, reference_number, status, items) 
@@ -68,7 +77,6 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
     );
 
     // Log Activity
-    const patient = await getAsync("SELECT first_name, last_name FROM patients WHERE id = ?", [patientId]);
     await runAsync(
       "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'PAYMENT_RECORD', ?)",
       [req.user.clinicId, req.user.userId, `Encaissement de ${amountTotal} FCFA pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`]

@@ -13,6 +13,15 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: "Le patient et le motif sont requis." });
     }
 
+    // Verify patient belongs to the clinic (prevent IDOR)
+    const patient = await getAsync(
+      "SELECT id FROM patients WHERE id = ? AND clinic_id = ?",
+      [patientId, req.user.clinicId]
+    );
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé dans cette clinique." });
+    }
+
     // 1. Insert Consultation
     const constantsJson = constants ? JSON.stringify(constants) : '{}';
     const consultationResult = await runAsync(
@@ -34,6 +43,18 @@ router.post('/', auth, async (req, res) => {
 
       for (const item of prescriptionItems) {
         const { medicationId, medicationName, dosage, frequency, duration, quantityPrescribed } = item;
+
+        // Verify medication belongs to the clinic if a catalog medication ID is supplied (prevent IDOR)
+        if (medicationId) {
+          const med = await getAsync(
+            "SELECT id FROM medications WHERE id = ? AND clinic_id = ?",
+            [medicationId, req.user.clinicId]
+          );
+          if (!med) {
+            return res.status(400).json({ error: `Le médicament ID ${medicationId} n'existe pas dans le catalogue de votre clinique.` });
+          }
+        }
+
         await runAsync(
           `INSERT INTO prescription_items (prescription_id, medication_id, medication_name, dosage, frequency, duration, quantity_prescribed, quantity_dispensed) 
            VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,

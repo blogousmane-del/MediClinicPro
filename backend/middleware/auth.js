@@ -1,7 +1,12 @@
 const jwt = require('jsonwebtoken');
 const { getAsync } = require('../database');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'mediclinic-super-secret-key-123456';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error("FATAL: La variable d'environnement JWT_SECRET n'est pas configurée dans le fichier .env.");
+  process.exit(1);
+}
 
 // General auth middleware
 async function auth(req, res, next) {

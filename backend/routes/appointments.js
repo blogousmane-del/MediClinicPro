@@ -52,6 +52,24 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: "Tous les champs obligatoires doivent être renseignés." });
     }
 
+    // Verify patient belongs to the user's clinic (prevent IDOR)
+    const patient = await getAsync(
+      "SELECT first_name, last_name, phone FROM patients WHERE id = ? AND clinic_id = ?",
+      [patientId, req.user.clinicId]
+    );
+    if (!patient) {
+      return res.status(404).json({ error: "Patient non trouvé dans cette clinique." });
+    }
+
+    // Verify practitioner belongs to the user's clinic (prevent IDOR)
+    const practitioner = await getAsync(
+      "SELECT id FROM users WHERE id = ? AND clinic_id = ? AND active = 1",
+      [practitionerId, req.user.clinicId]
+    );
+    if (!practitioner) {
+      return res.status(404).json({ error: "Praticien non trouvé dans cette clinique." });
+    }
+
     // Check conflict (practitioner scheduled at exact same time)
     const conflict = await getAsync(
       `SELECT id FROM appointments 
@@ -72,8 +90,6 @@ router.post('/', auth, async (req, res) => {
       [req.user.clinicId, patientId, practitionerId, dateTime, duration || 30, motif]
     );
 
-    // Fetch patient details for logging and SMS simulation
-    const patient = await getAsync("SELECT first_name, last_name, phone FROM patients WHERE id = ?", [patientId]);
     const clinic = await getAsync("SELECT name FROM clinics WHERE id = ?", [req.user.clinicId]);
 
     // Simulate SMS sending (log to server console & action log)
@@ -146,7 +162,7 @@ router.put('/:id', auth, async (req, res) => {
 
     // If cancelled, trigger simulated cancellation SMS
     if (status === 'cancelled') {
-      const patient = await getAsync("SELECT first_name, last_name, phone FROM patients WHERE id = ?", [appt.patient_id]);
+      const patient = await getAsync("SELECT first_name, last_name, phone FROM patients WHERE id = ? AND clinic_id = ?", [appt.patient_id, req.user.clinicId]);
       const clinic = await getAsync("SELECT name FROM clinics WHERE id = ?", [req.user.clinicId]);
       const smsMessage = `Annulation : Bonjour ${patient.first_name} ${patient.last_name}, votre RDV du ${new Date(appt.date_time).toLocaleString('fr-FR')} à la clinique "${clinic.name}" a été annulé.`;
       console.log(`[SMS SIMULATOR] To: ${patient.phone} | Content: "${smsMessage}"`);
