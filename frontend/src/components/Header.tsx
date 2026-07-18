@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Sun, Moon, Bell, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Sun, Moon, Bell, AlertTriangle, ShieldAlert, Menu } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
+  onToggleSidebar?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title }) => {
+export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
   const { clinic } = useAuth();
   const [theme, setTheme] = useState<string>('light');
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
@@ -52,13 +53,31 @@ export const Header: React.FC<HeaderProps> = ({ title }) => {
       boxShadow: 'var(--shadow-sm)',
       transition: 'background-color 0.3s ease, border-color 0.3s ease'
     }}>
-      {/* Title */}
-      <h1 style={{
-        fontSize: '1.25rem',
-        fontWeight: 600,
-        textTransform: 'capitalize',
-        fontFamily: 'var(--font-secondary)'
-      }}>{title}</h1>
+      {/* Left side title and menu button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          onClick={onToggleSidebar}
+          className="sidebar-toggle-btn"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--text-primary)',
+            display: 'none', // Overridden in media query in index.css
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '4px'
+          }}
+        >
+          <Menu size={22} />
+        </button>
+        <h1 style={{
+          fontSize: '1.25rem',
+          fontWeight: 600,
+          textTransform: 'capitalize',
+          fontFamily: 'var(--font-secondary)'
+        }}>{title}</h1>
+      </div>
 
       {/* Right side controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>

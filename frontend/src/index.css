@@ -437,3 +437,27 @@ h1, h2, h3, h4, h5, h6 {
   border-color: rgba(59, 130, 246, 0.2);
   color: var(--info);
 }
+
+/* Responsive Sidebar toggling */
+.sidebar {
+  transform: translateX(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .sidebar-toggle-btn {
+    display: flex !important;
+  }
+  
+  .sidebar-close-btn {
+    display: flex !important;
+  }
+}
+

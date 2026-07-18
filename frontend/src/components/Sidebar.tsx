@@ -11,15 +11,18 @@ import {
   Settings as SettingsIcon, 
   LogOut,
   Wifi,
-  WifiOff
+  WifiOff,
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isOpen, onClose }) => {
   const { user, clinic, logout } = useAuth();
   const { isOnline } = useOffline();
 
@@ -48,61 +51,102 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab }) =
   };
 
   return (
-    <aside style={{
-      width: 'var(--sidebar-width)',
-      height: '100vh',
-      backgroundColor: 'var(--secondary)',
-      color: '#94a3b8',
-      position: 'fixed',
-      left: 0,
-      top: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      borderRight: '1px solid var(--border)',
-      zIndex: 100,
-      boxShadow: '4px 0 10px rgba(0,0,0,0.1)'
-    }}>
-      {/* Brand Header */}
-      <div style={{
-        height: 'var(--header-height)',
-        padding: '0 1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-        backgroundColor: '#090d16'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            backgroundColor: 'var(--primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: '1.2rem'
-          }}>M</div>
-          <span style={{
-            fontWeight: 700,
-            fontSize: '1.15rem',
-            color: 'white',
-            fontFamily: 'var(--font-secondary)',
-            letterSpacing: '0.5px'
-          }}>MediClinic</span>
+    <>
+      {/* Backdrop overlay for mobile screens */}
+      {isOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={onClose}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 99
+          }}
+        />
+      )}
+      <aside 
+        className={`sidebar ${isOpen ? 'open' : ''}`}
+        style={{
+          width: 'var(--sidebar-width)',
+          height: '100vh',
+          backgroundColor: 'var(--secondary)',
+          color: '#94a3b8',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          borderRight: '1px solid var(--border)',
+          zIndex: 100,
+          boxShadow: '4px 0 10px rgba(0,0,0,0.1)'
+        }}
+      >
+        {/* Brand Header */}
+        <div style={{
+          height: 'var(--header-height)',
+          padding: '0 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+          backgroundColor: '#090d16'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              backgroundColor: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '1.2rem'
+            }}>M</div>
+            <span style={{
+              fontWeight: 700,
+              fontSize: '1.15rem',
+              color: 'white',
+              fontFamily: 'var(--font-secondary)',
+              letterSpacing: '0.5px'
+            }}>MediClinic</span>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Offline Badge indicator */}
+            <div title={isOnline ? "En ligne" : "Hors ligne (mode déconnecté)"} style={{ display: 'flex', alignItems: 'center' }}>
+              {isOnline ? (
+                <Wifi size={16} color="var(--success)" />
+              ) : (
+                <WifiOff size={16} color="var(--danger)" />
+              )}
+            </div>
+            
+            {/* Mobile Close Button */}
+            <button
+              onClick={onClose}
+              className="sidebar-close-btn"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                display: 'none', // Overridden in media query in index.css
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '4px'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
-        
-        {/* Offline Badge indicator */}
-        <div title={isOnline ? "En ligne" : "Hors ligne (mode déconnecté)"}>
-          {isOnline ? (
-            <Wifi size={16} color="var(--success)" />
-          ) : (
-            <WifiOff size={16} color="var(--danger)" />
-          )}
-        </div>
-      </div>
 
       {/* Clinic title info */}
       <div style={{
@@ -241,5 +285,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab }) =
         </button>
       </div>
     </aside>
-  );
+  </>
+);
 };

@@ -32,6 +32,7 @@ const MainAppContent: React.FC = () => {
   // Quick Action modal triggers
   const [openPatientModal, setOpenPatientModal] = useState<boolean>(false);
   const [openApptModal, setOpenApptModal] = useState<boolean>(false);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
   if (loading) {
     return (
@@ -92,17 +93,26 @@ const MainAppContent: React.FC = () => {
   return (
     <div className="app-container">
       {/* Navigation Drawer */}
-      <Sidebar currentTab={currentTab} setCurrentTab={(tab) => {
-        // Reset sub pages
-        if (tab === 'patients') {
-          setSelectedPatientId(null);
-        }
-        setCurrentTab(tab);
-      }} />
+      <Sidebar 
+        currentTab={currentTab} 
+        setCurrentTab={(tab) => {
+          // Reset sub pages
+          if (tab === 'patients') {
+            setSelectedPatientId(null);
+          }
+          setCurrentTab(tab);
+          setSidebarOpen(false);
+        }} 
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
       {/* Main Container */}
       <main className="main-content">
-        <Header title={tabTitles[currentTab]} />
+        <Header 
+          title={tabTitles[currentTab]} 
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        />
         
         {/* Render Tab components */}
         {currentTab === 'dashboard' && (
