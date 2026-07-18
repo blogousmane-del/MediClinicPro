@@ -1,0 +1,11 @@
+{
+  "name": "mediclinic-project",
+  "version": "1.0.0",
+  "description": "Root package runner for MediClinic monorepo",
+  "scripts": {
+    "backend": "node backend/server.js",
+    "frontend": "npm.cmd --prefix frontend run dev",
+    "dev": "powershell -Command \"Start-Process node -ArgumentList 'backend/server.js' -NoNewWindow; Start-Process npm.cmd -ArgumentList '--prefix frontend run dev' -NoNewWindow\"",
+    "build:frontend": "npm.cmd --prefix frontend run build"
+  }
+}
