@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { runAsync, getAsync, allAsync } = require('../database');
+const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 
 // GET /api/financials/payments
@@ -8,42 +8,38 @@ const { auth, checkRole } = require('../middleware/auth');
 router.get('/payments', auth, async (req, res) => {
   try {
     const { startDate, endDate, method, status } = req.query;
-    let query = `
-      SELECT pay.*, pat.first_name as patient_first_name, pat.last_name as patient_last_name, pat.folder_number, u.name as cashier_name
-      FROM payments pay
-      JOIN patients pat ON pay.patient_id = pat.id
-      JOIN users u ON pay.user_id = u.id
-      WHERE pay.clinic_id = ?
-    `;
-    const params = [req.user.clinicId];
+    
+    let queryBuilder = supabase
+      .from('payments')
+      .select('*, patient:patients(first_name, last_name, folder_number), cashier:users(name)')
+      .eq('clinic_id', req.user.clinicId);
 
     if (startDate) {
-      query += " AND pay.created_at >= ?";
-      params.push(`${startDate}T00:00:00`);
+      queryBuilder = queryBuilder.gte('created_at', `${startDate}T00:00:00`);
     }
     if (endDate) {
-      query += " AND pay.created_at <= ?";
-      params.push(`${endDate}T23:59:59`);
+      queryBuilder = queryBuilder.lte('created_at', `${endDate}T23:59:59`);
     }
     if (method) {
-      query += " AND pay.payment_method = ?";
-      params.push(method);
+      queryBuilder = queryBuilder.eq('payment_method', method);
     }
     if (status) {
-      query += " AND pay.status = ?";
-      params.push(status);
+      queryBuilder = queryBuilder.eq('status', status);
     }
 
-    query += " ORDER BY pay.created_at DESC";
-    const payments = await allAsync(query, params);
+    const { data: payments, error } = await queryBuilder.order('created_at', { ascending: false });
+    if (error) throw error;
 
-    // Parse JSON items
-    const parsedPayments = payments.map(pay => ({
+    const formattedPayments = (payments || []).map(pay => ({
       ...pay,
-      items: JSON.parse(pay.items || '[]')
+      patient_first_name: pay.patient ? pay.patient.first_name : 'Inconnu',
+      patient_last_name: pay.patient ? pay.patient.last_name : 'Inconnu',
+      folder_number: pay.patient ? pay.patient.folder_number : '',
+      cashier_name: pay.cashier ? pay.cashier.name : 'Inconnu',
+      items: typeof pay.items === 'string' ? JSON.parse(pay.items) : pay.items
     }));
 
-    res.json(parsedPayments);
+    res.json(formattedPayments);
   } catch (error) {
     console.error("Get Payments Error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération des transactions." });
@@ -61,30 +57,46 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
     }
 
     // Verify patient belongs to the user's clinic (prevent IDOR)
-    const patient = await getAsync(
-      "SELECT first_name, last_name FROM patients WHERE id = ? AND clinic_id = ?",
-      [patientId, req.user.clinicId]
-    );
+    const { data: patient, error: patientError } = await supabase
+      .from('patients')
+      .select('first_name, last_name')
+      .eq('id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (patientError) throw patientError;
     if (!patient) {
       return res.status(404).json({ error: "Patient non trouvé dans cette clinique." });
     }
 
-    const itemsJson = JSON.stringify(items);
-    const result = await runAsync(
-      `INSERT INTO payments (clinic_id, patient_id, user_id, amount_total, payment_method, reference_number, status, items) 
-       VALUES (?, ?, ?, ?, ?, ?, 'paid', ?)`,
-      [req.user.clinicId, patientId, req.user.userId, amountTotal, paymentMethod, referenceNumber || `REF-${Date.now()}`, itemsJson]
-    );
+    const { data: paymentResult, error: insertError } = await supabase
+      .from('payments')
+      .insert({
+        clinic_id: req.user.clinicId,
+        patient_id: patientId,
+        user_id: req.user.userId,
+        amount_total: amountTotal,
+        payment_method: paymentMethod,
+        reference_number: referenceNumber || `REF-${Date.now()}`,
+        status: 'paid',
+        items: items // Handled natively as JSONB
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'PAYMENT_RECORD', ?)",
-      [req.user.clinicId, req.user.userId, `Encaissement de ${amountTotal} FCFA pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PAYMENT_RECORD',
+      details: `Encaissement de ${amountTotal} FCFA pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`
+    });
 
     res.status(201).json({
       success: true,
-      paymentId: result.lastID,
+      paymentId: paymentResult.id,
       message: "Paiement enregistré avec succès."
     });
   } catch (error) {
@@ -97,57 +109,95 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
 // Financial analytics for manager / admin
 router.get('/stats', auth, checkRole(['admin', 'manager']), async (req, res) => {
   try {
-    // 1. Chiffre d'affaires total
-    const totalRevRow = await getAsync("SELECT SUM(amount_total) as total FROM payments WHERE clinic_id = ?", [req.user.clinicId]);
-    const totalRevenue = totalRevRow.total || 0;
+    // 1. Fetch all payments for CA calculations
+    const { data: allPayments, error: payError } = await supabase
+      .from('payments')
+      .select('amount_total, payment_method, created_at')
+      .eq('clinic_id', req.user.clinicId);
 
-    // 2. Chiffre d'affaires aujourd'hui
-    const today = new Date().toISOString().split('T')[0];
-    const todayRevRow = await getAsync(
-      "SELECT SUM(amount_total) as total FROM payments WHERE clinic_id = ? AND created_at LIKE ?",
-      [req.user.clinicId, `${today}%`]
-    );
-    const todayRevenue = todayRevRow.total || 0;
+    if (payError) throw payError;
 
-    // 3. Distribution des paiements par mode
-    const distribution = await allAsync(
-      "SELECT payment_method as method, SUM(amount_total) as total, COUNT(*) as count FROM payments WHERE clinic_id = ? GROUP BY payment_method",
-      [req.user.clinicId]
-    );
+    // Calculate Chiffre d'affaires total
+    const totalRevenue = (allPayments || []).reduce((sum, p) => sum + p.amount_total, 0);
 
-    // 4. Activité récente (10 derniers logs)
-    const logs = await allAsync(
-      `SELECT l.*, u.name as user_name 
-       FROM activity_logs l 
-       LEFT JOIN users u ON l.user_id = u.id 
-       WHERE l.clinic_id = ? 
-       ORDER BY l.created_at DESC LIMIT 10`,
-      [req.user.clinicId]
-    );
+    // Calculate Chiffre d'affaires aujourd'hui (local date comparison)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayRevenue = (allPayments || [])
+      .filter(p => p.created_at && p.created_at.startsWith(todayStr))
+      .reduce((sum, p) => sum + p.amount_total, 0);
 
-    // 5. Total counts for patients, appointments
-    const patientCount = await getAsync("SELECT COUNT(*) as count FROM patients WHERE clinic_id = ? AND archived = 0", [req.user.clinicId]);
-    const apptCount = await getAsync("SELECT COUNT(*) as count FROM appointments WHERE clinic_id = ? AND status = 'scheduled'", [req.user.clinicId]);
+    // Calculate payment methods distribution
+    const distMap = {};
+    (allPayments || []).forEach(p => {
+      const method = p.payment_method;
+      if (!distMap[method]) {
+        distMap[method] = { method, total: 0, count: 0 };
+      }
+      distMap[method].total += p.amount_total;
+      distMap[method].count += 1;
+    });
+    const distribution = Object.values(distMap);
 
-    // 6. Stock Alerts Counts
-    const lowStockRow = await getAsync("SELECT COUNT(*) as count FROM medications WHERE clinic_id = ? AND stock_quantity <= min_stock_threshold", [req.user.clinicId]);
-    
+    // 2. Fetch recent activity logs (10)
+    const { data: logs, error: logsError } = await supabase
+      .from('activity_logs')
+      .select('*, user:users(name)')
+      .eq('clinic_id', req.user.clinicId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (logsError) throw logsError;
+
+    const formattedLogs = (logs || []).map(l => ({
+      ...l,
+      user_name: l.user ? l.user.name : 'Système'
+    }));
+
+    // 3. Total counts for patients, appointments
+    const { count: patientCount, error: patCountErr } = await supabase
+      .from('patients')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinic_id', req.user.clinicId)
+      .eq('archived', 0);
+
+    if (patCountErr) throw patCountErr;
+
+    const { count: apptCount, error: apptCountErr } = await supabase
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinic_id', req.user.clinicId)
+      .eq('status', 'scheduled');
+
+    if (apptCountErr) throw apptCountErr;
+
+    // 4. Stock Alerts (Low stock and near expiry)
+    const { data: medications, error: medError } = await supabase
+      .from('medications')
+      .select('stock_quantity, min_stock_threshold, expiry_date')
+      .eq('clinic_id', req.user.clinicId);
+
+    if (medError) throw medError;
+
+    const lowStockCount = (medications || []).filter(m => m.stock_quantity <= m.min_stock_threshold).length;
+
     const limit30Days = new Date();
     limit30Days.setDate(limit30Days.getDate() + 30);
-    const nearExpiryRow = await getAsync(
-      "SELECT COUNT(*) as count FROM medications WHERE clinic_id = ? AND expiry_date <= ? AND expiry_date > CURRENT_TIMESTAMP", 
-      [req.user.clinicId, limit30Days.toISOString().split('T')[0]]
-    );
+    const limitStr = limit30Days.toISOString().split('T')[0];
+    const todayStr2 = new Date().toISOString().split('T')[0];
+
+    const nearExpiryCount = (medications || []).filter(m => {
+      return m.expiry_date && m.expiry_date <= limitStr && m.expiry_date >= todayStr2;
+    }).length;
 
     res.json({
       totalRevenue,
       todayRevenue,
       distribution,
-      logs,
-      patientsTotal: patientCount.count,
-      appointmentsScheduled: apptCount.count,
-      lowStockCount: lowStockRow.count,
-      nearExpiryCount: nearExpiryRow.count
+      logs: formattedLogs,
+      patientsTotal: patientCount || 0,
+      appointmentsScheduled: apptCount || 0,
+      lowStockCount,
+      nearExpiryCount
     });
   } catch (error) {
     console.error("Get Financial Stats Error:", error);
@@ -159,7 +209,7 @@ router.get('/stats', auth, checkRole(['admin', 'manager']), async (req, res) => 
 // Mobile Money subscription simulator (15 000 FCFA/mois)
 router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { provider, phoneNumber, months } = req.body; // e.g., 'wave', 'orange_money', 'mtn_momo'
+    const { provider, phoneNumber, months } = req.body;
 
     if (!provider || !phoneNumber) {
       return res.status(400).json({ error: "Fournisseur mobile money et numéro de téléphone requis." });
@@ -168,13 +218,19 @@ router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) =>
     const qtyMonths = parseInt(months) || 1;
     const amount = qtyMonths * 15000;
 
-    // Simulate Network push
+    // Simulate Payment confirmation
     console.log(`[MOBILE MONEY SIMULATOR] Push request sent to provider "${provider}" for number "${phoneNumber}" of amount "${amount} FCFA".`);
     console.log(`[MOBILE MONEY SIMULATOR] User confirmed PIN code. Payment successful!`);
 
     // Fetch current clinic details
-    const clinic = await getAsync("SELECT subscription_expires_at, subscription_status FROM clinics WHERE id = ?", [req.user.clinicId]);
-    
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('subscription_expires_at, subscription_status')
+      .eq('id', req.user.clinicId)
+      .single();
+
+    if (clinicError) throw clinicError;
+
     let baseDate = new Date();
     // If the clinic is active and hasn't expired yet, extend from expiry date
     if (clinic.subscription_status === 'active' && clinic.subscription_expires_at) {
@@ -189,18 +245,31 @@ router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) =>
     const newExpiryStr = baseDate.toISOString();
 
     // Update Clinic subscription status
-    await runAsync(
-      "UPDATE clinics SET subscription_status = 'active', subscription_expires_at = ? WHERE id = ?",
-      [newExpiryStr, req.user.clinicId]
-    );
+    const { error: updateError } = await supabase
+      .from('clinics')
+      .update({
+        subscription_status: 'active',
+        subscription_expires_at: newExpiryStr
+      })
+      .eq('id', req.user.clinicId);
+
+    if (updateError) throw updateError;
 
     // Log payment record in clinic activity log
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'SUBSCRIPTION_RENEW', ?)",
-      [req.user.clinicId, req.user.userId, `Abonnement renouvelé pour ${qtyMonths} mois (${amount} FCFA) via ${provider.toUpperCase()}`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'SUBSCRIPTION_RENEW',
+      details: `Abonnement renouvelé pour ${qtyMonths} mois (${amount} FCFA) via ${provider.toUpperCase()}`
+    });
 
-    const updatedClinic = await getAsync("SELECT * FROM clinics WHERE id = ?", [req.user.clinicId]);
+    const { data: updatedClinic, error: loadUpdatedError } = await supabase
+      .from('clinics')
+      .select('*')
+      .eq('id', req.user.clinicId)
+      .single();
+
+    if (loadUpdatedError) throw loadUpdatedError;
 
     res.json({
       success: true,

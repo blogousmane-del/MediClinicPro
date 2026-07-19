@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { runAsync, getAsync, allAsync } = require('../database');
+const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
 
 // GET /api/appointments
@@ -8,34 +8,37 @@ const { auth } = require('../middleware/auth');
 router.get('/', auth, async (req, res) => {
   try {
     const { date, practitionerId, status } = req.query;
-    let query = `
-      SELECT a.*, p.first_name as patient_first_name, p.last_name as patient_last_name, p.phone as patient_phone, u.name as practitioner_name
-      FROM appointments a
-      JOIN patients p ON a.patient_id = p.id
-      JOIN users u ON a.practitioner_id = u.id
-      WHERE a.clinic_id = ?
-    `;
-    const params = [req.user.clinicId];
+    
+    let queryBuilder = supabase
+      .from('appointments')
+      .select('*, patient:patients(first_name, last_name, phone), practitioner:users(name)')
+      .eq('clinic_id', req.user.clinicId);
 
     if (date) {
       // Expecting YYYY-MM-DD
-      query += " AND a.date_time LIKE ?";
-      params.push(`${date}%`);
+      queryBuilder = queryBuilder.like('date_time', `${date}%`);
     }
 
     if (practitionerId) {
-      query += " AND a.practitioner_id = ?";
-      params.push(practitionerId);
+      queryBuilder = queryBuilder.eq('practitioner_id', practitionerId);
     }
 
     if (status) {
-      query += " AND a.status = ?";
-      params.push(status);
+      queryBuilder = queryBuilder.eq('status', status);
     }
 
-    query += " ORDER BY a.date_time ASC";
-    const appointments = await allAsync(query, params);
-    res.json(appointments);
+    const { data: appointments, error } = await queryBuilder.order('date_time', { ascending: true });
+    if (error) throw error;
+
+    const formatted = (appointments || []).map(appt => ({
+      ...appt,
+      patient_first_name: appt.patient ? appt.patient.first_name : 'Inconnu',
+      patient_last_name: appt.patient ? appt.patient.last_name : 'Inconnu',
+      patient_phone: appt.patient ? appt.patient.phone : '',
+      practitioner_name: appt.practitioner ? appt.practitioner.name : 'Inconnu'
+    }));
+
+    res.json(formatted);
   } catch (error) {
     console.error("Get Appointments Error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération des rendez-vous." });
@@ -53,30 +56,43 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Verify patient belongs to the user's clinic (prevent IDOR)
-    const patient = await getAsync(
-      "SELECT first_name, last_name, phone FROM patients WHERE id = ? AND clinic_id = ?",
-      [patientId, req.user.clinicId]
-    );
+    const { data: patient, error: patientError } = await supabase
+      .from('patients')
+      .select('first_name, last_name, phone')
+      .eq('id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (patientError) throw patientError;
     if (!patient) {
       return res.status(404).json({ error: "Patient non trouvé dans cette clinique." });
     }
 
     // Verify practitioner belongs to the user's clinic (prevent IDOR)
-    const practitioner = await getAsync(
-      "SELECT id FROM users WHERE id = ? AND clinic_id = ? AND active = 1",
-      [practitionerId, req.user.clinicId]
-    );
+    const { data: practitioner, error: practitionerError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', practitionerId)
+      .eq('clinic_id', req.user.clinicId)
+      .eq('active', 1)
+      .maybeSingle();
+
+    if (practitionerError) throw practitionerError;
     if (!practitioner) {
       return res.status(404).json({ error: "Praticien non trouvé dans cette clinique." });
     }
 
     // Check conflict (practitioner scheduled at exact same time)
-    const conflict = await getAsync(
-      `SELECT id FROM appointments 
-       WHERE clinic_id = ? AND practitioner_id = ? AND date_time = ? AND status = 'scheduled'`,
-      [req.user.clinicId, practitionerId, dateTime]
-    );
+    const { data: conflict, error: conflictError } = await supabase
+      .from('appointments')
+      .select('id')
+      .eq('clinic_id', req.user.clinicId)
+      .eq('practitioner_id', practitionerId)
+      .eq('date_time', dateTime)
+      .eq('status', 'scheduled')
+      .maybeSingle();
 
+    if (conflictError) throw conflictError;
     if (conflict) {
       return res.status(400).json({ 
         error: "Ce praticien a déjà un rendez-vous planifié à cette heure précise.",
@@ -84,13 +100,29 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
-    const result = await runAsync(
-      `INSERT INTO appointments (clinic_id, patient_id, practitioner_id, date_time, duration, motif, status) 
-       VALUES (?, ?, ?, ?, ?, ?, 'scheduled')`,
-      [req.user.clinicId, patientId, practitionerId, dateTime, duration || 30, motif]
-    );
+    const { data: apptResult, error: insertError } = await supabase
+      .from('appointments')
+      .insert({
+        clinic_id: req.user.clinicId,
+        patient_id: patientId,
+        practitioner_id: practitionerId,
+        date_time: dateTime,
+        duration: duration || 30,
+        motif,
+        status: 'scheduled'
+      })
+      .select()
+      .single();
 
-    const clinic = await getAsync("SELECT name FROM clinics WHERE id = ?", [req.user.clinicId]);
+    if (insertError) throw insertError;
+
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('name')
+      .eq('id', req.user.clinicId)
+      .single();
+
+    if (clinicError) throw clinicError;
 
     // Simulate SMS sending (log to server console & action log)
     const formattedDate = new Date(dateTime).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' });
@@ -98,22 +130,30 @@ router.post('/', auth, async (req, res) => {
     console.log(`[SMS SIMULATOR] To: ${patient.phone} | Content: "${smsMessage}"`);
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'APPOINTMENT_CREATE', ?)",
-      [req.user.clinicId, req.user.userId, `RDV pris pour ${patient.first_name} ${patient.last_name} le ${dateTime}`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'APPOINTMENT_CREATE',
+      details: `RDV pris pour ${patient.first_name} ${patient.last_name} le ${dateTime}`
+    });
 
-    const newAppt = await getAsync(
-      `SELECT a.*, p.first_name as patient_first_name, p.last_name as patient_last_name, u.name as practitioner_name
-       FROM appointments a
-       JOIN patients p ON a.patient_id = p.id
-       JOIN users u ON a.practitioner_id = u.id
-       WHERE a.id = ?`,
-      [result.lastID]
-    );
+    const { data: newAppt, error: loadError } = await supabase
+      .from('appointments')
+      .select('*, patient:patients(first_name, last_name), practitioner:users(name)')
+      .eq('id', apptResult.id)
+      .single();
+
+    if (loadError) throw loadError;
+
+    const formattedNewAppt = {
+      ...newAppt,
+      patient_first_name: newAppt.patient ? newAppt.patient.first_name : '',
+      patient_last_name: newAppt.patient ? newAppt.patient.last_name : '',
+      practitioner_name: newAppt.practitioner ? newAppt.practitioner.name : ''
+    };
 
     res.status(201).json({
-      appointment: newAppt,
+      appointment: formattedNewAppt,
       smsSimulated: {
         to: patient.phone,
         message: smsMessage
@@ -132,47 +172,77 @@ router.put('/:id', auth, async (req, res) => {
     const { dateTime, duration, motif, status } = req.body;
     const apptId = req.params.id;
 
-    const appt = await getAsync("SELECT * FROM appointments WHERE id = ? AND clinic_id = ?", [apptId, req.user.clinicId]);
+    const { data: appt, error: checkError } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('id', apptId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
     if (!appt) {
       return res.status(404).json({ error: "Rendez-vous non trouvé." });
     }
 
     if (status === 'scheduled' && dateTime && dateTime !== appt.date_time) {
       // Check conflict for new time
-      const conflict = await getAsync(
-        `SELECT id FROM appointments 
-         WHERE clinic_id = ? AND practitioner_id = ? AND date_time = ? AND status = 'scheduled' AND id != ?`,
-        [req.user.clinicId, appt.practitioner_id, dateTime, apptId]
-      );
+      const { data: conflict, error: conflictError } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('clinic_id', req.user.clinicId)
+        .eq('practitioner_id', appt.practitioner_id)
+        .eq('date_time', dateTime)
+        .eq('status', 'scheduled')
+        .neq('id', apptId)
+        .maybeSingle();
 
+      if (conflictError) throw conflictError;
       if (conflict) {
         return res.status(400).json({ error: "Ce praticien a déjà un rendez-vous planifié à ce créneau." });
       }
     }
 
-    await runAsync(
-      `UPDATE appointments SET 
-        date_time = COALESCE(?, date_time), 
-        duration = COALESCE(?, duration), 
-        motif = COALESCE(?, motif), 
-        status = COALESCE(?, status) 
-       WHERE id = ? AND clinic_id = ?`,
-      [dateTime, duration, motif, status, apptId, req.user.clinicId]
-    );
+    const { error: updateError } = await supabase
+      .from('appointments')
+      .update({
+        date_time: dateTime || appt.date_time,
+        duration: duration !== undefined ? duration : appt.duration,
+        motif: motif || appt.motif,
+        status: status || appt.status
+      })
+      .eq('id', apptId)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (updateError) throw updateError;
 
     // If cancelled, trigger simulated cancellation SMS
     if (status === 'cancelled') {
-      const patient = await getAsync("SELECT first_name, last_name, phone FROM patients WHERE id = ? AND clinic_id = ?", [appt.patient_id, req.user.clinicId]);
-      const clinic = await getAsync("SELECT name FROM clinics WHERE id = ?", [req.user.clinicId]);
-      const smsMessage = `Annulation : Bonjour ${patient.first_name} ${patient.last_name}, votre RDV du ${new Date(appt.date_time).toLocaleString('fr-FR')} à la clinique "${clinic.name}" a été annulé.`;
-      console.log(`[SMS SIMULATOR] To: ${patient.phone} | Content: "${smsMessage}"`);
+      const { data: patient, error: patientError } = await supabase
+        .from('patients')
+        .select('first_name, last_name, phone')
+        .eq('id', appt.patient_id)
+        .eq('clinic_id', req.user.clinicId)
+        .single();
+        
+      const { data: clinic, error: clinicError } = await supabase
+        .from('clinics')
+        .select('name')
+        .eq('id', req.user.clinicId)
+        .single();
+
+      if (!patientError && !clinicError && patient) {
+        const smsMessage = `Annulation : Bonjour ${patient.first_name} ${patient.last_name}, votre RDV du ${new Date(appt.date_time).toLocaleString('fr-FR')} à la clinique "${clinic.name}" a été annulé.`;
+        console.log(`[SMS SIMULATOR] To: ${patient.phone} | Content: "${smsMessage}"`);
+      }
     }
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'APPOINTMENT_UPDATE', ?)",
-      [req.user.clinicId, req.user.userId, `RDV ID ${apptId} mis à jour (Statut: ${status || appt.status})`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'APPOINTMENT_UPDATE',
+      details: `RDV ID ${apptId} mis à jour (Statut: ${status || appt.status})`
+    });
 
     res.json({ success: true, message: "Rendez-vous mis à jour avec succès." });
   } catch (error) {

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { runAsync, getAsync, allAsync } = require('../database');
+const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
 
 // GET /api/patients
@@ -9,18 +9,24 @@ router.get('/', auth, async (req, res) => {
   try {
     const { q, showArchived } = req.query;
     const archivedVal = showArchived === 'true' ? 1 : 0;
-    let query = "SELECT * FROM patients WHERE clinic_id = ? AND archived = ?";
-    let params = [req.user.clinicId, archivedVal];
+    
+    let queryBuilder = supabase
+      .from('patients')
+      .select('*')
+      .eq('clinic_id', req.user.clinicId)
+      .eq('archived', archivedVal);
 
     if (q) {
-      query += " AND (first_name LIKE ? OR last_name LIKE ? OR folder_number LIKE ? OR phone LIKE ?)";
-      const searchPattern = `%${q}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+      // Case-insensitive search using ilike in OR block
+      queryBuilder = queryBuilder.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,folder_number.ilike.%${q}%,phone.ilike.%${q}%`);
     }
 
-    query += " ORDER BY last_name ASC, first_name ASC";
-    const patients = await allAsync(query, params);
-    res.json(patients);
+    const { data: patients, error } = await queryBuilder
+      .order('last_name', { ascending: true })
+      .order('first_name', { ascending: true });
+
+    if (error) throw error;
+    res.json(patients || []);
   } catch (error) {
     console.error("Get Patients Error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération des patients." });
@@ -38,11 +44,17 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Check for exact duplicate (same name + birthdate + phone)
-    const duplicate = await getAsync(
-      "SELECT id FROM patients WHERE clinic_id = ? AND first_name = ? AND last_name = ? AND birth_date = ? AND phone = ?",
-      [req.user.clinicId, firstName, lastName, birthDate, phone]
-    );
+    const { data: duplicate, error: checkError } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('clinic_id', req.user.clinicId)
+      .eq('first_name', firstName)
+      .eq('last_name', lastName)
+      .eq('birth_date', birthDate)
+      .eq('phone', phone)
+      .maybeSingle();
 
+    if (checkError) throw checkError;
     if (duplicate) {
       return res.status(400).json({ error: "Un patient avec le même nom, date de naissance et téléphone existe déjà." });
     }
@@ -50,29 +62,46 @@ router.post('/', auth, async (req, res) => {
     // Generate folder number (MED-YYYY-XXXX)
     const currentYear = new Date().getFullYear();
     const prefix = `MED-${currentYear}-`;
-    const countRow = await getAsync(
-      "SELECT COUNT(*) as count FROM patients WHERE clinic_id = ? AND folder_number LIKE ?",
-      [req.user.clinicId, `${prefix}%`]
-    );
-    const sequenceNum = String(countRow.count + 1).padStart(4, '0');
+
+    const { count, error: countError } = await supabase
+      .from('patients')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinic_id', req.user.clinicId)
+      .like('folder_number', `${prefix}%`);
+
+    if (countError) throw countError;
+    const sequenceNum = String((count || 0) + 1).padStart(4, '0');
     const folderNumber = `${prefix}${sequenceNum}`;
 
-    const result = await runAsync(
-      `INSERT INTO patients (clinic_id, folder_number, first_name, last_name, birth_date, gender, phone, email, address, allergies, antecedents) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.user.clinicId, folderNumber, firstName, lastName, birthDate, gender,
-        phone, email || '', address || '', allergies || '', antecedents || ''
-      ]
-    );
+    const { data: newPatient, error: insertError } = await supabase
+      .from('patients')
+      .insert({
+        clinic_id: req.user.clinicId,
+        folder_number: folderNumber,
+        first_name: firstName,
+        last_name: lastName,
+        birth_date: birthDate,
+        gender,
+        phone,
+        email: email || '',
+        address: address || '',
+        allergies: allergies || '',
+        antecedents: antecedents || '',
+        archived: 0
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'PATIENT_CREATE', ?)",
-      [req.user.clinicId, req.user.userId, `Création du patient ${firstName} ${lastName} (${folderNumber})`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PATIENT_CREATE',
+      details: `Création du patient ${firstName} ${lastName} (${folderNumber})`
+    });
 
-    const newPatient = await getAsync("SELECT * FROM patients WHERE id = ?", [result.lastID]);
     res.status(201).json(newPatient);
   } catch (error) {
     console.error("Create Patient Error:", error);
@@ -85,75 +114,94 @@ router.post('/', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
   try {
     const patientId = req.params.id;
-    const patient = await getAsync(
-      "SELECT * FROM patients WHERE id = ? AND clinic_id = ?",
-      [patientId, req.user.clinicId]
-    );
+    
+    const { data: patient, error: patientError } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
 
+    if (patientError) throw patientError;
     if (!patient) {
       return res.status(404).json({ error: "Patient non trouvé." });
     }
 
-    // Fetch consultations
-    const consultations = await allAsync(
-      `SELECT c.*, u.name as doctor_name 
-       FROM consultations c 
-       LEFT JOIN users u ON c.doctor_id = u.id 
-       WHERE c.patient_id = ? AND c.clinic_id = ? 
-       ORDER BY c.date_time DESC`,
-      [patientId, req.user.clinicId]
-    );
+    // Fetch consultations with doctor name
+    const { data: consultations, error: consultsError } = await supabase
+      .from('consultations')
+      .select('*, doctor:users(name)')
+      .eq('patient_id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .order('date_time', { ascending: false });
 
-    // Fetch prescriptions
-    const prescriptions = await allAsync(
-      `SELECT pr.*, u.name as doctor_name 
-       FROM prescriptions pr 
-       LEFT JOIN users u ON pr.doctor_id = u.id 
-       WHERE pr.patient_id = ? AND pr.clinic_id = ? 
-       ORDER BY pr.date_time DESC`,
-      [patientId, req.user.clinicId]
-    );
+    if (consultsError) throw consultsError;
+
+    // Fetch prescriptions with doctor name
+    const { data: prescriptions, error: prescError } = await supabase
+      .from('prescriptions')
+      .select('*, doctor:users(name)')
+      .eq('patient_id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .order('date_time', { ascending: false });
+
+    if (prescError) throw prescError;
 
     // Hydrate prescription items
     for (const pr of prescriptions) {
-      const items = await allAsync(
-        "SELECT * FROM prescription_items WHERE prescription_id = ?",
-        [pr.id]
-      );
-      pr.items = items;
+      pr.doctor_name = pr.doctor ? pr.doctor.name : 'Inconnu';
+      
+      const { data: items, error: itemsError } = await supabase
+        .from('prescription_items')
+        .select('*')
+        .eq('prescription_id', pr.id);
+        
+      if (itemsError) throw itemsError;
+      pr.items = items || [];
     }
 
-    // Fetch lab exams
-    const labExams = await allAsync(
-      `SELECT le.*, u.name as doctor_name, t.name as technician_name 
-       FROM lab_exams le 
-       LEFT JOIN users u ON le.doctor_id = u.id 
-       LEFT JOIN users t ON le.technician_id = t.id 
-       WHERE le.patient_id = ? AND le.clinic_id = ? 
-       ORDER BY le.created_at DESC`,
-      [patientId, req.user.clinicId]
-    );
+    // Fetch lab exams with doctor and technician names
+    const { data: labExams, error: labError } = await supabase
+      .from('lab_exams')
+      .select('*, doctor:users(name), technician:users(name)')
+      .eq('patient_id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .order('created_at', { ascending: false });
+
+    if (labError) throw labError;
 
     // Fetch payments
-    const payments = await allAsync(
-      "SELECT * FROM payments WHERE patient_id = ? AND clinic_id = ? ORDER BY created_at DESC",
-      [patientId, req.user.clinicId]
-    );
+    const { data: payments, error: payError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('patient_id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .order('created_at', { ascending: false });
+
+    if (payError) throw payError;
 
     // Compile clinical history timeline
     const timeline = [];
-    consultations.forEach(c => {
+    
+    (consultations || []).forEach(c => {
+      // Parse JSON constants if stringified, otherwise use native object
+      const constants = typeof c.constants === 'string' ? JSON.parse(c.constants) : c.constants;
+      
       timeline.push({
         id: `c-${c.id}`,
         type: 'consultation',
         date: c.date_time,
         title: `Consultation : ${c.motif}`,
-        subtitle: `Par ${c.doctor_name}`,
-        details: c
+        subtitle: `Par ${c.doctor ? c.doctor.name : 'Inconnu'}`,
+        details: {
+          ...c,
+          constants,
+          doctor_name: c.doctor ? c.doctor.name : 'Inconnu'
+        }
       });
     });
 
-    prescriptions.forEach(p => {
+    (prescriptions || []).forEach(p => {
       timeline.push({
         id: `p-${p.id}`,
         type: 'prescription',
@@ -164,25 +212,37 @@ router.get('/:id', auth, async (req, res) => {
       });
     });
 
-    labExams.forEach(le => {
+    (labExams || []).forEach(le => {
+      const results_json = typeof le.results_json === 'string' ? JSON.parse(le.results_json) : le.results_json;
+      
       timeline.push({
         id: `le-${le.id}`,
         type: 'lab',
         date: le.created_at,
         title: `Examen de Laboratoire : ${le.test_name}`,
         subtitle: `Statut : ${le.status === 'completed' ? 'Résultats saisis' : 'En attente'}`,
-        details: le
+        details: {
+          ...le,
+          results_json,
+          doctor_name: le.doctor ? le.doctor.name : 'Inconnu',
+          technician_name: le.technician ? le.technician.name : 'Inconnu'
+        }
       });
     });
 
-    payments.forEach(pay => {
+    (payments || []).forEach(pay => {
+      const items = typeof pay.items === 'string' ? JSON.parse(pay.items) : pay.items;
+      
       timeline.push({
         id: `pay-${pay.id}`,
         type: 'payment',
         date: pay.created_at,
         title: `Facture & Paiement`,
         subtitle: `Montant : ${pay.amount_total} FCFA (${pay.payment_method.toUpperCase()})`,
-        details: pay
+        details: {
+          ...pay,
+          items
+        }
       });
     });
 
@@ -192,10 +252,22 @@ router.get('/:id', auth, async (req, res) => {
     res.json({
       patient,
       timeline,
-      consultations,
+      consultations: (consultations || []).map(c => ({
+        ...c,
+        constants: typeof c.constants === 'string' ? JSON.parse(c.constants) : c.constants,
+        doctor_name: c.doctor ? c.doctor.name : 'Inconnu'
+      })),
       prescriptions,
-      labExams,
-      payments
+      labExams: (labExams || []).map(le => ({
+        ...le,
+        results_json: typeof le.results_json === 'string' ? JSON.parse(le.results_json) : le.results_json,
+        doctor_name: le.doctor ? le.doctor.name : 'Inconnu',
+        technician_name: le.technician ? le.technician.name : 'Inconnu'
+      })),
+      payments: (payments || []).map(pay => ({
+        ...pay,
+        items: typeof pay.items === 'string' ? JSON.parse(pay.items) : pay.items
+      }))
     });
   } catch (error) {
     console.error("Get Patient Details Error:", error);
@@ -210,24 +282,44 @@ router.put('/:id', auth, async (req, res) => {
     const { firstName, lastName, birthDate, gender, phone, email, address, allergies, antecedents } = req.body;
     const patientId = req.params.id;
 
-    const patient = await getAsync("SELECT id FROM patients WHERE id = ? AND clinic_id = ?", [patientId, req.user.clinicId]);
+    // Verify patient belongs to the clinic
+    const { data: patient, error: checkError } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
     if (!patient) {
       return res.status(404).json({ error: "Patient non trouvé." });
     }
 
-    await runAsync(
-      `UPDATE patients SET 
-        first_name = ?, last_name = ?, birth_date = ?, gender = ?, 
-        phone = ?, email = ?, address = ?, allergies = ?, antecedents = ? 
-       WHERE id = ? AND clinic_id = ?`,
-      [firstName, lastName, birthDate, gender, phone, email || '', address || '', allergies || '', antecedents || '', patientId, req.user.clinicId]
-    );
+    const { error: updateError } = await supabase
+      .from('patients')
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+        birth_date: birthDate,
+        gender,
+        phone,
+        email: email || '',
+        address: address || '',
+        allergies: allergies || '',
+        antecedents: antecedents || ''
+      })
+      .eq('id', patientId)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (updateError) throw updateError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'PATIENT_UPDATE', ?)",
-      [req.user.clinicId, req.user.userId, `Mise à jour du patient ID ${patientId}`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PATIENT_UPDATE',
+      details: `Mise à jour du patient ID ${patientId}`
+    });
 
     res.json({ success: true, message: "Informations du patient mises à jour." });
   } catch (error) {
@@ -240,23 +332,34 @@ router.put('/:id', auth, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
   try {
     const patientId = req.params.id;
-    const patient = await getAsync("SELECT id, first_name, last_name FROM patients WHERE id = ? AND clinic_id = ?", [patientId, req.user.clinicId]);
+    
+    const { data: patient, error: checkError } = await supabase
+      .from('patients')
+      .select('id, first_name, last_name')
+      .eq('id', patientId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
 
+    if (checkError) throw checkError;
     if (!patient) {
       return res.status(404).json({ error: "Patient non trouvé." });
     }
 
-    // Toggle archiving
-    await runAsync(
-      "UPDATE patients SET archived = 1 WHERE id = ? AND clinic_id = ?",
-      [patientId, req.user.clinicId]
-    );
+    const { error: updateError } = await supabase
+      .from('patients')
+      .update({ archived: 1 })
+      .eq('id', patientId)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (updateError) throw updateError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'PATIENT_ARCHIVE', ?)",
-      [req.user.clinicId, req.user.userId, `Archivage du patient ${patient.first_name} ${patient.last_name}`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PATIENT_ARCHIVE',
+      details: `Archivage du patient ${patient.first_name} ${patient.last_name}`
+    });
 
     res.json({ success: true, message: "Patient archivé avec succès." });
   } catch (error) {

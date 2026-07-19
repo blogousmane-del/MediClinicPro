@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { runAsync, getAsync } = require('../database');
+const { supabase } = require('../database');
 const { JWT_SECRET, auth, checkRole } = require('../middleware/auth');
 
 // POST /api/auth/register
@@ -16,7 +16,13 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if email already exists
-    const existingUser = await getAsync("SELECT id FROM users WHERE email = ?", [email]);
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
     if (existingUser) {
       return res.status(400).json({ error: "Cette adresse email est déjà enregistrée." });
     }
@@ -25,27 +31,46 @@ router.post('/register', async (req, res) => {
     const trialExpiry = new Date();
     trialExpiry.setDate(trialExpiry.getDate() + 14); // 14 days free trial
 
-    const clinicResult = await runAsync(
-      `INSERT INTO clinics (name, address, phone, subscription_status, subscription_expires_at) 
-       VALUES (?, '', ?, 'active', ?)`,
-      [clinicName, phone, trialExpiry.toISOString()]
-    );
-    const clinicId = clinicResult.lastID;
+    const { data: clinicData, error: clinicError } = await supabase
+      .from('clinics')
+      .insert({
+        name: clinicName,
+        phone: phone,
+        address: '',
+        subscription_status: 'active',
+        subscription_expires_at: trialExpiry.toISOString()
+      })
+      .select()
+      .single();
+
+    if (clinicError) throw clinicError;
+    const clinicId = clinicData.id;
 
     // Create Admin User
     const passwordHash = await bcrypt.hash(password, 10);
-    const userResult = await runAsync(
-      `INSERT INTO users (clinic_id, name, email, password_hash, role) 
-       VALUES (?, ?, ?, ?, 'admin')`,
-      [clinicId, adminName, email, passwordHash]
-    );
-    const userId = userResult.lastID;
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .insert({
+        clinic_id: clinicId,
+        name: adminName,
+        email: email,
+        password_hash: passwordHash,
+        role: 'admin',
+        active: 1
+      })
+      .select()
+      .single();
+
+    if (userError) throw userError;
+    const userId = userData.id;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'REGISTER', 'Inscription de la clinique et de l\'administrateur')",
-      [clinicId, userId]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: clinicId,
+      user_id: userId,
+      action: 'REGISTER',
+      details: 'Inscription de la clinique et de l\'administrateur'
+    });
 
     // Generate Token
     const token = jwt.sign(
@@ -84,7 +109,14 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: "Email et mot de passe requis." });
     }
 
-    const user = await getAsync("SELECT * FROM users WHERE email = ? AND active = 1", [email]);
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .eq('active', 1)
+      .maybeSingle();
+
+    if (userError) throw userError;
     if (!user) {
       return res.status(400).json({ error: "Identifiants invalides." });
     }
@@ -94,7 +126,13 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: "Identifiants invalides." });
     }
 
-    const clinic = await getAsync("SELECT * FROM clinics WHERE id = ?", [user.clinic_id]);
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('*')
+      .eq('id', user.clinic_id)
+      .single();
+
+    if (clinicError) throw clinicError;
 
     const token = jwt.sign(
       { userId: user.id, clinicId: user.clinic_id, role: user.role, name: user.name },
@@ -103,10 +141,12 @@ router.post('/login', async (req, res) => {
     );
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'LOGIN', ?)",
-      [user.clinic_id, user.id, `Connexion de l'utilisateur ${user.name}`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: user.clinic_id,
+      user_id: user.id,
+      action: 'LOGIN',
+      details: `Connexion de l'utilisateur ${user.name}`
+    });
 
     res.json({
       token,
@@ -127,12 +167,21 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await getAsync("SELECT id, name, email, role, active FROM users WHERE id = ?", [req.user.userId]);
-    const clinic = await getAsync("SELECT * FROM clinics WHERE id = ?", [req.user.clinicId]);
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, email, role, active')
+      .eq('id', req.user.userId)
+      .single();
 
-    if (!user) {
-      return res.status(404).json({ error: "Utilisateur non trouvé." });
-    }
+    if (userError) throw userError;
+
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('*')
+      .eq('id', req.user.clinicId)
+      .single();
+
+    if (clinicError) throw clinicError;
 
     res.json({
       user,
@@ -147,36 +196,57 @@ router.get('/me', auth, async (req, res) => {
 // POST /api/auth/onboarding
 router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { clinicAddress, clinicPhone, staff, activeModules } = req.body;
+    const { clinicAddress, clinicPhone, staff } = req.body;
 
     // 1. Update clinic info
-    await runAsync(
-      "UPDATE clinics SET address = ?, phone = ? WHERE id = ?",
-      [clinicAddress || '', clinicPhone || '', req.user.clinicId]
-    );
+    const { error: clinicUpdateError } = await supabase
+      .from('clinics')
+      .update({
+        address: clinicAddress || '',
+        phone: clinicPhone || ''
+      })
+      .eq('id', req.user.clinicId);
+
+    if (clinicUpdateError) throw clinicUpdateError;
 
     // 2. Add staff users (if any)
     if (staff && Array.isArray(staff)) {
       for (const member of staff) {
         const { name, email, password, role } = member;
         if (name && email && password && role) {
-          const emailCheck = await getAsync("SELECT id FROM users WHERE email = ?", [email]);
+          const { data: emailCheck, error: checkError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
+          if (checkError) throw checkError;
+
           if (!emailCheck) {
             const passwordHash = await bcrypt.hash(password, 10);
-            await runAsync(
-              "INSERT INTO users (clinic_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
-              [req.user.clinicId, name, email, passwordHash, role]
-            );
+            const { error: insertUserError } = await supabase
+              .from('users')
+              .insert({
+                clinic_id: req.user.clinicId,
+                name,
+                email,
+                password_hash: passwordHash,
+                role,
+                active: 1
+              });
+            if (insertUserError) throw insertUserError;
           }
         }
       }
     }
 
     // 3. Log onboarding success
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'ONBOARDING', 'Configuration initiale complétée')",
-      [req.user.clinicId, req.user.userId]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'ONBOARDING',
+      details: 'Configuration initiale complétée'
+    });
 
     res.json({ success: true, message: "Configuration initiale enregistrée avec succès." });
   } catch (error) {

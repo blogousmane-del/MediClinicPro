@@ -1,186 +1,260 @@
 const express = require('express');
 const router = express.Router();
-const { runAsync, getAsync, allAsync } = require('../database');
+const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 
 // GET /api/pharmacy/medications
-// Fetch catalog of medications
+// List medications / search catalog
 router.get('/medications', auth, async (req, res) => {
   try {
-    const medications = await allAsync(
-      "SELECT * FROM medications WHERE clinic_id = ? ORDER BY name ASC",
-      [req.user.clinicId]
-    );
+    const { q, lowStock } = req.query;
 
-    // Enrich with alert flags
-    const today = new Date();
-    const limit30Days = new Date();
-    limit30Days.setDate(limit30Days.getDate() + 30);
+    let queryBuilder = supabase
+      .from('medications')
+      .select('*')
+      .eq('clinic_id', req.user.clinicId);
 
-    const enriched = medications.map(med => {
-      const isLowStock = med.stock_quantity <= med.min_stock_threshold;
-      
-      let isNearExpiry = false;
-      let isExpired = false;
-      if (med.expiry_date) {
-        const expiry = new Date(med.expiry_date);
-        isExpired = expiry < today;
-        isNearExpiry = !isExpired && expiry <= limit30Days;
-      }
+    if (q) {
+      queryBuilder = queryBuilder.ilike('name', `%${q}%`);
+    }
 
-      return {
-        ...med,
-        isLowStock,
-        isNearExpiry,
-        isExpired
-      };
-    });
+    const { data: medications, error } = await queryBuilder.order('name', { ascending: true });
+    if (error) throw error;
 
-    res.json(enriched);
+    let result = medications || [];
+    
+    // In-memory column-to-column comparison for stock alerts
+    if (lowStock === 'true') {
+      result = result.filter(med => med.stock_quantity <= med.min_stock_threshold);
+    }
+
+    res.json(result);
   } catch (error) {
     console.error("Get Medications Error:", error);
-    res.status(500).json({ error: "Erreur lors de la récupération des médicaments." });
+    res.status(500).json({ error: "Erreur lors de la récupération du catalogue de pharmacie." });
   }
 });
 
 // POST /api/pharmacy/replenish
-// Record a stock entry (replenishment)
+// Record a stock entry (replenish medication)
 router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), async (req, res) => {
   try {
-    const { name, form, dosage, quantity, pricePurchase, priceSale, expiryDate, batchNumber, supplier } = req.body;
+    const { name, form, dosage, qty, pricePurchase, priceSale, expiryDate, batchNumber, supplier } = req.body;
 
-    if (!name || !form || !dosage || !quantity || !pricePurchase || !priceSale) {
-      return res.status(400).json({ error: "Les informations de base du produit et la quantité sont requises." });
+    if (!name || !form || !dosage || !qty || !pricePurchase || !priceSale) {
+      return res.status(400).json({ error: "Les informations de réapprovisionnement principales sont obligatoires." });
     }
 
-    const qty = parseInt(quantity);
-    if (qty <= 0) {
-      return res.status(400).json({ error: "La quantité doit être supérieure à zéro." });
-    }
+    // Check if medication already exists in the catalog
+    const { data: med, error: checkError } = await supabase
+      .from('medications')
+      .select('*')
+      .eq('clinic_id', req.user.clinicId)
+      .eq('name', name)
+      .eq('form', form)
+      .eq('dosage', dosage)
+      .maybeSingle();
 
-    // Check if medication type already exists in catalog (same name, form, dosage)
-    let med = await getAsync(
-      "SELECT * FROM medications WHERE clinic_id = ? AND name = ? AND form = ? AND dosage = ?",
-      [req.user.clinicId, name, form, dosage]
-    );
+    if (checkError) throw checkError;
 
     let medId;
     if (med) {
       // Update existing record
       medId = med.id;
-      await runAsync(
-        `UPDATE medications SET 
-          stock_quantity = stock_quantity + ?,
-          price_purchase = ?,
-          price_sale = ?,
-          expiry_date = ?,
-          batch_number = ?,
-          supplier = ?
-         WHERE id = ? AND clinic_id = ?`,
-        [qty, pricePurchase, priceSale, expiryDate || med.expiry_date, batchNumber || med.batch_number, supplier || med.supplier, medId, req.user.clinicId]
-      );
+      const { error: updateError } = await supabase
+        .from('medications')
+        .update({
+          stock_quantity: med.stock_quantity + qty,
+          price_purchase: pricePurchase,
+          price_sale: priceSale,
+          expiry_date: expiryDate || med.expiry_date,
+          batch_number: batchNumber || med.batch_number,
+          supplier: supplier || med.supplier
+        })
+        .eq('id', medId)
+        .eq('clinic_id', req.user.clinicId);
+
+      if (updateError) throw updateError;
     } else {
       // Create new medication record
-      const result = await runAsync(
-        `INSERT INTO medications (clinic_id, name, form, dosage, stock_quantity, min_stock_threshold, price_purchase, price_sale, expiry_date, batch_number, supplier) 
-         VALUES (?, ?, ?, ?, ?, 10, ?, ?, ?, ?, ?)`,
-        [req.user.clinicId, name, form, dosage, qty, pricePurchase, priceSale, expiryDate || '', batchNumber || '', supplier || '']
-      );
-      medId = result.lastID;
+      const { data: newMed, error: insertError } = await supabase
+        .from('medications')
+        .insert({
+          clinic_id: req.user.clinicId,
+          name,
+          form,
+          dosage,
+          stock_quantity: qty,
+          min_stock_threshold: 10,
+          price_purchase: pricePurchase,
+          price_sale: priceSale,
+          expiry_date: expiryDate || '',
+          batch_number: batchNumber || '',
+          supplier: supplier || ''
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      medId = newMed.id;
     }
 
     // Record Stock Entry
-    await runAsync(
-      `INSERT INTO stock_entries (clinic_id, medication_id, user_id, quantity, price_purchase, expiry_date, batch_number, supplier) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.clinicId, medId, req.user.userId, qty, pricePurchase, expiryDate || '', batchNumber || '', supplier || '']
-    );
+    const { error: stockEntryError } = await supabase
+      .from('stock_entries')
+      .insert({
+        clinic_id: req.user.clinicId,
+        medication_id: medId,
+        user_id: req.user.userId,
+        quantity: qty,
+        price_purchase: pricePurchase,
+        expiry_date: expiryDate || '',
+        batch_number: batchNumber || '',
+        supplier: supplier || ''
+      });
+
+    if (stockEntryError) throw stockEntryError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'PHARMACY_REPLENISH', ?)",
-      [req.user.clinicId, req.user.userId, `Approvisionnement de ${qty} unités de ${name} ${dosage}`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'STOCK_REPLENISH',
+      details: `Réapprovisionnement de ${qty} unités de ${name} ${dosage} (${form})`
+    });
 
-    res.json({ success: true, message: "Approvisionnement enregistré et stock mis à jour." });
+    res.status(201).json({
+      success: true,
+      medicationId: medId,
+      message: "Réapprovisionnement enregistré et stock mis à jour."
+    });
   } catch (error) {
     console.error("Replenish Stock Error:", error);
-    res.status(500).json({ error: "Erreur lors de l'enregistrement de l'approvisionnement." });
+    res.status(500).json({ error: "Erreur lors de l'enregistrement du stock." });
   }
 });
 
 // GET /api/pharmacy/prescriptions
-// List prescriptions for pharmacist check
+// List prescriptions in the clinic
 router.get('/prescriptions', auth, async (req, res) => {
   try {
-    const { status } = req.query; // pending or dispensed
-    let query = `
-      SELECT pr.*, p.first_name as patient_first_name, p.last_name as patient_last_name, p.folder_number, u.name as doctor_name
-      FROM prescriptions pr
-      JOIN patients p ON pr.patient_id = p.id
-      JOIN users u ON pr.doctor_id = u.id
-      WHERE pr.clinic_id = ?
-    `;
-    const params = [req.user.clinicId];
+    const { status } = req.query; // pending or dispensed or partial
+
+    let queryBuilder = supabase
+      .from('prescriptions')
+      .select('*, patient:patients(first_name, last_name, folder_number), doctor:users(name)')
+      .eq('clinic_id', req.user.clinicId);
 
     if (status) {
-      query += " AND pr.status = ?";
-      params.push(status);
+      queryBuilder = queryBuilder.eq('status', status);
     }
 
-    query += " ORDER BY pr.date_time DESC";
-    const prescriptions = await allAsync(query, params);
+    const { data: prescriptions, error } = await queryBuilder.order('date_time', { ascending: false });
+    if (error) throw error;
 
-    // Hydrate prescription items
-    for (const pr of prescriptions) {
-      pr.items = await allAsync(
-        "SELECT * FROM prescription_items WHERE prescription_id = ?",
-        [pr.id]
-      );
-    }
+    const formatted = (prescriptions || []).map(pr => ({
+      ...pr,
+      patient_first_name: pr.patient ? pr.patient.first_name : 'Inconnu',
+      patient_last_name: pr.patient ? pr.patient.last_name : 'Inconnu',
+      folder_number: pr.patient ? pr.patient.folder_number : '',
+      doctor_name: pr.doctor ? pr.doctor.name : 'Inconnu'
+    }));
 
-    res.json(prescriptions);
+    res.json(formatted);
   } catch (error) {
-    console.error("Get Pharmacy Prescriptions Error:", error);
+    console.error("Get Prescriptions Error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération des ordonnances." });
   }
 });
 
-// POST /api/pharmacy/dispense/:id
-// Confirm dispensation of medicines
-router.post('/dispense/:id', auth, checkRole(['admin', 'pharmacist']), async (req, res) => {
+// GET /api/pharmacy/prescriptions/:id
+// Get a single prescription details for dispensing
+router.get('/prescriptions/:id', auth, async (req, res) => {
   try {
     const prescriptionId = req.params.id;
-    const { items } = req.body; // Expecting [ { itemId: 1, quantityDispensed: 3 } ]
 
-    const prescription = await getAsync(
-      "SELECT * FROM prescriptions WHERE id = ? AND clinic_id = ?",
-      [prescriptionId, req.user.clinicId]
-    );
+    const { data: prescription, error: prescError } = await supabase
+      .from('prescriptions')
+      .select('*, patient:patients(*), doctor:users(name)')
+      .eq('id', prescriptionId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
 
+    if (prescError) throw prescError;
     if (!prescription) {
       return res.status(404).json({ error: "Ordonnance non trouvée." });
     }
 
-    if (prescription.status === 'dispensed') {
-      return res.status(400).json({ error: "Cette ordonnance a déjà été entièrement délivrée." });
+    const { data: items, error: itemsError } = await supabase
+      .from('prescription_items')
+      .select('*')
+      .eq('prescription_id', prescriptionId);
+
+    if (itemsError) throw itemsError;
+
+    res.json({
+      ...prescription,
+      patient_first_name: prescription.patient ? prescription.patient.first_name : '',
+      patient_last_name: prescription.patient ? prescription.patient.last_name : '',
+      folder_number: prescription.patient ? prescription.patient.folder_number : '',
+      doctor_name: prescription.doctor ? prescription.doctor.name : '',
+      items: items || []
+    });
+  } catch (error) {
+    console.error("Get Prescription Details Error:", error);
+    res.status(500).json({ error: "Erreur lors de la récupération de l'ordonnance." });
+  }
+});
+
+// POST /api/pharmacy/dispense/:id
+// Dispense medications for a prescription
+router.post('/dispense/:id', auth, checkRole(['admin', 'pharmacist']), async (req, res) => {
+  try {
+    const prescriptionId = req.params.id;
+    const { dispensations } = req.body; // Array of { itemId, qty }
+
+    if (!dispensations || !Array.isArray(dispensations) || dispensations.length === 0) {
+      return res.status(400).json({ error: "Détails de la dispensation manquants." });
     }
 
-    let allFullyDispensed = true;
+    // Verify prescription belongs to the clinic (prevent IDOR)
+    const { data: prescription, error: prescError } = await supabase
+      .from('prescriptions')
+      .select('id, patient_id')
+      .eq('id', prescriptionId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
 
-    for (const item of items) {
-      const { itemId, quantityDispensed } = item;
-      const qty = parseInt(quantityDispensed);
+    if (prescError) throw prescError;
+    if (!prescription) {
+      return res.status(404).json({ error: "Ordonnance non trouvée dans cette clinique." });
+    }
 
-      const prItem = await getAsync(
-        "SELECT * FROM prescription_items WHERE id = ? AND prescription_id = ?",
-        [itemId, prescriptionId]
-      );
+    // Process each item
+    for (const disp of dispensations) {
+      const { itemId, qty } = disp;
+
+      // Load prescription item
+      const { data: prItem, error: itemError } = await supabase
+        .from('prescription_items')
+        .select('*')
+        .eq('id', itemId)
+        .eq('prescription_id', prescriptionId)
+        .maybeSingle();
+
+      if (itemError) throw itemError;
 
       if (prItem && qty > 0) {
         // If linked to a catalog medication, decrement stock
         if (prItem.medication_id) {
-          const med = await getAsync("SELECT stock_quantity, name FROM medications WHERE id = ? AND clinic_id = ?", [prItem.medication_id, req.user.clinicId]);
+          const { data: med, error: medError } = await supabase
+            .from('medications')
+            .select('stock_quantity, name')
+            .eq('id', prItem.medication_id)
+            .eq('clinic_id', req.user.clinicId)
+            .maybeSingle();
+
+          if (medError) throw medError;
           if (med) {
             if (med.stock_quantity < qty) {
               return res.status(400).json({ 
@@ -189,45 +263,84 @@ router.post('/dispense/:id', auth, checkRole(['admin', 'pharmacist']), async (re
             }
 
             // Decrement Stock
-            await runAsync(
-              "UPDATE medications SET stock_quantity = stock_quantity - ? WHERE id = ? AND clinic_id = ?",
-              [qty, prItem.medication_id, req.user.clinicId]
-            );
+            const { error: decStockError } = await supabase
+              .from('medications')
+              .update({ stock_quantity: med.stock_quantity - qty })
+              .eq('id', prItem.medication_id)
+              .eq('clinic_id', req.user.clinicId);
+
+            if (decStockError) throw decStockError;
           }
         }
 
         // Update Prescription Item quantity dispensed
-        await runAsync(
-          "UPDATE prescription_items SET quantity_dispensed = quantity_dispensed + ? WHERE id = ?",
-          [qty, itemId]
-        );
+        const { error: updateItemDispError } = await supabase
+          .from('prescription_items')
+          .update({ quantity_dispensed: prItem.quantity_dispensed + qty })
+          .eq('id', itemId);
 
-        // Check if item is now fully satisfied
-        const updatedItem = await getAsync("SELECT quantity_prescribed, quantity_dispensed FROM prescription_items WHERE id = ?", [itemId]);
-        if (updatedItem.quantity_dispensed < updatedItem.quantity_prescribed) {
-          allFullyDispensed = false;
+        if (updateItemDispError) throw updateItemDispError;
+      }
+    }
+
+    // Check if the prescription is now fully satisfied (quantity_dispensed >= quantity_prescribed for all items)
+    const { data: updatedItems, error: loadUpdatedItemsError } = await supabase
+      .from('prescription_items')
+      .select('*')
+      .eq('prescription_id', prescriptionId);
+
+    if (loadUpdatedItemsError) throw loadUpdatedItemsError;
+
+    let allSatisfied = true;
+    let anySatisfied = false;
+
+    for (const item of updatedItems) {
+      if (item.quantity_dispensed >= item.quantity_prescribed) {
+        anySatisfied = true;
+      } else {
+        allSatisfied = false;
+        if (item.quantity_dispensed > 0) {
+          anySatisfied = true;
         }
       }
     }
 
-    // Update prescription overall status
-    const status = allFullyDispensed ? 'dispensed' : 'partial';
-    await runAsync(
-      "UPDATE prescriptions SET status = ? WHERE id = ?",
-      [status, prescriptionId]
-    );
+    let finalStatus = 'pending';
+    if (allSatisfied) {
+      finalStatus = 'dispensed';
+    } else if (anySatisfied) {
+      finalStatus = 'partial';
+    }
+
+    // Update prescription status
+    const { error: updatePrescStatusError } = await supabase
+      .from('prescriptions')
+      .update({ status: finalStatus })
+      .eq('id', prescriptionId)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (updatePrescStatusError) throw updatePrescStatusError;
 
     // Log Activity
-    const patient = await getAsync("SELECT first_name, last_name FROM patients WHERE id = ?", [prescription.patient_id]);
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'PHARMACY_DISPENSE', ?)",
-      [req.user.clinicId, req.user.userId, `Dispensation de l'ordonnance ID ${prescriptionId} pour ${patient.first_name} ${patient.last_name} (${status})`]
-    );
+    const { data: patient, error: patientError } = await supabase
+      .from('patients')
+      .select('first_name, last_name')
+      .eq('id', prescription.patient_id)
+      .single();
 
-    res.json({ success: true, message: `Ordonnance traitée avec succès (${status}).` });
+    if (!patientError && patient) {
+      await supabase.from('activity_logs').insert({
+        clinic_id: req.user.clinicId,
+        user_id: req.user.userId,
+        action: 'PHARMACY_DISPENSE',
+        details: `Dispensation de médicaments pour ${patient.first_name} ${patient.last_name} (Ordonnance ID: ${prescriptionId})`
+      });
+    }
+
+    res.json({ success: true, status: finalStatus, message: "Dispensation enregistrée." });
   } catch (error) {
-    console.error("Dispense Medication Error:", error);
-    res.status(500).json({ error: "Erreur lors de la dispensation." });
+    console.error("Dispense Medications Error:", error);
+    res.status(500).json({ error: "Erreur lors de la dispensation des médicaments." });
   }
 });
 

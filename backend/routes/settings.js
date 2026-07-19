@@ -1,18 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { runAsync, getAsync, allAsync } = require('../database');
+const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 
 // GET /api/settings/users
 // Get all staff users
 router.get('/users', auth, checkRole(['admin', 'manager']), async (req, res) => {
   try {
-    const users = await allAsync(
-      "SELECT id, name, email, role, active, created_at FROM users WHERE clinic_id = ? ORDER BY role ASC, name ASC",
-      [req.user.clinicId]
-    );
-    res.json(users);
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id, name, email, role, active, created_at')
+      .eq('clinic_id', req.user.clinicId)
+      .order('role', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    res.json(users || []);
   } catch (error) {
     console.error("Get settings users error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération des utilisateurs." });
@@ -29,26 +33,43 @@ router.post('/users', auth, checkRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: "Tous les champs sont requis." });
     }
 
-    const existingUser = await getAsync("SELECT id FROM users WHERE email = ?", [email]);
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
     if (existingUser) {
       return res.status(400).json({ error: "Un utilisateur avec cet email existe déjà." });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const result = await runAsync(
-      `INSERT INTO users (clinic_id, name, email, password_hash, role, active) 
-       VALUES (?, ?, ?, ?, ?, 1)`,
-      [req.user.clinicId, name, email, passwordHash, role]
-    );
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        clinic_id: req.user.clinicId,
+        name,
+        email,
+        password_hash: passwordHash,
+        role,
+        active: 1
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'USER_CREATE', ?)",
-      [req.user.clinicId, req.user.userId, `Création de l'utilisateur ${name} (${role})`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'USER_CREATE',
+      details: `Création de l'utilisateur ${name} (${role})`
+    });
 
     res.status(201).json({
-      id: result.lastID,
+      id: newUser.id,
       name,
       email,
       role,
@@ -67,7 +88,14 @@ router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
     const userId = req.params.id;
     const { active, role, name } = req.body;
 
-    const user = await getAsync("SELECT id, name FROM users WHERE id = ? AND clinic_id = ?", [userId, req.user.clinicId]);
+    const { data: user, error: checkError } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('id', userId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
     if (!user) {
       return res.status(404).json({ error: "Utilisateur non trouvé." });
     }
@@ -76,20 +104,25 @@ router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: "Vous ne pouvez pas désactiver votre propre compte." });
     }
 
-    await runAsync(
-      `UPDATE users SET 
-        active = COALESCE(?, active), 
-        role = COALESCE(?, role), 
-        name = COALESCE(?, name) 
-       WHERE id = ?`,
-      [active !== undefined ? (active ? 1 : 0) : null, role, name, userId]
-    );
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        active: active !== undefined ? (active ? 1 : 0) : undefined,
+        role: role || undefined,
+        name: name || undefined
+      })
+      .eq('id', userId)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (updateError) throw updateError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'USER_UPDATE', ?)",
-      [req.user.clinicId, req.user.userId, `Mise à jour de l'utilisateur ${user.name}`]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'USER_UPDATE',
+      details: `Mise à jour de l'utilisateur ${user.name}`
+    });
 
     res.json({ success: true, message: "Utilisateur mis à jour avec succès." });
   } catch (error) {
@@ -102,7 +135,13 @@ router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
 // Get clinic details & custom configuration
 router.get('/clinic', auth, async (req, res) => {
   try {
-    const clinic = await getAsync("SELECT * FROM clinics WHERE id = ?", [req.user.clinicId]);
+    const { data: clinic, error } = await supabase
+      .from('clinics')
+      .select('*')
+      .eq('id', req.user.clinicId)
+      .maybeSingle();
+
+    if (error) throw error;
     if (!clinic) {
       return res.status(404).json({ error: "Clinique non trouvée." });
     }
@@ -122,14 +161,8 @@ router.get('/clinic', auth, async (req, res) => {
       }
     };
 
-    // If clinic has settings column, we can parse it.
-    // Let's do a safe alter-check or just try-catch reading from a settings JSON file or settings column
-    try {
-      if (clinic.settings) {
-        settings = JSON.parse(clinic.settings);
-      }
-    } catch (e) {
-      // settings is empty or not formatted
+    if (clinic.settings) {
+      settings = typeof clinic.settings === 'string' ? JSON.parse(clinic.settings) : clinic.settings;
     }
 
     res.json({
@@ -148,31 +181,26 @@ router.put('/clinic', auth, checkRole(['admin', 'manager']), async (req, res) =>
   try {
     const { name, address, phone, logo, settings } = req.body;
 
-    // Check if we need to add the settings column (migration safety)
-    try {
-      await runAsync("ALTER TABLE clinics ADD COLUMN settings TEXT DEFAULT '{}'");
-    } catch (e) {
-      // Column probably already exists, ignore error
-    }
+    const { error: updateError } = await supabase
+      .from('clinics')
+      .update({
+        name: name || undefined,
+        address: address || undefined,
+        phone: phone || undefined,
+        logo: logo || undefined,
+        settings: settings || undefined // PostgreSQL JSONB handles it natively
+      })
+      .eq('id', req.user.clinicId);
 
-    const settingsJson = settings ? JSON.stringify(settings) : '{}';
-
-    await runAsync(
-      `UPDATE clinics SET 
-        name = COALESCE(?, name), 
-        address = COALESCE(?, address), 
-        phone = COALESCE(?, phone), 
-        logo = COALESCE(?, logo), 
-        settings = ? 
-       WHERE id = ?`,
-      [name, address, phone, logo, settingsJson, req.user.clinicId]
-    );
+    if (updateError) throw updateError;
 
     // Log Activity
-    await runAsync(
-      "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'CLINIC_CONFIG_UPDATE', 'Mise à jour des paramètres généraux')",
-      [req.user.clinicId, req.user.userId]
-    );
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'CLINIC_CONFIG_UPDATE',
+      details: 'Mise à jour des paramètres généraux'
+    });
 
     res.json({ success: true, message: "Paramètres mis à jour avec succès." });
   } catch (error) {

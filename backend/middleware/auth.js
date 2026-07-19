@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { getAsync } = require('../database');
+const { supabase } = require('../database');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -21,10 +21,15 @@ async function auth(req, res, next) {
     req.user = decoded;
 
     // Check clinic subscription status
-    const clinic = await getAsync(
-      "SELECT subscription_status, subscription_expires_at FROM clinics WHERE id = ?",
-      [decoded.clinicId]
-    );
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('subscription_status, subscription_expires_at')
+      .eq('id', decoded.clinicId)
+      .maybeSingle();
+
+    if (clinicError) {
+      console.error("Auth Middleware Clinic Error:", clinicError);
+    }
 
     if (clinic) {
       req.clinicStatus = clinic.subscription_status;
