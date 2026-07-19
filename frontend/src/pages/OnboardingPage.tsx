@@ -78,6 +78,7 @@ export const OnboardingPage: React.FC = () => {
   return (
     <div style={{
       backgroundColor: '#0b0f19',
+      backgroundImage: 'radial-gradient(circle at 50% 120%, rgba(13, 148, 136, 0.1), rgba(11, 15, 25, 0))',
       color: '#f9fafb',
       minHeight: '100vh',
       display: 'flex',
@@ -86,13 +87,50 @@ export const OnboardingPage: React.FC = () => {
       padding: '2rem 1.5rem',
       fontFamily: 'var(--font-primary)'
     }}>
-      <div style={{
-        backgroundColor: '#111827',
-        border: '1px solid #1f2937',
-        borderRadius: '16px',
+      {/* Inline styles to bypass global light/dark variables and ensure high readability */}
+      <style>{`
+        .onboard-card {
+          background-color: #111827 !important;
+          border: 1px solid #1f2937 !important;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+          border-radius: 16px !important;
+        }
+        .onboard-input {
+          background-color: #0b0f19 !important;
+          border: 1px solid #1f2937 !important;
+          color: #ffffff !important;
+          border-radius: 8px !important;
+          transition: all 0.2s ease !important;
+        }
+        .onboard-input:focus {
+          border-color: #14b8a6 !important;
+          box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+          background-color: #05080f !important;
+        }
+        .onboard-input::placeholder {
+          color: #64748b !important;
+          opacity: 1 !important;
+        }
+        .onboard-label {
+          color: #94a3b8 !important;
+          font-weight: 500 !important;
+          font-size: 0.875rem !important;
+          margin-bottom: 0.375rem !important;
+          display: inline-block !important;
+        }
+        /* Specific override for browser autofill background */
+        .onboard-input:-webkit-autofill,
+        .onboard-input:-webkit-autofill:hover, 
+        .onboard-input:-webkit-autofill:focus {
+          -webkit-text-fill-color: #ffffff !important;
+          -webkit-box-shadow: 0 0 0px 1000px #0b0f19 inset !important;
+          transition: background-color 5000s ease-in-out 0s !important;
+        }
+      `}</style>
+
+      <div className="onboard-card" style={{
         width: '100%',
         maxWidth: '750px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
         overflow: 'hidden'
       }}>
         {/* Steps header banner */}
@@ -140,7 +178,7 @@ export const OnboardingPage: React.FC = () => {
               </p>
 
               <div className="form-group">
-                <label style={{ color: '#94a3b8' }}>Adresse physique de l'établissement</label>
+                <span className="onboard-label">Adresse physique de l'établissement</span>
                 <div style={{ position: 'relative' }}>
                   <MapPin size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                   <input
@@ -148,14 +186,14 @@ export const OnboardingPage: React.FC = () => {
                     placeholder="Ex: Cocody Angré 8ème Tranche, face station Shell, Abidjan"
                     value={address}
                     onChange={e => setAddress(e.target.value)}
-                    className="input-control w-full"
-                    style={{ paddingLeft: '38px', backgroundColor: '#0b0f19', borderColor: '#1f2937' }}
+                    className="input-control onboard-input w-full"
+                    style={{ paddingLeft: '38px' }}
                   />
                 </div>
               </div>
 
               <div className="form-group">
-                <label style={{ color: '#94a3b8' }}>Téléphone de contact</label>
+                <span className="onboard-label">Téléphone de contact</span>
                 <div style={{ position: 'relative' }}>
                   <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                   <input
@@ -163,8 +201,8 @@ export const OnboardingPage: React.FC = () => {
                     placeholder="Ex: +225 27 22 45 45 45"
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
-                    className="input-control w-full"
-                    style={{ paddingLeft: '38px', backgroundColor: '#0b0f19', borderColor: '#1f2937' }}
+                    className="input-control onboard-input w-full"
+                    style={{ paddingLeft: '38px' }}
                   />
                 </div>
               </div>
@@ -186,7 +224,7 @@ export const OnboardingPage: React.FC = () => {
             <div>
               <h3 style={{ fontSize: '1.3rem', fontWeight: 600, marginBottom: '0.5rem', color: 'white' }}>Invitez vos collaborateurs</h3>
               <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                Ajoutez des médecins, secrétaires ou pharmaciens. Vous pourrez aussi le faire plus tard dans les paramètres.
+                Invitez des praticiens, secrétaires ou pharmaciens. Vous pourrez aussi le faire plus tard dans les paramètres.
               </p>
 
               {/* Staff Input Area */}
@@ -201,48 +239,45 @@ export const OnboardingPage: React.FC = () => {
                 gap: '12px'
               }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ color: '#94a3b8' }}>Nom Complet</label>
+                  <span className="onboard-label">Nom Complet</span>
                   <input
                     type="text"
                     placeholder="Ex: Dr. Yao Kouakou"
                     value={newStaffName}
                     onChange={e => setNewStaffName(e.target.value)}
-                    className="input-control"
-                    style={{ backgroundColor: '#0b0f19', borderColor: '#374151' }}
+                    className="input-control onboard-input w-full"
                   />
                 </div>
                 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ color: '#94a3b8' }}>Adresse Email</label>
+                  <span className="onboard-label">Adresse Email</span>
                   <input
                     type="email"
                     placeholder="Ex: yao@mediclinic.com"
                     value={newStaffEmail}
                     onChange={e => setNewStaffEmail(e.target.value)}
-                    className="input-control"
-                    style={{ backgroundColor: '#0b0f19', borderColor: '#374151' }}
+                    className="input-control onboard-input w-full"
                   />
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ color: '#94a3b8' }}>Mot de passe</label>
+                  <span className="onboard-label">Mot de passe</span>
                   <input
                     type="password"
                     placeholder="Minimum 6 caractères"
                     value={newStaffPass}
                     onChange={e => setNewStaffPass(e.target.value)}
-                    className="input-control"
-                    style={{ backgroundColor: '#0b0f19', borderColor: '#374151' }}
+                    className="input-control onboard-input w-full"
                   />
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ color: '#94a3b8' }}>Rôle / Poste</label>
+                  <span className="onboard-label">Rôle / Poste</span>
                   <select
                     value={newStaffRole}
                     onChange={e => setNewStaffRole(e.target.value as any)}
-                    className="input-control"
-                    style={{ backgroundColor: '#0b0f19', borderColor: '#374151' }}
+                    className="input-control onboard-input w-full"
+                    style={{ padding: '0.625rem 0.875rem' }}
                   >
                     <option value="doctor">Médecin / Praticien</option>
                     <option value="secretary">Secrétaire / Accueil</option>
