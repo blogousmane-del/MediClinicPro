@@ -72,6 +72,12 @@ router.post('/register', async (req, res) => {
       details: 'Inscription de la clinique et de l\'administrateur'
     });
 
+    // Send confirmation email asynchronously (non-blocking)
+    const { sendConfirmationEmail } = require('../utils/mailer');
+    sendConfirmationEmail(email, adminName, clinicName).catch(err => {
+      console.error("[Email] Erreur d'envoi non bloquante lors de l'inscription :", err);
+    });
+
     // Generate Token
     const token = jwt.sign(
       { userId, clinicId, role: 'admin', name: adminName },

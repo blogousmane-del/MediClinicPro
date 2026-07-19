@@ -9,6 +9,7 @@
     "test": "node test-db.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.43.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -16,7 +17,7 @@
     "express-rate-limit": "^8.6.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
-    "@supabase/supabase-js": "^2.43.4",
+    "nodemailer": "^9.0.3",
     "sqlite3": "^6.0.1"
   }
 }
