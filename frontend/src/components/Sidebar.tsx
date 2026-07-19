@@ -74,16 +74,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
         style={{
           width: 'var(--sidebar-width)',
           height: '100vh',
-          backgroundColor: 'var(--secondary)',
+          backgroundColor: 'rgba(12, 18, 30, 0.95)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           color: '#94a3b8',
           position: 'fixed',
           left: 0,
           top: 0,
           display: 'flex',
           flexDirection: 'column',
-          borderRight: '1px solid var(--border)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.06)',
           zIndex: 100,
-          boxShadow: '4px 0 10px rgba(0,0,0,0.1)'
+          boxShadow: '8px 0 32px rgba(0,0,0,0.25)'
         }}
       >
         {/* Brand Header */}
@@ -94,27 +96,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-          backgroundColor: '#090d16'
+          backgroundColor: 'rgba(9, 13, 22, 0.4)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '6px',
-              backgroundColor: 'var(--primary)',
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
-              fontWeight: 'bold',
-              fontSize: '1.2rem'
+              fontWeight: 700,
+              fontSize: '1.25rem',
+              boxShadow: '0 0 12px rgba(13, 148, 136, 0.4)'
             }}>M</div>
             <span style={{
               fontWeight: 700,
-              fontSize: '1.15rem',
+              fontSize: '1.2rem',
               color: 'white',
               fontFamily: 'var(--font-secondary)',
-              letterSpacing: '0.5px'
+              letterSpacing: '0.75px',
+              background: 'linear-gradient(135deg, #ffffff, #94a3b8)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
             }}>MediClinic</span>
           </div>
           
@@ -122,7 +128,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             {/* Offline Badge indicator */}
             <div title={isOnline ? "En ligne" : "Hors ligne (mode déconnecté)"} style={{ display: 'flex', alignItems: 'center' }}>
               {isOnline ? (
-                <Wifi size={16} color="var(--success)" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--success)' }} />
+                  <span style={{ position: 'absolute', width: '14px', height: '14px', borderRadius: '50%', border: '2px solid var(--success)', animation: 'ping 1.5s infinite', opacity: 0.5 }} />
+                </div>
               ) : (
                 <WifiOff size={16} color="var(--danger)" />
               )}
@@ -137,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 border: 'none',
                 cursor: 'pointer',
                 color: '#94a3b8',
-                display: 'none', // Overridden in media query in index.css
+                display: 'none',
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '4px'
@@ -150,12 +159,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
 
       {/* Clinic title info */}
       <div style={{
-        padding: '1rem 1.5rem',
+        padding: '1.25rem 1.5rem',
         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-        backgroundColor: '#0c121e'
+        backgroundColor: 'rgba(12, 18, 30, 0.2)'
       }}>
         <div style={{
-          fontSize: '0.875rem',
+          fontSize: '0.9rem',
           fontWeight: 600,
           color: 'white',
           overflow: 'hidden',
@@ -163,9 +172,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
           whiteSpace: 'nowrap'
         }}>{clinic?.name || 'Ma Clinique'}</div>
         <div style={{
-          fontSize: '0.75rem',
+          fontSize: '0.78rem',
           color: 'var(--text-muted)',
-          marginTop: '2px'
+          marginTop: '4px'
         }}>{clinic?.address || 'Abidjan, CI'}</div>
       </div>
 
@@ -175,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
         padding: '1.5rem 0.75rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '4px',
+        gap: '6px',
         overflowY: 'auto'
       }}>
         {filteredItems.map(item => {
@@ -190,22 +199,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                padding: '10px 14px',
-                borderRadius: '8px',
+                padding: '12px 14px',
+                paddingLeft: isActive ? '11px' : '14px',
+                borderRadius: '12px',
                 border: 'none',
-                background: isActive ? 'var(--primary-light)' : 'transparent',
+                borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
+                background: isActive ? 'rgba(13, 148, 136, 0.12)' : 'transparent',
                 color: isActive ? 'white' : '#94a3b8',
                 textAlign: 'left',
                 width: '100%',
                 cursor: 'pointer',
                 transition: 'var(--transition)',
-                fontWeight: isActive ? 600 : 400
+                fontWeight: isActive ? 600 : 500
               }}
               onMouseEnter={(e) => {
-                if (!isActive) e.currentTarget.style.color = 'white';
+                if (!isActive) {
+                  e.currentTarget.style.color = 'white';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
+                }
               }}
               onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.color = '#94a3b8';
+                if (!isActive) {
+                  e.currentTarget.style.color = '#94a3b8';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
               }}
             >
               <Icon size={20} color={isActive ? 'var(--primary)' : 'inherit'} />
@@ -217,31 +234,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
 
       {/* User profile footer */}
       <div style={{
-        padding: '1rem',
+        padding: '1.25rem 1rem',
         borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-        backgroundColor: '#090d16',
+        backgroundColor: 'rgba(9, 13, 22, 0.4)',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width: '36px',
-            height: '36px',
+            width: '38px',
+            height: '38px',
             borderRadius: '50%',
-            backgroundColor: 'rgba(255,255,255,0.1)',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02))',
+            border: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
             fontWeight: 600,
-            fontSize: '0.9rem'
+            fontSize: '0.95rem'
           }}>
             {user.name.charAt(0)}
           </div>
           <div style={{ flexGrow: 1, overflow: 'hidden' }}>
             <div style={{
-              fontSize: '0.875rem',
+              fontSize: '0.9rem',
               fontWeight: 600,
               color: 'white',
               whiteSpace: 'nowrap',
@@ -249,8 +267,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               overflow: 'hidden'
             }}>{user.name}</div>
             <div style={{
-              fontSize: '0.75rem',
-              color: 'var(--text-muted)'
+              fontSize: '0.78rem',
+              color: 'var(--text-muted)',
+              marginTop: '1px'
             }}>{roleLabels[user.role]}</div>
           </div>
         </div>
@@ -262,22 +281,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            padding: '8px',
-            borderRadius: '6px',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
+            padding: '10px',
+            borderRadius: 'var(--radius-full)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
             background: 'rgba(239, 68, 68, 0.05)',
-            color: '#ef4444',
+            color: '#ff5a5a',
             cursor: 'pointer',
-            fontWeight: 500,
+            fontWeight: 600,
             fontSize: '0.85rem',
             width: '100%',
             transition: 'var(--transition)'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)';
+            e.currentTarget.style.transform = 'none';
           }}
         >
           <LogOut size={16} />

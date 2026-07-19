@@ -76,8 +76,8 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
           expiry_date = ?,
           batch_number = ?,
           supplier = ?
-         WHERE id = ?`,
-        [qty, pricePurchase, priceSale, expiryDate || med.expiry_date, batchNumber || med.batch_number, supplier || med.supplier, medId]
+         WHERE id = ? AND clinic_id = ?`,
+        [qty, pricePurchase, priceSale, expiryDate || med.expiry_date, batchNumber || med.batch_number, supplier || med.supplier, medId, req.user.clinicId]
       );
     } else {
       // Create new medication record
@@ -180,7 +180,7 @@ router.post('/dispense/:id', auth, checkRole(['admin', 'pharmacist']), async (re
       if (prItem && qty > 0) {
         // If linked to a catalog medication, decrement stock
         if (prItem.medication_id) {
-          const med = await getAsync("SELECT stock_quantity, name FROM medications WHERE id = ?", [prItem.medication_id]);
+          const med = await getAsync("SELECT stock_quantity, name FROM medications WHERE id = ? AND clinic_id = ?", [prItem.medication_id, req.user.clinicId]);
           if (med) {
             if (med.stock_quantity < qty) {
               return res.status(400).json({ 
@@ -190,8 +190,8 @@ router.post('/dispense/:id', auth, checkRole(['admin', 'pharmacist']), async (re
 
             // Decrement Stock
             await runAsync(
-              "UPDATE medications SET stock_quantity = stock_quantity - ? WHERE id = ?",
-              [qty, prItem.medication_id]
+              "UPDATE medications SET stock_quantity = stock_quantity - ? WHERE id = ? AND clinic_id = ?",
+              [qty, prItem.medication_id, req.user.clinicId]
             );
           }
         }

@@ -219,8 +219,8 @@ router.put('/:id', auth, async (req, res) => {
       `UPDATE patients SET 
         first_name = ?, last_name = ?, birth_date = ?, gender = ?, 
         phone = ?, email = ?, address = ?, allergies = ?, antecedents = ? 
-       WHERE id = ?`,
-      [firstName, lastName, birthDate, gender, phone, email || '', address || '', allergies || '', antecedents || '', patientId]
+       WHERE id = ? AND clinic_id = ?`,
+      [firstName, lastName, birthDate, gender, phone, email || '', address || '', allergies || '', antecedents || '', patientId, req.user.clinicId]
     );
 
     // Log Activity
@@ -248,8 +248,8 @@ router.delete('/:id', auth, async (req, res) => {
 
     // Toggle archiving
     await runAsync(
-      "UPDATE patients SET archived = 1 WHERE id = ?",
-      [patientId]
+      "UPDATE patients SET archived = 1 WHERE id = ? AND clinic_id = ?",
+      [patientId, req.user.clinicId]
     );
 
     // Log Activity

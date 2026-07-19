@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { runAsync, getAsync } = require('../database');
-const { JWT_SECRET, auth } = require('../middleware/auth');
+const { JWT_SECRET, auth, checkRole } = require('../middleware/auth');
 
 // POST /api/auth/register
 // Clinic registration + Admin user creation
@@ -145,7 +145,7 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // POST /api/auth/onboarding
-router.post('/onboarding', auth, async (req, res) => {
+router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
   try {
     const { clinicAddress, clinicPhone, staff, activeModules } = req.body;
 

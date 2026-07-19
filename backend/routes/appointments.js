@@ -156,8 +156,8 @@ router.put('/:id', auth, async (req, res) => {
         duration = COALESCE(?, duration), 
         motif = COALESCE(?, motif), 
         status = COALESCE(?, status) 
-       WHERE id = ?`,
-      [dateTime, duration, motif, status, apptId]
+       WHERE id = ? AND clinic_id = ?`,
+      [dateTime, duration, motif, status, apptId, req.user.clinicId]
     );
 
     // If cancelled, trigger simulated cancellation SMS

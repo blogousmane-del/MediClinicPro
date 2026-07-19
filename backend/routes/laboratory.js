@@ -61,12 +61,12 @@ router.post('/results/:id', auth, checkRole(['admin', 'lab_tech']), async (req, 
         results_json = ?,
         technician_id = ?,
         completed_at = ?
-       WHERE id = ?`,
-      [resultsText, jsonStr, req.user.userId, completedAt, examId]
+       WHERE id = ? AND clinic_id = ?`,
+      [resultsText, jsonStr, req.user.userId, completedAt, examId, req.user.clinicId]
     );
 
     // Log Activity
-    const patient = await getAsync("SELECT first_name, last_name FROM patients WHERE id = ?", [exam.patient_id]);
+    const patient = await getAsync("SELECT first_name, last_name FROM patients WHERE id = ? AND clinic_id = ?", [exam.patient_id, req.user.clinicId]);
     await runAsync(
       "INSERT INTO activity_logs (clinic_id, user_id, action, details) VALUES (?, ?, 'LAB_RESULTS_ENTER', ?)",
       [req.user.clinicId, req.user.userId, `Saisie des résultats d'examen (${exam.test_name}) pour ${patient.first_name} ${patient.last_name}`]
