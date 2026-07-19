@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar as CalendarIcon, Clock, User, Plus, X, Search, Check, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, User, Plus, X, Search, Check, AlertCircle, Phone } from 'lucide-react';
 
 interface Patient {
   id: number;
@@ -251,8 +251,77 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
         </div>
       </div>
 
+      {/* CSS Styles for responsive calendar list */}
+      <style>{`
+        .appointments-wrapper {
+          width: 100%;
+        }
+        
+        .grid-responsive-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        
+        .grid-responsive-1to2col {
+          display: grid;
+          grid-template-columns: 1fr 2fr;
+          gap: 10px;
+        }
+        
+        .appointment-card {
+          background-color: var(--bg-secondary);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: 1.25rem;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          box-shadow: var(--shadow-sm);
+          transition: var(--transition);
+        }
+        
+        .appointment-card:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow);
+          border-color: var(--primary);
+        }
+        
+        /* Desktop & Mobile display switching */
+        @media (max-width: 768px) {
+          .desktop-table-container {
+            display: none !important;
+          }
+          .mobile-cards-container {
+            display: flex !important;
+            flex-direction: column;
+            gap: 12px;
+          }
+        }
+        
+        @media (min-width: 769px) {
+          .desktop-table-container {
+            display: block !important;
+          }
+          .mobile-cards-container {
+            display: none !important;
+          }
+        }
+        
+        @media (max-width: 500px) {
+          .grid-responsive-2col,
+          .grid-responsive-1to2col {
+            grid-template-columns: 1fr !important;
+          }
+          .modal-content {
+            width: 95% !important;
+            margin: 10px !important;
+          }
+        }
+      `}</style>
+
       {/* Appointments List */}
-      <div className="table-container">
+      <div className="appointments-wrapper">
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
             Chargement des créneaux...
@@ -262,63 +331,136 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
             Aucun rendez-vous enregistré à cette date.
           </div>
         ) : (
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Heure</th>
-                <th>Patient</th>
-                <th>Téléphone</th>
-                <th>Praticien</th>
-                <th>Motif de visite</th>
-                <th>Durée</th>
-                <th>Statut</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop Table View */}
+            <div className="table-container desktop-table-container">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Heure</th>
+                    <th>Patient</th>
+                    <th>Téléphone</th>
+                    <th>Praticien</th>
+                    <th>Motif de visite</th>
+                    <th>Durée</th>
+                    <th>Statut</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.map(appt => {
+                    const hour = new Date(appt.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <tr key={appt.id}>
+                        <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{hour}</td>
+                        <td style={{ fontWeight: 600 }}>{appt.patient_last_name.toUpperCase()} {appt.patient_first_name}</td>
+                        <td>{appt.patient_phone}</td>
+                        <td>{appt.practitioner_name}</td>
+                        <td style={{ fontSize: '0.9rem' }}>{appt.motif}</td>
+                        <td>{appt.duration} min</td>
+                        <td>
+                          <span className={`badge ${statusBadges[appt.status]}`}>
+                            {statusLabels[appt.status]}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          {appt.status === 'scheduled' && ['admin', 'secretary'].includes(user?.role || '') && (
+                            <div style={{ display: 'inline-flex', gap: '6px' }}>
+                              <button
+                                onClick={() => handleUpdateStatus(appt.id, 'completed')}
+                                className="btn btn-secondary"
+                                style={{ padding: '6px 10px', fontSize: '0.75rem', color: 'var(--success)', borderColor: 'var(--success)', backgroundColor: 'transparent' }}
+                                title="Marquer comme honoré"
+                              >
+                                <Check size={14} />
+                              </button>
+                              
+                              <button
+                                onClick={() => handleUpdateStatus(appt.id, 'cancelled')}
+                                className="btn btn-outline"
+                                style={{ padding: '6px 10px', fontSize: '0.75rem', borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                                title="Annuler"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="mobile-cards-container">
               {appointments.map(appt => {
                 const hour = new Date(appt.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                 return (
-                  <tr key={appt.id}>
-                    <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{hour}</td>
-                    <td style={{ fontWeight: 600 }}>{appt.patient_last_name.toUpperCase()} {appt.patient_first_name}</td>
-                    <td>{appt.patient_phone}</td>
-                    <td>{appt.practitioner_name}</td>
-                    <td style={{ fontSize: '0.9rem' }}>{appt.motif}</td>
-                    <td>{appt.duration} min</td>
-                    <td>
+                  <div key={appt.id} className="appointment-card">
+                    {/* Time & Status Row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', color: 'var(--primary)' }}>
+                        <Clock size={16} />
+                        <span>{hour}</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>({appt.duration} min)</span>
+                      </div>
                       <span className={`badge ${statusBadges[appt.status]}`}>
                         {statusLabels[appt.status]}
                       </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {appt.status === 'scheduled' && ['admin', 'secretary'].includes(user?.role || '') && (
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleUpdateStatus(appt.id, 'completed')}
-                            className="btn btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', color: 'var(--success)', borderColor: 'var(--success)', backgroundColor: 'transparent' }}
-                            title="Marquer comme honoré"
-                          >
-                            <Check size={14} />
-                          </button>
-                          
-                          <button
-                            onClick={() => handleUpdateStatus(appt.id, 'cancelled')}
-                            className="btn btn-outline"
-                            style={{ padding: '6px 10px', fontSize: '0.75rem', borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                            title="Annuler"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
+                    </div>
+
+                    {/* Patient & Phone */}
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                        {appt.patient_last_name.toUpperCase()} {appt.patient_first_name}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <Phone size={14} style={{ color: 'var(--text-muted)' }} />
+                        <span>{appt.patient_phone}</span>
+                      </div>
+                    </div>
+
+                    {/* Practitioner Name */}
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <User size={14} style={{ color: 'var(--text-muted)' }} />
+                      <span>{appt.practitioner_name}</span>
+                    </div>
+
+                    {/* Motif */}
+                    <div style={{ fontSize: '0.85rem', padding: '8px 10px', backgroundColor: 'var(--bg-primary)', borderRadius: '6px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.8rem' }}>Motif : </strong>
+                      {appt.motif}
+                    </div>
+
+                    {/* Mobile Actions */}
+                    {appt.status === 'scheduled' && ['admin', 'secretary'].includes(user?.role || '') && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                        <button
+                          onClick={() => handleUpdateStatus(appt.id, 'completed')}
+                          className="btn btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--success)', borderColor: 'var(--success)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Check size={14} />
+                          <span>Confirmer</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleUpdateStatus(appt.id, 'cancelled')}
+                          className="btn btn-outline"
+                          style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'var(--danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <X size={14} />
+                          <span>Annuler</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -401,7 +543,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
                 </div>
 
                 {/* Date & Time */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="grid-responsive-2col">
                   <div className="form-group">
                     <label>Date du RDV *</label>
                     <input
@@ -425,7 +567,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
                 </div>
 
                 {/* Duration & Motif */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
+                <div className="grid-responsive-1to2col">
                   <div className="form-group">
                     <label>Durée (min)</label>
                     <input
@@ -499,3 +641,4 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
     </div>
   );
 };
+export default AppointmentsPage;
