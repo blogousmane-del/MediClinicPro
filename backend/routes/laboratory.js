@@ -11,7 +11,7 @@ router.get('/exams', auth, async (req, res) => {
 
     let queryBuilder = supabase
       .from('lab_exams')
-      .select('*, patient:patients(first_name, last_name, folder_number, birth_date, gender), doctor:users(name)')
+      .select('*, patient:patients(first_name, last_name, folder_number, birth_date, gender), doctor:users!lab_exams_doctor_id_fkey(name)')
       .eq('clinic_id', req.user.clinicId);
 
     if (status) {

@@ -59,18 +59,28 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: "Un patient avec le même nom, date de naissance et téléphone existe déjà." });
     }
 
-    // Generate folder number (MED-YYYY-XXXX)
+    // Generate folder number (MED-YYYY-XXXX) - globally unique to prevent key conflicts
     const currentYear = new Date().getFullYear();
     const prefix = `MED-${currentYear}-`;
 
-    const { count, error: countError } = await supabase
+    const { data: existingFolders, error: fetchError } = await supabase
       .from('patients')
-      .select('*', { count: 'exact', head: true })
-      .eq('clinic_id', req.user.clinicId)
+      .select('folder_number')
       .like('folder_number', `${prefix}%`);
 
-    if (countError) throw countError;
-    const sequenceNum = String((count || 0) + 1).padStart(4, '0');
+    if (fetchError) throw fetchError;
+
+    let nextSeq = 1;
+    if (existingFolders && existingFolders.length > 0) {
+      const sequences = existingFolders.map(p => {
+        const parts = p.folder_number.split('-');
+        const lastPart = parts[parts.length - 1];
+        return parseInt(lastPart, 10) || 0;
+      });
+      nextSeq = Math.max(...sequences) + 1;
+    }
+
+    const sequenceNum = String(nextSeq).padStart(4, '0');
     const folderNumber = `${prefix}${sequenceNum}`;
 
     const { data: newPatient, error: insertError } = await supabase
@@ -163,7 +173,7 @@ router.get('/:id', auth, async (req, res) => {
     // Fetch lab exams with doctor and technician names
     const { data: labExams, error: labError } = await supabase
       .from('lab_exams')
-      .select('*, doctor:users(name), technician:users(name)')
+      .select('*, doctor:users!lab_exams_doctor_id_fkey(name), technician:users!lab_exams_technician_id_fkey(name)')
       .eq('patient_id', patientId)
       .eq('clinic_id', req.user.clinicId)
       .order('created_at', { ascending: false });
