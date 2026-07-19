@@ -107,36 +107,44 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
 
 // GET /api/financials/stats
 // Financial analytics for manager / admin
-router.get('/stats', auth, checkRole(['admin', 'manager']), async (req, res) => {
+router.get('/stats', auth, async (req, res) => {
   try {
-    // 1. Fetch all payments for CA calculations
-    const { data: allPayments, error: payError } = await supabase
-      .from('payments')
-      .select('amount_total, payment_method, created_at')
-      .eq('clinic_id', req.user.clinicId);
+    const hasFinancialsAccess = ['admin', 'manager'].includes(req.user.role);
 
-    if (payError) throw payError;
+    // 1. Fetch all payments for CA calculations (only if permitted)
+    let totalRevenue = 0;
+    let todayRevenue = 0;
+    let distribution = [];
 
-    // Calculate Chiffre d'affaires total
-    const totalRevenue = (allPayments || []).reduce((sum, p) => sum + p.amount_total, 0);
+    if (hasFinancialsAccess) {
+      const { data: allPayments, error: payError } = await supabase
+        .from('payments')
+        .select('amount_total, payment_method, created_at')
+        .eq('clinic_id', req.user.clinicId);
 
-    // Calculate Chiffre d'affaires aujourd'hui (local date comparison)
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayRevenue = (allPayments || [])
-      .filter(p => p.created_at && p.created_at.startsWith(todayStr))
-      .reduce((sum, p) => sum + p.amount_total, 0);
+      if (payError) throw payError;
 
-    // Calculate payment methods distribution
-    const distMap = {};
-    (allPayments || []).forEach(p => {
-      const method = p.payment_method;
-      if (!distMap[method]) {
-        distMap[method] = { method, total: 0, count: 0 };
-      }
-      distMap[method].total += p.amount_total;
-      distMap[method].count += 1;
-    });
-    const distribution = Object.values(distMap);
+      // Calculate Chiffre d'affaires total
+      totalRevenue = (allPayments || []).reduce((sum, p) => sum + p.amount_total, 0);
+
+      // Calculate Chiffre d'affaires aujourd'hui (local date comparison)
+      const todayStr = new Date().toISOString().split('T')[0];
+      todayRevenue = (allPayments || [])
+        .filter(p => p.created_at && p.created_at.startsWith(todayStr))
+        .reduce((sum, p) => sum + p.amount_total, 0);
+
+      // Calculate payment methods distribution
+      const distMap = {};
+      (allPayments || []).forEach(p => {
+        const method = p.payment_method;
+        if (!distMap[method]) {
+          distMap[method] = { method, total: 0, count: 0 };
+        }
+        distMap[method].total += p.amount_total;
+        distMap[method].count += 1;
+      });
+      distribution = Object.values(distMap);
+    }
 
     // 2. Fetch recent activity logs (10)
     const { data: logs, error: logsError } = await supabase
