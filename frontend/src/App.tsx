@@ -7,8 +7,7 @@ import { Header } from './components/Header';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
-import { LoginPage } from './pages/Auth/LoginPage';
-import { RegisterPage } from './pages/Auth/RegisterPage';
+import { AuthPage } from './pages/Auth/AuthPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { Dashboard } from './pages/Dashboard';
 import { PatientsPage } from './pages/Patients/PatientsPage';
@@ -53,11 +52,8 @@ const MainAppContent: React.FC = () => {
 
   // 1. Unauthenticated workflow
   if (!user) {
-    if (loggedOutTab === 'login') {
-      return <LoginPage onNavigate={setLoggedOutTab} />;
-    }
-    if (loggedOutTab === 'register') {
-      return <RegisterPage onNavigate={setLoggedOutTab} />;
+    if (loggedOutTab === 'login' || loggedOutTab === 'register') {
+      return <AuthPage initialTab={loggedOutTab} onNavigate={setLoggedOutTab} />;
     }
     return <LandingPage onNavigate={setLoggedOutTab} />;
   }
