@@ -105,11 +105,53 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
       padding: '2rem 1.5rem',
       fontFamily: 'var(--font-primary)'
     }}>
-      <div className="glass-card" style={{
+      {/* Inline styles to bypass global light/dark variables and ensure high readability */}
+      <style>{`
+        .auth-card {
+          background-color: #0b111e !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          border-radius: 16px !important;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+          backdrop-filter: blur(16px);
+        }
+        .auth-input {
+          background-color: #090d16 !important;
+          border: 1px solid #1e293b !important;
+          color: #ffffff !important;
+          padding-left: 38px !important;
+          border-radius: 8px !important;
+          transition: all 0.2s ease !important;
+        }
+        .auth-input:focus {
+          border-color: #14b8a6 !important;
+          box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+          background-color: #05080f !important;
+        }
+        .auth-input::placeholder {
+          color: #64748b !important;
+          opacity: 1 !important;
+        }
+        .auth-label {
+          color: #94a3b8 !important;
+          font-weight: 500 !important;
+          font-size: 0.875rem !important;
+          margin-bottom: 0.375rem !important;
+          display: inline-block !important;
+        }
+        /* Specific override for autofill background */
+        .auth-input:-webkit-autofill,
+        .auth-input:-webkit-autofill:hover, 
+        .auth-input:-webkit-autofill:focus {
+          -webkit-text-fill-color: #ffffff !important;
+          -webkit-box-shadow: 0 0 0px 1000px #090d16 inset !important;
+          transition: background-color 5000s ease-in-out 0s !important;
+        }
+      `}</style>
+
+      <div className="auth-card" style={{
         maxWidth: '480px',
         width: '100%',
         padding: '2.5rem',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
         position: 'relative'
       }}>
         {/* Back to Home Link */}
@@ -137,21 +179,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
         {/* Brand / Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #0d9488, #0f766e)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: '1.6rem',
-            boxShadow: '0 0 15px rgba(13, 148, 136, 0.4)',
-            marginBottom: '0.75rem'
-          }}>M</div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'white', letterSpacing: '-0.025em' }}>MediClinic Pro</h1>
+          {/* Note: The 'M' logo square has been removed for a cleaner look as requested */}
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'white', letterSpacing: '-0.025em' }}>MediClinic Pro</h1>
           <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '4px' }}>
             Gestion clinique & financière moderne pour la Côte d'Ivoire
           </p>
@@ -169,7 +198,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
             <form onSubmit={handleRecoverySubmit}>
               <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label style={{ color: '#94a3b8' }}>Adresse Email</label>
+                <span className="auth-label">Adresse Email</span>
                 <div style={{ position: 'relative' }}>
                   <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                   <input
@@ -177,8 +206,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                     placeholder="Ex: docteur@gmail.com"
                     value={recoveryEmail}
                     onChange={e => setRecoveryEmail(e.target.value)}
-                    className="input-control w-full"
-                    style={{ paddingLeft: '38px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                    className="input-control auth-input w-full"
                     disabled={isSubmitting}
                     required
                   />
@@ -230,10 +258,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               gap: '20px'
             }}>
               <button
+                type="button"
                 onClick={() => { setActiveTab('login'); }}
                 style={{
                   paddingBottom: '0.75rem',
-                  color: activeTab === 'login' ? '#14b8a6' : '#94a3b8',
+                  color: activeTab === 'login' ? '#14b8a6' : '#64748b',
                   borderBottom: activeTab === 'login' ? '2px solid #14b8a6' : 'none',
                   background: 'none',
                   borderTop: 'none',
@@ -250,10 +279,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                 Connexion
               </button>
               <button
+                type="button"
                 onClick={() => { setActiveTab('register'); }}
                 style={{
                   paddingBottom: '0.75rem',
-                  color: activeTab === 'register' ? '#14b8a6' : '#94a3b8',
+                  color: activeTab === 'register' ? '#14b8a6' : '#64748b',
                   borderBottom: activeTab === 'register' ? '2px solid #14b8a6' : 'none',
                   background: 'none',
                   borderTop: 'none',
@@ -275,7 +305,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
             {activeTab === 'login' && (
               <form onSubmit={handleLoginSubmit}>
                 <div className="form-group">
-                  <label style={{ color: '#94a3b8' }}>Adresse Email</label>
+                  <span className="auth-label">Adresse Email</span>
                   <div style={{ position: 'relative' }}>
                     <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                     <input
@@ -283,8 +313,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                       placeholder="Ex: docteur@gmail.com"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                      className="input-control auth-input w-full"
                       disabled={isSubmitting}
                       required
                     />
@@ -293,7 +322,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
                 <div className="form-group" style={{ marginBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ color: '#94a3b8', marginBottom: 0 }}>Mot de passe</label>
+                    <span className="auth-label" style={{ marginBottom: 0 }}>Mot de passe</span>
                     <button
                       type="button"
                       onClick={() => setIsForgotView(true)}
@@ -317,8 +346,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                       placeholder="Saisissez votre mot de passe"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px', paddingRight: '40px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                      className="input-control auth-input w-full"
+                      style={{ paddingRight: '40px' }}
                       disabled={isSubmitting}
                       required
                     />
@@ -378,7 +407,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               <form onSubmit={handleRegisterSubmit}>
                 {/* Clinic Name */}
                 <div className="form-group">
-                  <label style={{ color: '#94a3b8' }}>Nom de la Clinique *</label>
+                  <span className="auth-label">Nom de la Clinique *</span>
                   <div style={{ position: 'relative' }}>
                     <Building2 size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                     <input
@@ -386,8 +415,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                       placeholder="Ex: Cabinet Médical Saint-Jean"
                       value={clinicName}
                       onChange={e => setClinicName(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                      className="input-control auth-input w-full"
                       disabled={isSubmitting}
                       required
                     />
@@ -396,7 +424,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
                 {/* Admin Name */}
                 <div className="form-group">
-                  <label style={{ color: '#94a3b8' }}>Nom du Responsable *</label>
+                  <span className="auth-label">Nom du Responsable *</span>
                   <div style={{ position: 'relative' }}>
                     <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                     <input
@@ -404,8 +432,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                       placeholder="Ex: Dr. Koné Aminata"
                       value={adminName}
                       onChange={e => setAdminName(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                      className="input-control auth-input w-full"
                       disabled={isSubmitting}
                       required
                     />
@@ -414,7 +441,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
                 {/* Email */}
                 <div className="form-group">
-                  <label style={{ color: '#94a3b8' }}>Adresse Email *</label>
+                  <span className="auth-label">Adresse Email *</span>
                   <div style={{ position: 'relative' }}>
                     <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                     <input
@@ -422,8 +449,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                       placeholder="Ex: contact@saintjean.ci"
                       value={registerEmail}
                       onChange={e => setRegisterEmail(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                      className="input-control auth-input w-full"
                       disabled={isSubmitting}
                       required
                     />
@@ -432,7 +458,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
                 {/* Phone */}
                 <div className="form-group">
-                  <label style={{ color: '#94a3b8' }}>Téléphone (Mobile Money) *</label>
+                  <span className="auth-label">Téléphone (Mobile Money) *</span>
                   <div style={{ position: 'relative' }}>
                     <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                     <input
@@ -440,8 +466,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                       placeholder="Ex: +225 0707070707"
                       value={phone}
                       onChange={e => setPhone(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                      className="input-control auth-input w-full"
                       disabled={isSubmitting}
                       required
                     />
@@ -450,7 +475,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
                 {/* Password */}
                 <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ color: '#94a3b8' }}>Mot de passe *</label>
+                  <span className="auth-label">Mot de passe *</span>
                   <div style={{ position: 'relative' }}>
                     <KeyRound size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
                     <input
@@ -458,8 +483,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                       placeholder="Minimum 6 caractères"
                       value={registerPassword}
                       onChange={e => setRegisterPassword(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px', paddingRight: '40px', backgroundColor: '#090d16', borderColor: '#1e293b' }}
+                      className="input-control auth-input w-full"
+                      style={{ paddingRight: '40px' }}
                       disabled={isSubmitting}
                       required
                     />
