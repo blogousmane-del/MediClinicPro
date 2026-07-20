@@ -10,7 +10,19 @@ export const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState<number>(1);
   const [address, setAddress] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
-  
+
+  const handleStep1Next = () => {
+    if (!address.trim()) {
+      showToast('error', 'Champs requis', 'Veuillez renseigner l\'adresse physique de votre clinique.');
+      return;
+    }
+    if (!phone.trim()) {
+      showToast('error', 'Champs requis', 'Veuillez renseigner le téléphone de contact.');
+      return;
+    }
+    setStep(2);
+  };
+
   // Step 2: Users list
   const [staffList, setStaffList] = useState<any[]>([]);
   const [newStaffName, setNewStaffName] = useState<string>('');
@@ -209,7 +221,7 @@ export const OnboardingPage: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2.5rem' }}>
                 <button
-                  onClick={() => setStep(2)}
+                  onClick={handleStep1Next}
                   className="btn btn-primary"
                   style={{ gap: '6px' }}
                 >
