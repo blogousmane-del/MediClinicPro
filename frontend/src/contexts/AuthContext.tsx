@@ -16,6 +16,7 @@ export interface Clinic {
   logo: string;
   subscription_status: 'active' | 'expired' | 'trial';
   subscription_expires_at: string;
+  settings?: any;
 }
 
 interface AuthContextType {
@@ -27,7 +28,7 @@ interface AuthContextType {
   register: (clinicName: string, adminName: string, email: string, password: string, phone: string) => Promise<void>;
   logout: () => void;
   onboardClinic: (address: string, phone: string, staff: any[], modules: string[]) => Promise<void>;
-  renewSubscription: (provider: string, phone: string, months: number) => Promise<void>;
+  renewSubscription: (provider: string, phone: string, months: number, plan: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -113,12 +114,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const renewSubscription = async (provider: string, phone: string, months: number) => {
+  const renewSubscription = async (provider: string, phone: string, months: number, plan: string) => {
     try {
       const data = await api.post('/financials/subscription-pay', {
         provider,
         phoneNumber: phone,
-        months
+        months,
+        plan
       });
       if (data.success) {
         setClinic(data.clinic);

@@ -214,26 +214,34 @@ router.get('/stats', auth, async (req, res) => {
 });
 
 // POST /api/financials/subscription-pay
-// Mobile Money subscription simulator (15 000 FCFA/mois)
+// Mobile Money subscription simulator (Starter, Pro, Expert plans)
 router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { provider, phoneNumber, months } = req.body;
+    const { provider, phoneNumber, months, plan } = req.body;
 
     if (!provider || !phoneNumber) {
       return res.status(400).json({ error: "Fournisseur mobile money et numéro de téléphone requis." });
     }
 
+    const selectedPlan = plan || 'starter';
+    const planPrices = {
+      starter: 15000,
+      pro: 30000,
+      expert: 60000
+    };
+    const pricePerMonth = planPrices[selectedPlan] || 15000;
+
     const qtyMonths = parseInt(months) || 1;
-    const amount = qtyMonths * 15000;
+    const amount = qtyMonths * pricePerMonth;
 
     // Simulate Payment confirmation
-    console.log(`[MOBILE MONEY SIMULATOR] Push request sent to provider "${provider}" for number "${phoneNumber}" of amount "${amount} FCFA".`);
+    console.log(`[MOBILE MONEY SIMULATOR] Push request sent to provider "${provider}" for number "${phoneNumber}" of amount "${amount} FCFA" on plan "${selectedPlan}".`);
     console.log(`[MOBILE MONEY SIMULATOR] User confirmed PIN code. Payment successful!`);
 
     // Fetch current clinic details
     const { data: clinic, error: clinicError } = await supabase
       .from('clinics')
-      .select('subscription_expires_at, subscription_status')
+      .select('subscription_expires_at, subscription_status, settings')
       .eq('id', req.user.clinicId)
       .single();
 
@@ -252,12 +260,18 @@ router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) =>
     baseDate.setMonth(baseDate.getMonth() + qtyMonths);
     const newExpiryStr = baseDate.toISOString();
 
+    const updatedSettings = {
+      ...(clinic.settings || {}),
+      subscription_plan: selectedPlan
+    };
+
     // Update Clinic subscription status
     const { error: updateError } = await supabase
       .from('clinics')
       .update({
         subscription_status: 'active',
-        subscription_expires_at: newExpiryStr
+        subscription_expires_at: newExpiryStr,
+        settings: updatedSettings
       })
       .eq('id', req.user.clinicId);
 
@@ -268,7 +282,7 @@ router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) =>
       clinic_id: req.user.clinicId,
       user_id: req.user.userId,
       action: 'SUBSCRIPTION_RENEW',
-      details: `Abonnement renouvelé pour ${qtyMonths} mois (${amount} FCFA) via ${provider.toUpperCase()}`
+      details: `Abonnement ${selectedPlan.toUpperCase()} renouvelé pour ${qtyMonths} mois (${amount} FCFA) via ${provider.toUpperCase()}`
     });
 
     const { data: updatedClinic, error: loadUpdatedError } = await supabase
@@ -281,7 +295,7 @@ router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) =>
 
     res.json({
       success: true,
-      message: `Abonnement de ${amount} FCFA traité avec succès via ${provider.toUpperCase()}.`,
+      message: `Abonnement ${selectedPlan.toUpperCase()} de ${amount} FCFA traité avec succès via ${provider.toUpperCase()}.`,
       clinic: updatedClinic
     });
   } catch (error) {

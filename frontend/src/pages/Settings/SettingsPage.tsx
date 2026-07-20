@@ -36,6 +36,7 @@ export const SettingsPage: React.FC = () => {
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
 
   // Billing states
+  const [billingPlan, setBillingPlan] = useState<'starter' | 'pro' | 'expert'>('starter');
   const [billingProvider, setBillingProvider] = useState<string>('wave');
   const [billingPhone, setBillingPhone] = useState<string>('');
   const [billingMonths, setBillingMonths] = useState<number>(1);
@@ -88,6 +89,7 @@ export const SettingsPage: React.FC = () => {
         address: clinicAddress,
         phone: clinicPhone,
         settings: {
+          ...clinic?.settings,
           tariffs
         }
       };
@@ -156,8 +158,10 @@ export const SettingsPage: React.FC = () => {
 
     setIsProcessingPayment(true);
     try {
-      await renewSubscription(billingProvider, billingPhone, billingMonths);
-      showToast('success', 'Abonnement renouvelé !', `Paiement de ${(billingMonths * 15000).toLocaleString()} FCFA simulé et confirmé.`);
+      await renewSubscription(billingProvider, billingPhone, billingMonths, billingPlan);
+      const planPrices = { starter: 15000, pro: 30000, expert: 60000 };
+      const amount = billingMonths * planPrices[billingPlan];
+      showToast('success', 'Abonnement renouvelé !', `Paiement de ${amount.toLocaleString()} FCFA simulé et confirmé.`);
       setBillingPhone('');
       await refreshProfile();
     } catch (err: any) {
@@ -175,6 +179,21 @@ export const SettingsPage: React.FC = () => {
     pharmacist: 'Pharmacien',
     lab_tech: 'Laborantin',
     manager: 'Gestionnaire'
+  };
+
+  const planPrices = { starter: 15000, pro: 30000, expert: 60000 };
+  const currentPlan = clinic?.settings?.subscription_plan || 'starter';
+
+  const planLabels: Record<string, string> = {
+    starter: 'Starter (Débutant)',
+    pro: 'Pro (Professionnel)',
+    expert: 'Expert (Grand Établissement)'
+  };
+
+  const planColors: Record<string, string> = {
+    starter: 'badge-info',
+    pro: 'badge-success',
+    expert: 'badge-warning' // Gold
   };
 
   return (
@@ -375,110 +394,231 @@ export const SettingsPage: React.FC = () => {
         </>
       )}
 
-      {/* SUBTAB 3: Billing & Subscription Simulator */}
+      {/* SUBTAB 3: Billing & Subscription SaaS */}
       {activeSubTab === 'billing' && clinic && (
-        <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: '1.5rem', alignItems: 'start' }}>
-          {/* Subscription details card */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>État de votre abonnement</h3>
-            
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              backgroundColor: 'var(--bg-tertiary)',
-              padding: '16px',
-              borderRadius: '8px'
-            }}>
-              <div>
-                <span className="text-xs text-muted" style={{ fontWeight: 600 }}>STATUT</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                  <span className={`badge ${clinic.subscription_status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                    {clinic.subscription_status === 'active' ? 'ABONNÉ ACTIF' : 'EXPIRÉ'}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-xs text-muted" style={{ fontWeight: 600 }}>DATE D'EXPIRATION</span>
-                <div style={{ fontWeight: 'bold', fontSize: '1rem', marginTop: '2px', color: clinic.subscription_status === 'active' ? 'inherit' : 'var(--danger)' }}>
-                  {new Date(clinic.subscription_expires_at).toLocaleDateString('fr-FR', { dateStyle: 'long' })}
-                </div>
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          
+          {/* Status summary */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'row', gap: '2.5rem', flexWrap: 'wrap', padding: '1.5rem', alignItems: 'center' }}>
+            <div>
+              <span className="text-xs text-muted" style={{ fontWeight: 600, display: 'block', marginBottom: '4px' }}>STATUT DE L'ABONNEMENT</span>
+              <span className={`badge ${clinic.subscription_status === 'active' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.9rem', padding: '6px 12px' }}>
+                {clinic.subscription_status === 'active' ? '🔴 ABONNÉ ACTIF' : '⚠️ EXPIRÉ'}
+              </span>
             </div>
 
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              MediClinic coûte <strong>15 000 FCFA/mois</strong>. Lorsque votre abonnement expire, l'application repasse en lecture seule.
+            <div>
+              <span className="text-xs text-muted" style={{ fontWeight: 600, display: 'block', marginBottom: '4px' }}>FORFAIT ACTUEL</span>
+              <span className={`badge ${planColors[currentPlan]}`} style={{ fontSize: '0.9rem', padding: '6px 12px' }}>
+                {planLabels[currentPlan].toUpperCase()}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-xs text-muted" style={{ fontWeight: 600, display: 'block', marginBottom: '4px' }}>DATE D'EXPIRATION</span>
+              <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: clinic.subscription_status === 'active' ? 'var(--text-primary)' : 'var(--danger)' }}>
+                {new Date(clinic.subscription_expires_at).toLocaleDateString('fr-FR', { dateStyle: 'long' })}
+              </span>
             </div>
           </div>
 
-          {/* Simulator Form */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Bac à sable : Simulation Mobile Money</h3>
+          {/* Pricing Plans Grid */}
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '1rem', color: 'white' }}>Forfaits & Tarifs SaaS</h3>
             
-            <form onSubmit={handleSimulateSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Opérateur Mobile Money *</label>
-                <select
-                  value={billingProvider}
-                  onChange={e => setBillingProvider(e.target.value)}
-                  className="input-control"
-                >
-                  <option value="wave">Wave CI</option>
-                  <option value="orange_money">Orange Money</option>
-                  <option value="mtn_momo">MTN Mobile Money</option>
-                </select>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Numéro de téléphone payeur *</label>
-                <div style={{ position: 'relative' }}>
-                  <Smartphone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-                  <input
-                    type="tel"
-                    placeholder="Ex: +225 0707..."
-                    value={billingPhone}
-                    onChange={e => setBillingPhone(e.target.value)}
-                    className="input-control w-full"
-                    style={{ paddingLeft: '38px' }}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Durée d'abonnement</label>
-                <select
-                  value={billingMonths}
-                  onChange={e => setBillingMonths(parseInt(e.target.value))}
-                  className="input-control"
-                >
-                  <option value={1}>1 mois (15 000 FCFA)</option>
-                  <option value={3}>3 mois (45 000 FCFA)</option>
-                  <option value={6}>6 mois (90 000 FCFA)</option>
-                  <option value={12}>12 mois (180 000 FCFA)</option>
-                </select>
-              </div>
-
-              <div style={{
-                backgroundColor: 'var(--bg-tertiary)',
-                padding: '12px',
-                borderRadius: '6px',
-                fontSize: '0.85rem',
-                borderLeft: '4px solid var(--primary)'
-              }}>
-                <strong>Simulateur :</strong> En cliquant, un Push OTP sera simulé vers l'opérateur et le compte sera instantanément renouvelé de {billingMonths} mois.
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary w-full"
-                disabled={isProcessingPayment}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+              
+              {/* STARTER */}
+              <div 
+                onClick={() => setBillingPlan('starter')}
+                className="card"
+                style={{
+                  cursor: 'pointer',
+                  border: billingPlan === 'starter' ? '2px solid var(--primary)' : '1px solid var(--border)',
+                  boxShadow: billingPlan === 'starter' ? '0 0 15px rgba(13, 148, 136, 0.25)' : 'var(--shadow-sm)',
+                  backgroundColor: billingPlan === 'starter' ? 'var(--bg-secondary)' : 'rgba(255,255,255,0.01)',
+                  transition: 'var(--transition)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}
               >
-                {isProcessingPayment ? 'Traitement simulation...' : `Payer ${(billingMonths * 15000).toLocaleString()} FCFA`}
-              </button>
-            </form>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: '1.1rem', color: 'white' }}>Starter</strong>
+                  {billingPlan === 'starter' && <span className="badge badge-success">Sélectionné</span>}
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>15 000 FCFA <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>/ mois</span></div>
+                <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <li>De 1 à 3 collaborateurs</li>
+                  <li>Dossiers patients complets</li>
+                  <li>Agenda & Rendez-vous</li>
+                  <li>Consultations & Ordonnances</li>
+                </ul>
+              </div>
+
+              {/* PRO */}
+              <div 
+                onClick={() => setBillingPlan('pro')}
+                className="card"
+                style={{
+                  cursor: 'pointer',
+                  border: billingPlan === 'pro' ? '2px solid var(--primary)' : '1px solid var(--border)',
+                  boxShadow: billingPlan === 'pro' ? '0 0 15px rgba(13, 148, 136, 0.25)' : 'var(--shadow-sm)',
+                  backgroundColor: billingPlan === 'pro' ? 'var(--bg-secondary)' : 'rgba(255,255,255,0.01)',
+                  transition: 'var(--transition)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: '1.1rem', color: 'white' }}>Pro</strong>
+                  {billingPlan === 'pro' && <span className="badge badge-success">Sélectionné</span>}
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>30 000 FCFA <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>/ mois</span></div>
+                <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <li>De 4 à 10 collaborateurs</li>
+                  <li>Tout le forfait Starter</li>
+                  <li>Gestion de la Pharmacie</li>
+                  <li>Facturation & Recettes</li>
+                </ul>
+              </div>
+
+              {/* EXPERT */}
+              <div 
+                onClick={() => setBillingPlan('expert')}
+                className="card"
+                style={{
+                  cursor: 'pointer',
+                  border: billingPlan === 'expert' ? '2px solid var(--primary)' : '1px solid var(--border)',
+                  boxShadow: billingPlan === 'expert' ? '0 0 15px rgba(13, 148, 136, 0.25)' : 'var(--shadow-sm)',
+                  backgroundColor: billingPlan === 'expert' ? 'var(--bg-secondary)' : 'rgba(255,255,255,0.01)',
+                  transition: 'var(--transition)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ fontSize: '1.1rem', color: 'white' }}>Expert</strong>
+                  {billingPlan === 'expert' && <span className="badge badge-success">Sélectionné</span>}
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>60 000 FCFA <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>/ mois</span></div>
+                <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <li>Nombre d'utilisateurs illimités</li>
+                  <li>Tout le forfait Pro</li>
+                  <li>File du Laboratoire d'analyses</li>
+                  <li>Exportations PDF / Excel</li>
+                </ul>
+              </div>
+
+            </div>
           </div>
+
+          {/* Payment & Simulation */}
+          <div style={{ display: 'grid', gridTemplateColumns: '6fr 5fr', gap: '1.5rem', alignItems: 'start' }}>
+            
+            {/* MM Simulator Form */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Simuler le renouvellement par Mobile Money</h3>
+              
+              <form onSubmit={handleSimulateSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Forfait sélectionné</label>
+                    <select
+                      value={billingPlan}
+                      onChange={e => setBillingPlan(e.target.value as any)}
+                      className="input-control"
+                    >
+                      <option value="starter">Starter (15 000 FCFA/mois)</option>
+                      <option value="pro">Pro (30 000 FCFA/mois)</option>
+                      <option value="expert">Expert (60 000 FCFA/mois)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Durée d'engagement</label>
+                    <select
+                      value={billingMonths}
+                      onChange={e => setBillingMonths(parseInt(e.target.value))}
+                      className="input-control"
+                    >
+                      <option value={1}>1 mois</option>
+                      <option value={3}>3 mois</option>
+                      <option value={6}>6 mois</option>
+                      <option value={12}>12 mois (1 an)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Opérateur Mobile Money *</label>
+                  <select
+                    value={billingProvider}
+                    onChange={e => setBillingProvider(e.target.value)}
+                    className="input-control"
+                  >
+                    <option value="wave">Wave Côte d'Ivoire</option>
+                    <option value="orange_money">Orange Money</option>
+                    <option value="mtn_momo">MTN Mobile Money</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Numéro de téléphone payeur *</label>
+                  <div style={{ position: 'relative' }}>
+                    <Smartphone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+                    <input
+                      type="tel"
+                      placeholder="Ex: +225 0707..."
+                      value={billingPhone}
+                      onChange={e => setBillingPhone(e.target.value)}
+                      className="input-control w-full"
+                      style={{ paddingLeft: '38px' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full"
+                  style={{ marginTop: '6px', fontWeight: 600 }}
+                  disabled={isProcessingPayment}
+                >
+                  {isProcessingPayment ? 'Traitement en cours...' : `Confirmer et Payer ${(billingMonths * planPrices[billingPlan]).toLocaleString()} FCFA`}
+                </button>
+              </form>
+            </div>
+
+            {/* Help / Pricing Guide */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Pourquoi choisir un forfait supérieur ?</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', lineHeight: 1.4, color: 'var(--text-secondary)' }}>
+                <p>
+                  🚀 <strong>Forfait Pro :</strong> Déverrouille les modules de gestion des stocks de pharmacie, de dispensation sur ordonnance, ainsi que les rapports de caisse pour le comptable.
+                </p>
+                <p>
+                  🔬 <strong>Forfait Expert :</strong> Conçu pour les structures médicales complètes. Il intègre la file d'attente du laboratoire d'analyses, la saisie et l'impression des comptes-rendus d'analyses, ainsi que l'assistance technique prioritaire.
+                </p>
+                <div style={{
+                  backgroundColor: 'var(--bg-tertiary)',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-primary)',
+                  borderLeft: '4px solid var(--primary)',
+                  marginTop: '6px'
+                }}>
+                  Le basculement de forfait prolonge votre durée d'abonnement selon le prorata du tarif choisi.
+                </div>
+              </div>
+            </div>
+
+          </div>
+
         </div>
       )}
 
@@ -534,3 +674,4 @@ export const SettingsPage: React.FC = () => {
     </div>
   );
 };
+export default SettingsPage;
