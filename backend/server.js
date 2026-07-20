@@ -28,7 +28,11 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    if (
+      allowedOrigins.indexOf(origin) !== -1 || 
+      process.env.NODE_ENV !== 'production' || 
+      origin.includes('vercel.app')
+    ) {
       return callback(null, true);
     }
     return callback(new Error('CORS Policy: Request from origin not allowed.'));
@@ -89,4 +93,13 @@ async function startServer() {
   }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+} else {
+  // On Vercel, initialize database asynchronously without starting a port listener
+  initDb()
+    .then(() => console.log("Database initialized successfully in Vercel Serverless environment."))
+    .catch(err => console.error("Failed to initialize database in Vercel Serverless environment:", err));
+}
+
+module.exports = app;
