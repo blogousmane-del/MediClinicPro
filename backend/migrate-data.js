@@ -1,3 +1,5 @@
+// One-off local migration script (SQLite -> Supabase). Not used at runtime/deploy.
+// Run again locally with: npm install sqlite3 --no-save && node migrate-data.js
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { createClient } = require('@supabase/supabase-js');

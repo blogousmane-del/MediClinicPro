@@ -4,8 +4,10 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error("FATAL: Les variables d'environnement SUPABASE_URL ou SUPABASE_KEY ne sont pas configurées dans le fichier .env.");
-  process.exit(1);
+  throw new Error(
+    "SUPABASE_URL ou SUPABASE_KEY manquant(e). En local, renseignez backend/.env. " +
+    "Sur Vercel, ajoutez ces variables dans Project Settings > Environment Variables."
+  );
 }
 
 // Initialize Supabase Client with service role key for administrative bypass of RLS on backend

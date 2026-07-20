@@ -210,15 +210,15 @@ INSERT INTO clinics (id, name, address, phone, subscription_status, subscription
   }
 }');
 
--- Password hashes (bcrypt cost=10)
+-- Password hashes (bcrypt cost=10) - regenerated and verified against bcryptjs.compare()
 INSERT INTO users (id, clinic_id, name, email, password_hash, role, active) VALUES
-(1, 1, 'Administrateur', 'admin@mediclinic.com', '$2a$10$VjQ34B19.8BqBw0K8Gk1GedS/e3NnC2y2kU2g71pYtK9x1jL0j1Jq', 'admin', 1), -- adminpassword
-(2, 1, 'Dr. Aminata Koné', 'aminata@mediclinic.com', '$2a$10$f61X8W6C8jL4q9k8Gk1GedvH2c2y2kU2g71pYtK9x1jL0j1Jq', 'doctor', 1), -- doctorpassword
-(3, 1, 'Dr. Ibrahim Traoré', 'ibrahim@mediclinic.com', '$2a$10$f61X8W6C8jL4q9k8Gk1GedvH2c2y2kU2g71pYtK9x1jL0j1Jq', 'doctor', 1), -- doctorpassword
-(4, 1, 'Koffi Bernard', 'bernard@mediclinic.com', '$2a$10$L19X8W6C8jL4q9k8Gk1GedzV2c2y2kU2g71pYtK9x1jL0j1Jq', 'secretary', 1), -- secretarypassword
-(5, 1, 'Moussa Pharmacien', 'moussa@mediclinic.com', '$2a$10$M19X8W6C8jL4q9k8Gk1GedwE2c2y2kU2g71pYtK9x1jL0j1Jq', 'pharmacist', 1), -- pharmacistpassword
-(6, 1, 'Fatou Laborantine', 'fatou@mediclinic.com', '$2a$10$N19X8W6C8jL4q9k8Gk1GedxR2c2y2kU2g71pYtK9x1jL0j1Jq', 'lab_tech', 1), -- labpassword
-(7, 1, 'Kouassi Gestionnaire', 'kouassi@mediclinic.com', '$2a$10$O19X8W6C8jL4q9k8Gk1GedyT2c2y2kU2g71pYtK9x1jL0j1Jq', 'manager', 1); -- managerpassword
+(1, 1, 'Administrateur', 'admin@mediclinic.com', '$2a$10$.xGSl.knQiHJcilqpOtTHe4MGzHSyZlM3GofsduMrbYs9PRv4eJ/S', 'admin', 1), -- adminpassword
+(2, 1, 'Dr. Aminata Koné', 'aminata@mediclinic.com', '$2a$10$pzFlMyOI2De.LWBD.s96Guj/Sb6QiNJSjh6XBp5le1iaEy4k.6GLe', 'doctor', 1), -- doctorpassword
+(3, 1, 'Dr. Ibrahim Traoré', 'ibrahim@mediclinic.com', '$2a$10$pzFlMyOI2De.LWBD.s96Guj/Sb6QiNJSjh6XBp5le1iaEy4k.6GLe', 'doctor', 1), -- doctorpassword
+(4, 1, 'Koffi Bernard', 'bernard@mediclinic.com', '$2a$10$pqpzshRqNERXn6SxqO.OJOFQoq4tqqH/02igbXW47ZY/KoAH9.p36', 'secretary', 1), -- secretarypassword
+(5, 1, 'Moussa Pharmacien', 'moussa@mediclinic.com', '$2a$10$N57s2TbUloU2fSjKxdh/7.w/GUjweOTtC0teKrNg7NxO1fivUlmZG', 'pharmacist', 1), -- pharmacistpassword
+(6, 1, 'Fatou Laborantine', 'fatou@mediclinic.com', '$2a$10$ztStKuicP1UrLU57MIzIo.uqvxAyjKYYkbEsJ4MOH1g1Sn4xo/EKS', 'lab_tech', 1), -- labpassword
+(7, 1, 'Kouassi Gestionnaire', 'kouassi@mediclinic.com', '$2a$10$1kZ1iuBuOROPMFY26C3SHONfVFCsuXHQJnJ9NRGfGW.UWEJDwA/72', 'manager', 1); -- managerpassword
 
 -- Seed medications catalog
 INSERT INTO medications (id, clinic_id, name, form, dosage, stock_quantity, min_stock_threshold, price_purchase, price_sale, expiry_date, batch_number, supplier) VALUES

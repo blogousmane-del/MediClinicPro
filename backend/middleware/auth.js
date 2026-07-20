@@ -4,8 +4,10 @@ const { supabase } = require('../database');
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  console.error("FATAL: La variable d'environnement JWT_SECRET n'est pas configurée dans le fichier .env.");
-  process.exit(1);
+  throw new Error(
+    "JWT_SECRET manquant. En local, renseignez backend/.env. " +
+    "Sur Vercel, ajoutez cette variable dans Project Settings > Environment Variables."
+  );
 }
 
 // General auth middleware
