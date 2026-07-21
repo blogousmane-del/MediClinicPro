@@ -1,8 +1,10 @@
+// IMPORTANT: Load .env FIRST, before any module that reads process.env
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const { initDb } = require('./database');
 const authRoutes = require('./routes/auth');

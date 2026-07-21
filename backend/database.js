@@ -4,8 +4,8 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    "SUPABASE_URL ou SUPABASE_KEY manquant(e). En local, renseignez backend/.env. " +
+  console.error(
+    "⚠️  SUPABASE_URL ou SUPABASE_KEY manquant(e). En local, renseignez backend/.env. " +
     "Sur Vercel, ajoutez ces variables dans Project Settings > Environment Variables."
   );
 }

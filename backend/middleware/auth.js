@@ -4,8 +4,8 @@ const { supabase } = require('../database');
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
-  throw new Error(
-    "JWT_SECRET manquant. En local, renseignez backend/.env. " +
+  console.error(
+    "⚠️  JWT_SECRET manquant. En local, renseignez backend/.env. " +
     "Sur Vercel, ajoutez cette variable dans Project Settings > Environment Variables."
   );
 }
