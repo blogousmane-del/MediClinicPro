@@ -214,23 +214,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
 
       {/* Final CTA */}
       <section className="landing-cta-band">
-        <p style={{ fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgb(13, 148, 136)', marginBottom: '1rem' }}>
-          Commencer
+        <div className="landing-image-card">
+          <img src="/clinic_hero.png" alt="Cabinet médical moderne MediClinic Côte d'Ivoire" />
+        </div>
+        <p style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgb(13, 148, 136)', marginBottom: '0.75rem' }}>
+          COMMENCER DÈS AUJOURD'HUI
         </p>
-        <h2 style={{ fontSize: '1.75rem', fontFamily: 'var(--font-secondary)', maxWidth: '480px', margin: '0 auto 1rem' }}>
+        <h2 style={{ fontSize: '2.1rem', fontFamily: 'var(--font-secondary)', maxWidth: '520px', margin: '0 auto 1rem', color: '#ffffff' }}>
           Prêt à transformer votre clinique ?
         </h2>
-        <p style={{ color: '#94a3b8', maxWidth: '420px', margin: '0 auto' }}>
-          Rejoignez les cliniques de Côte d'Ivoire qui ont choisi MediClinic pour simplifier leur gestion médicale au quotidien.
+        <p style={{ color: '#cbd5e1', maxWidth: '480px', margin: '0 auto 1.5rem', fontSize: '1.05rem', lineHeight: 1.6 }}>
+          Rejoignez les cliniques et cabinets médicalisés de Côte d'Ivoire qui ont choisi MediClinic pour simplifier leur gestion médicale au quotidien.
         </p>
         <div className="landing-cta-row">
-          <button onClick={() => onNavigate('register')} className="btn btn-primary">
-            Démarrer gratuitement
+          <button onClick={() => onNavigate('register')} className="btn btn-primary" style={{ padding: '0.85rem 2rem', fontSize: '1rem' }}>
+            Démarrer gratuitement <ArrowRight size={18} />
           </button>
           <a
             href="#pricing"
             className="btn btn-secondary"
-            style={{ backgroundColor: 'transparent', border: '1px solid #374151', color: 'white', textDecoration: 'none' }}
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid #374151', color: 'white', textDecoration: 'none', padding: '0.85rem 1.75rem', fontSize: '1rem' }}
           >
             Voir les tarifs <ChevronRight size={18} />
           </a>

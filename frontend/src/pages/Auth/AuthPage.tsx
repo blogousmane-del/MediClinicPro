@@ -538,55 +538,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                 </div>
               </form>
             )}
-
-            {/* Demo Accounts Quick Seeder (For easier testing) */}
-            {activeTab === 'login' && (
-              <div style={{
-                marginTop: '2rem',
-                backgroundColor: '#0f172a',
-                borderRadius: '10px',
-                padding: '1rem',
-                fontSize: '0.8rem',
-                color: '#94a3b8',
-                border: '1px solid #1e293b',
-                boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.2)'
-              }}>
-                <div style={{ fontWeight: 600, marginBottom: '8px', color: 'white' }}>🔑 Comptes Démo (Cliquer pour remplir) :</div>
-                <div className="modal-grid" style={{ gap: '6px' }}>
-                  {[
-                    { label: 'Administrateur', email: 'admin@mediclinic.com', pass: 'adminpassword' },
-                    { label: 'Médecin', email: 'aminata@mediclinic.com', pass: 'doctorpassword' },
-                    { label: 'Secrétaire', email: 'bernard@mediclinic.com', pass: 'secretarypassword' },
-                    { label: 'Pharmacien', email: 'moussa@mediclinic.com', pass: 'pharmacistpassword' }
-                  ].map((acc) => (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      onClick={() => {
-                        setEmail(acc.email);
-                        setPassword(acc.pass);
-                        showToast('info', 'Compte sélectionné', `${acc.label} pré-rempli.`);
-                      }}
-                      style={{
-                        padding: '6px',
-                        backgroundColor: '#1e293b',
-                        border: '1px solid #334155',
-                        borderRadius: '6px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        textAlign: 'left',
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
-                    >
-                      <strong>{acc.label}</strong>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

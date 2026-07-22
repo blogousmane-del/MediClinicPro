@@ -777,15 +777,33 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .landing-cta-band {
-  background: #111827;
-  border-top: 1px solid #1f2937;
+  background: linear-gradient(180deg, #0d1527 0%, #070d18 100%);
+  border-top: 1px solid rgba(13, 148, 136, 0.25);
   border-bottom: 1px solid #1f2937;
-  padding: 3rem 1.25rem;
+  padding: 4rem 1.25rem;
   text-align: center;
+  position: relative;
 }
 
 @media (min-width: 768px) {
-  .landing-cta-band { padding: 4.5rem 2rem; }
+  .landing-cta-band { padding: 5rem 2rem; }
+}
+
+.landing-cta-band h2 {
+  color: #ffffff !important;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+@media (min-width: 768px) {
+  .landing-cta-band h2 { font-size: 2.5rem; }
+}
+
+.landing-cta-band p {
+  color: #cbd5e1 !important;
+  font-size: 1.05rem;
+  line-height: 1.6;
 }
 
 .landing-cta-band .landing-cta-row {
@@ -795,6 +813,29 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (min-width: 480px) {
   .landing-cta-band .landing-cta-row { max-width: none; justify-content: center; }
+}
+
+.landing-image-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 20px 45px -10px rgba(13, 148, 136, 0.35);
+  border: 1px solid rgba(13, 148, 136, 0.3);
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto 2rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.landing-image-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 25px 50px -10px rgba(13, 148, 136, 0.45);
+}
+
+.landing-image-card img {
+  width: 100%;
+  height: 280px;
+  object-fit: cover;
+  display: block;
 }
 
 .landing-footer {
