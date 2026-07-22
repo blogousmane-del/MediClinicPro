@@ -7,6 +7,7 @@ import { Header } from './components/Header';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
+import { TermsOfServicePage } from './pages/TermsOfServicePage';
 import { AuthPage } from './pages/Auth/AuthPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { Dashboard } from './pages/Dashboard';
@@ -14,6 +15,7 @@ import { PatientsPage } from './pages/Patients/PatientsPage';
 import { PatientDetailPage } from './pages/Patients/PatientDetailPage';
 import { AppointmentsPage } from './pages/Appointments/AppointmentsPage';
 import { PharmacyPage } from './pages/Pharmacy/PharmacyPage';
+import { OrdonnancesPage } from './pages/Prescriptions/OrdonnancesPage';
 import { LaboratoryPage } from './pages/Laboratory/LaboratoryPage';
 import { AccountingPage } from './pages/Accounting/AccountingPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
@@ -26,7 +28,7 @@ const MainAppContent: React.FC = () => {
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
 
   // Auth pages switching states (when not logged in)
-  const [loggedOutTab, setLoggedOutTab] = useState<'landing' | 'login' | 'register'>('landing');
+  const [loggedOutTab, setLoggedOutTab] = useState<'landing' | 'login' | 'register' | 'terms'>('landing');
 
   // Quick Action modal triggers
   const [openPatientModal, setOpenPatientModal] = useState<boolean>(false);
@@ -55,6 +57,9 @@ const MainAppContent: React.FC = () => {
     if (loggedOutTab === 'login' || loggedOutTab === 'register') {
       return <AuthPage initialTab={loggedOutTab} onNavigate={setLoggedOutTab} />;
     }
+    if (loggedOutTab === 'terms') {
+      return <TermsOfServicePage onBack={() => setLoggedOutTab('landing')} onRegister={() => setLoggedOutTab('register')} />;
+    }
     return <LandingPage onNavigate={setLoggedOutTab} />;
   }
 
@@ -70,6 +75,7 @@ const MainAppContent: React.FC = () => {
     appointments: 'Gestion des Rendez-vous',
     patients: selectedPatientId ? 'Dossier Patient' : 'Registre des Patients',
     pharmacy: 'Gestion de Pharmacie',
+    prescriptions: 'Gestion des Ordonnances',
     laboratory: 'File du Laboratoire',
     accounting: 'Grand Livre & Recettes',
     settings: 'Paramètres du cabinet'
@@ -138,6 +144,7 @@ const MainAppContent: React.FC = () => {
         )}
         
         {currentTab === 'pharmacy' && <PharmacyPage />}
+        {currentTab === 'prescriptions' && <OrdonnancesPage />}
         {currentTab === 'laboratory' && <LaboratoryPage />}
         {currentTab === 'accounting' && <AccountingPage />}
         {currentTab === 'settings' && <SettingsPage />}

@@ -5,12 +5,12 @@ import {
   LayoutDashboard, 
   Calendar, 
   Users, 
-  Pill, 
-  FlaskConical, 
-  CreditCard, 
-  Settings as SettingsIcon, 
+  Pill,
+  FlaskConical,
+  FileText,
+  Receipt,
+  Settings as SettingsIcon,
   LogOut,
-  Wifi,
   WifiOff,
   X
 } from 'lucide-react';
@@ -34,8 +34,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
     { id: 'appointments', label: 'Rendez-vous', icon: Calendar, roles: ['admin', 'doctor', 'secretary', 'manager'] },
     { id: 'patients', label: 'Patients', icon: Users, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager'] },
     { id: 'pharmacy', label: 'Pharmacie', icon: Pill, roles: ['admin', 'pharmacist', 'manager'] },
+    { id: 'prescriptions', label: 'Ordonnances', icon: FileText, roles: ['admin', 'doctor', 'pharmacist', 'manager'] },
     { id: 'laboratory', label: 'Laboratoire', icon: FlaskConical, roles: ['admin', 'lab_tech', 'manager'] },
-    { id: 'accounting', label: 'Comptabilité', icon: CreditCard, roles: ['admin', 'secretary', 'manager'] },
+    { id: 'accounting', label: 'Comptabilité', icon: Receipt, roles: ['admin', 'secretary', 'manager'] },
     { id: 'settings', label: 'Paramètres', icon: SettingsIcon, roles: ['admin', 'manager'] },
   ];
 

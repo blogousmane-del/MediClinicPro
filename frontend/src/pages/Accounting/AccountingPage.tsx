@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { CreditCard, Search, Calendar, FileDown, Printer, Wallet, ArrowUpRight } from 'lucide-react';
+import { CreditCard, FileDown, Printer, Wallet } from 'lucide-react';
 
 interface Payment {
   id: number;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar as CalendarIcon, Clock, User, Plus, X, Search, Check, AlertCircle, Phone } from 'lucide-react';
+import { Clock, User, Plus, X, Check, Phone } from 'lucide-react';
 
 interface Patient {
   id: number;

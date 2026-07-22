@@ -2,18 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Users, 
-  Calendar, 
-  CreditCard, 
-  AlertTriangle, 
-  Plus, 
-  UserPlus, 
-  TrendingUp, 
-  Clock, 
-  CheckCircle,
+import {
+  Users,
+  Calendar,
+  Receipt,
+  AlertTriangle,
+  UserPlus,
+  Clock,
   Activity,
-  FileText
 } from 'lucide-react';
 
 interface Stats {
@@ -197,7 +193,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               color: 'var(--success)',
               boxShadow: '0 0 15px rgba(16, 185, 129, 0.15)'
             }}>
-              <CreditCard size={22} />
+              <Receipt size={22} />
             </div>
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>

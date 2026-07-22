@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { Settings, Users, CreditCard, Plus, Check, ShieldAlert, Smartphone } from 'lucide-react';
+import { Plus, Smartphone } from 'lucide-react';
 
 interface StaffUser {
   id: number;

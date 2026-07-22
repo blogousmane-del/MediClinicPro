@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 interface LandingPageProps {
-  onNavigate: (tab: 'login' | 'register') => void;
+  onNavigate: (tab: 'login' | 'register' | 'terms') => void;
 }
 
 interface Feature {
@@ -243,6 +243,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         <div className="landing-footer-links">
           <a href="#features">Fonctionnalités</a>
           <a href="#pricing">Tarifs</a>
+          <a onClick={() => onNavigate('terms')} style={{ cursor: 'pointer' }}>Conditions d'utilisation</a>
         </div>
       </footer>
     </div>
