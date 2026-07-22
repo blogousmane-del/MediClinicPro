@@ -5,6 +5,7 @@ backend/mediclinic.db
 backend/mediclinic.db-journal
 frontend/dist/
 .env
+.mcp.json
 .DS_Store
 *.log
 .eslintcache
