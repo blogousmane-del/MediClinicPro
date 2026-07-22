@@ -28,14 +28,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
 
   if (!user) return null;
 
-  // Filter tabs by role
+  // Filter tabs by role matching Image 1 design
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager'] },
-    { id: 'appointments', label: 'Rendez-vous', icon: Calendar, roles: ['admin', 'doctor', 'secretary', 'manager'] },
     { id: 'patients', label: 'Patients', icon: Users, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager'] },
-    { id: 'pharmacy', label: 'Pharmacie', icon: Pill, roles: ['admin', 'pharmacist', 'manager'] },
+    { id: 'appointments', label: 'Rendez-vous', icon: Calendar, roles: ['admin', 'doctor', 'secretary', 'manager'] },
     { id: 'prescriptions', label: 'Ordonnances', icon: FileText, roles: ['admin', 'doctor', 'pharmacist', 'manager'] },
     { id: 'laboratory', label: 'Laboratoire', icon: FlaskConical, roles: ['admin', 'lab_tech', 'manager'] },
+    { id: 'pharmacy', label: 'Pharmacie', icon: Pill, roles: ['admin', 'pharmacist', 'manager'] },
     { id: 'accounting', label: 'Comptabilité', icon: Receipt, roles: ['admin', 'secretary', 'manager'] },
     { id: 'settings', label: 'Paramètres', icon: SettingsIcon, roles: ['admin', 'manager'] },
   ];
@@ -205,11 +205,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 gap: '12px',
                 padding: '12px 14px',
                 paddingLeft: isActive ? '11px' : '14px',
-                borderRadius: '12px',
+                borderRadius: '10px',
                 border: 'none',
-                borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                background: isActive ? 'rgba(13, 148, 136, 0.12)' : 'transparent',
-                color: isActive ? 'white' : '#94a3b8',
+                background: isActive ? '#1e4d40' : 'transparent',
+                color: isActive ? '#ffffff' : '#94a3b8',
                 textAlign: 'left',
                 width: '100%',
                 cursor: 'pointer',
@@ -219,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               onMouseEnter={(e) => {
                 if (!isActive) {
                   e.currentTarget.style.color = 'white';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
                 }
               }}
               onMouseLeave={(e) => {
@@ -229,7 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 }
               }}
             >
-              <Icon size={20} color={isActive ? 'var(--primary)' : 'inherit'} />
+              <Icon size={19} color={isActive ? '#ffffff' : 'inherit'} />
               <span style={{ fontSize: '0.9375rem' }}>{item.label}</span>
             </button>
           );

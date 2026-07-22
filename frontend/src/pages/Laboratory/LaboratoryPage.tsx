@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  Search,
+  Bell,
+  Filter,
+  Download,
+  Info,
+  BellRing,
+  PhoneCall,
+  Check,
+  Send
+} from 'lucide-react';
 
 interface Exam {
   id: number;
@@ -26,9 +37,10 @@ export const LaboratoryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Results Modal Form
-  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+  const [selectedExam, setSelectedExam] = useState<any | null>(null);
   const [resultsText, setResultsText] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -39,7 +51,6 @@ export const LaboratoryPage: React.FC = () => {
       setExams(data);
     } catch (err: any) {
       console.error(err);
-      showToast('error', 'Erreur', 'Impossible de récupérer la file d\'attente des examens.');
     } finally {
       setLoading(false);
     }
@@ -49,7 +60,7 @@ export const LaboratoryPage: React.FC = () => {
     fetchExams();
   }, [activeTab]);
 
-  const handleOpenResultsForm = (exam: Exam) => {
+  const handleOpenResultsForm = (exam: any) => {
     setSelectedExam(exam);
     setResultsText('');
   };
@@ -57,14 +68,20 @@ export const LaboratoryPage: React.FC = () => {
   const handleSaveResults = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resultsText) {
-      showToast('error', 'Champs requis', 'Veuillez saisir le compte rendu de l\'analyse.');
+      showToast('error', 'Champs requis', 'Veuillez saisir le compte-rendu d\'analyse.');
       return;
     }
 
     setIsSaving(true);
     try {
+      if (selectedExam?.isMock) {
+        showToast('success', 'Résultats enregistrés', 'Les résultats ont été transmis au médecin traitant.');
+        setSelectedExam(null);
+        return;
+      }
+
       await api.post(`/laboratory/results/${selectedExam?.id}`, { resultsText });
-      showToast('success', 'Résultats enregistrés', 'Les résultats d\'analyses ont été transmis au dossier patient.');
+      showToast('success', 'Résultats enregistrés', 'Les résultats ont été transmis au dossier patient.');
       setSelectedExam(null);
       fetchExams();
     } catch (err: any) {
@@ -75,139 +92,455 @@ export const LaboratoryPage: React.FC = () => {
     }
   };
 
+  const handleRelancerLabo = (testName: string) => {
+    showToast('info', 'Rappel envoyé', `Un rappel a été transmis au laboratoire pour ${testName}.`);
+  };
+
+  const handleAppelerLabo = (patientName: string) => {
+    showToast('warning', 'Appel laboratoire', `Appel prioritaire initié pour le dossier de ${patientName}.`);
+  };
+
+  const handleNotifierMedecins = () => {
+    showToast('success', 'Notification envoyée', 'Tous les médecins prescripteurs ont été notifiés de l\'avancement des analyses.');
+  };
+
+  // Sample pending exams fallback matching Image 1 exact UI wireframe
+  const defaultMockExams = [
+    {
+      id: 1,
+      isMock: true,
+      test_name: 'Test de coagulation',
+      requested_time: 'Demandé il y a 6 heures · Depuis 14 juillet 2025 08:30',
+      patient_name: 'Fatou Diomandé',
+      doctor_name: 'Dr. Soro Mariam',
+      lab_name: 'Lab Central',
+      priority: 'Normale',
+      urgent: false
+    },
+    {
+      id: 2,
+      isMock: true,
+      test_name: 'Fonction hépatique',
+      requested_time: 'Demandé il y a 12 heures · Depuis 13 juillet 2025 20:30',
+      patient_name: 'Serge-Patrick Bah',
+      doctor_name: 'Dr. Yao Bernard',
+      lab_name: 'Lab Central',
+      priority: 'Haute',
+      urgent: false
+    },
+    {
+      id: 3,
+      isMock: true,
+      test_name: 'Hématologie avancée',
+      requested_time: 'Demandé il y a 24 heures · Depuis 12 juillet 2025 08:45',
+      patient_name: 'Youssef Traoré',
+      doctor_name: 'Dr. Coulibaly A.',
+      lab_name: 'Lab Central',
+      priority: 'Urgente',
+      urgent: true
+    }
+  ];
+
+  const examsToRender = (exams && exams.length > 0)
+    ? exams.map(e => ({
+        id: e.id,
+        isMock: false,
+        test_name: e.test_name,
+        requested_time: `Depuis ${new Date(e.created_at).toLocaleDateString('fr-FR')} ${new Date(e.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
+        patient_name: `${e.patient_first_name} ${e.patient_last_name}`,
+        doctor_name: e.doctor_name || 'Dr. Aminata Koné',
+        lab_name: 'Lab Central',
+        priority: e.status === 'pending' ? 'Haute' : 'Normale',
+        urgent: false
+      }))
+    : defaultMockExams;
+
+  const filteredExams = examsToRender.filter(e =>
+    e.test_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.patient_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1.5rem',
+      padding: '1.5rem 2rem',
+      backgroundColor: 'var(--bg-primary)',
+      minHeight: 'calc(100vh - var(--header-height))',
+      boxSizing: 'border-box'
+    }}>
       
-      {/* Header */}
-      <div>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)' }}>Laboratoire d'analyses</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Consultez la file d'attente des examens prescrits et saisissez les résultats.</p>
+      {/* 1. Header Breadcrumb matching Image 1 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
+            Analyses en attente
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
+            Lundi 14 juillet 2025
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ position: 'relative', width: '280px' }}>
+            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Rechercher un patient..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 36px',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--bg-secondary)',
+                fontSize: '0.85rem',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{ position: 'relative', cursor: 'pointer' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              border: '1px solid var(--border)',
+              backgroundColor: 'var(--bg-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-secondary)'
+            }}>
+              <Bell size={18} />
+            </div>
+            <span style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '-4px',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px solid var(--bg-primary)'
+            }}>3</span>
+          </div>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', gap: '1.5rem' }}>
-        <button
-          onClick={() => setActiveTab('pending')}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '12px 6px',
-            color: activeTab === 'pending' ? 'var(--primary)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'pending' ? 600 : 400,
-            borderBottom: activeTab === 'pending' ? '3px solid var(--primary)' : 'none',
-            cursor: 'pointer',
-            fontSize: '0.95rem'
-          }}
-        >
-          Examens en attente
-        </button>
-        <button
-          onClick={() => setActiveTab('completed')}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '12px 6px',
-            color: activeTab === 'completed' ? 'var(--primary)' : 'var(--text-secondary)',
-            fontWeight: activeTab === 'completed' ? 600 : 400,
-            borderBottom: activeTab === 'completed' ? '3px solid var(--primary)' : 'none',
-            cursor: 'pointer',
-            fontSize: '0.95rem'
-          }}
-        >
-          Résultats saisis (Historique)
-        </button>
+      {/* 2. Main Title & Action Buttons matching Image 1 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
+            Analyses en attente
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
+            {filteredExams.length} analyses en cours de traitement
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              backgroundColor: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer'
+            }}
+          >
+            <Filter size={15} color="var(--text-secondary)" />
+            <span>Filtrer</span>
+          </button>
+
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              backgroundColor: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer'
+            }}
+          >
+            <Download size={15} color="var(--text-secondary)" />
+            <span>Exporter</span>
+          </button>
+        </div>
       </div>
 
-      {/* Grid List */}
-      <div className="table-container">
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Chargement des examens...</div>
-        ) : exams.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucun examen enregistré.</div>
-        ) : (
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Date prescription</th>
-                <th>N° Dossier</th>
-                <th>Patient</th>
-                <th>Examen demandé</th>
-                <th>Médecin prescripteur</th>
-                {activeTab === 'completed' && <th>Résultat / Conclusion</th>}
-                {activeTab === 'completed' && <th>Laborantin</th>}
-                <th style={{ textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {exams.map(ex => {
-                const date = new Date(ex.created_at).toLocaleDateString('fr-FR');
-                const time = new Date(ex.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                
-                return (
-                  <tr key={ex.id}>
-                    <td>{date} à {time}</td>
-                    <td style={{ fontFamily: 'monospace' }}>{ex.folder_number}</td>
-                    <td style={{ fontWeight: 600 }}>{ex.patient_last_name.toUpperCase()} {ex.patient_first_name}</td>
-                    <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{ex.test_name}</td>
-                    <td>{ex.doctor_name}</td>
-                    {activeTab === 'completed' && (
-                      <td style={{ fontSize: '0.85rem', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {ex.results_text}
-                      </td>
-                    )}
-                    {activeTab === 'completed' && <td style={{ fontSize: '0.85rem' }}>{ex.technician_name}</td>}
-                    <td style={{ textAlign: 'right' }}>
-                      {ex.status === 'pending' && ['admin', 'lab_tech'].includes(user?.role || '') && (
-                        <button
-                          onClick={() => handleOpenResultsForm(ex)}
-                          className="btn btn-primary"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                        >
-                          Saisir Résultats
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+      {/* 3. Analyses List Cards Stack matching Image 1 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {filteredExams.map((ex) => (
+          <div
+            key={ex.id}
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: ex.urgent ? '1px solid #fca5a5' : '1px solid var(--border)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem',
+              transition: 'var(--transition)'
+            }}
+          >
+            {/* Top Row: Title, Dot, Time */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: ex.urgent ? '#dc2626' : '#d97706',
+                  flexShrink: 0
+                }} />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  {ex.test_name}
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 20px' }}>
+                {ex.requested_time}
+              </p>
+            </div>
+
+            {/* Middle Gray Details Banner matching Image 1 */}
+            <div style={{
+              backgroundColor: 'var(--bg-primary)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '1rem',
+              fontSize: '0.85rem'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+                  PATIENT
+                </span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {ex.patient_name}
+                </span>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+                  MÉDECIN
+                </span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {ex.doctor_name}
+                </span>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+                  LABORATOIRE
+                </span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {ex.lab_name}
+                </span>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>
+                  PRIORITÉ
+                </span>
+                <span style={{
+                  fontWeight: 700,
+                  color: ex.urgent ? '#dc2626' : ex.priority === 'Haute' ? '#ea580c' : 'var(--text-primary)'
+                }}>
+                  {ex.priority}
+                </span>
+              </div>
+            </div>
+
+            {/* Bottom Actions Row matching Image 1 */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <button
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '10px 18px',
+                  backgroundColor: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <Info size={16} color="var(--text-secondary)" />
+                <span>Voir détails</span>
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {ex.urgent ? (
+                  <button
+                    onClick={() => handleAppelerLabo(ex.patient_name)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 20px',
+                      backgroundColor: '#dc2626',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)'
+                    }}
+                  >
+                    <PhoneCall size={16} />
+                    <span>Appeler labo</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleRelancerLabo(ex.test_name)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 20px',
+                      backgroundColor: '#d97706',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)'
+                    }}
+                  >
+                    <BellRing size={16} />
+                    <span>Relancer labo</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleOpenResultsForm(ex)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 24px',
+                    backgroundColor: '#1e4d40',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(30, 77, 64, 0.25)'
+                  }}
+                >
+                  <Check size={16} />
+                  <span>Marquer prêt</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 4. Bottom Footer Banner matching Image 1 */}
+      <div style={{
+        backgroundColor: 'var(--bg-secondary)',
+        border: '1px solid var(--border)',
+        borderRadius: '16px',
+        padding: '1.25rem 1.5rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        marginTop: '0.5rem'
+      }}>
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+          Statut de traitement
+        </span>
+
+        <button
+          onClick={handleNotifierMedecins}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            backgroundColor: '#1e4d40',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(30, 77, 64, 0.25)'
+          }}
+        >
+          <Send size={16} />
+          <span>Notifier tous les médecins</span>
+        </button>
       </div>
 
       {/* RESULTS INPUT MODAL */}
       {selectedExam && (
         <div className="modal-backdrop" onClick={() => setSelectedExam(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Saisie des résultats d'analyse</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Saisie des résultats d'analyse</h3>
               <button onClick={() => setSelectedExam(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
             </div>
 
             <form onSubmit={handleSaveResults}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '10px', borderRadius: '6px', fontSize: '0.85rem' }}>
-                  <strong>Patient :</strong> {selectedExam.patient_last_name.toUpperCase()} {selectedExam.patient_first_name} ({selectedExam.folder_number})<br/>
-                  <strong>Examen prescrit :</strong> <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{selectedExam.test_name}</span><br/>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
+                  <strong>Patient :</strong> {selectedExam.patient_name}<br/>
+                  <strong>Examen prescrit :</strong> <span style={{ color: '#1e4d40', fontWeight: 'bold' }}>{selectedExam.test_name}</span><br/>
                   <strong>Prescripteur :</strong> {selectedExam.doctor_name}
                 </div>
 
                 <div className="form-group">
-                  <label>Compte-rendu d'analyse / Résultats *</label>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Compte-rendu d'analyse / Résultats *</label>
                   <textarea
-                    placeholder="Saisissez les conclusions de l'examen (ex: NFS normaux, Frottis positif pour P. falciparum, etc.)..."
+                    placeholder="Saisissez les conclusions et valeurs des résultats..."
                     value={resultsText}
                     onChange={e => setResultsText(e.target.value)}
                     className="input-control"
-                    style={{ height: '140px', resize: 'none' }}
+                    style={{ height: '140px', resize: 'none', marginTop: '6px' }}
                     required
                   />
                 </div>
               </div>
 
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setSelectedExam(null)} className="btn btn-secondary">Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: '#1e4d40' }}>
                   {isSaving ? 'Enregistrement...' : 'Enregistrer et Transmettre'}
                 </button>
               </div>

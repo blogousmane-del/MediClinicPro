@@ -16,11 +16,12 @@ Full import requested by user 2026-07-22 — all 25 pages + 16 shared components
 - [x] **Ordonnances** (new) — `frontend/src/pages/Prescriptions/OrdonnancesPage.tsx`, wired via `Sidebar.tsx` + `App.tsx`. Promoted from Pharmacy's redundant "Prescriptions" sub-tab, expanded to show all statuses (pending/partial/dispensed) via existing `GET /pharmacy/prescriptions?status=` endpoint. **Also fixed a pre-existing bug**: the old dispense action sent `{ items: [{itemId, quantityDispensed}] }` but the backend expects `{ dispensations: [{itemId, qty}] }` — the button was silently broken before. Fixed in the new page.
 - [x] **Terms of Service** (new) — `frontend/src/pages/TermsOfServicePage.tsx`, reachable from Landing Page footer. Built with placeholder legal content (`[Nom de l'entité légale]` etc.) instead of Banani's fabricated company name/SLA numbers/contact info — flagged in-page as a draft needing real legal review before going live.
 
+- [x] `AuthPage` (Connexion + Mobile) — added Banani's split-panel branding layout (mobile: compact top bar; desktop 1024px+: full left panel with headline/feature chips/copyright) via new `.auth-*` classes in `index.css`. All existing functional logic untouched (login/register tabs, forgot-password view, password visibility toggle, loading states). Deliberately skipped 3 Banani elements: "OTP SMS" login button (no backend endpoint — would be a dead affordance), "Contacter l'administrateur" link (no destination), "Données hébergées en Côte d'Ivoire" claim (unverified — Supabase region not confirmed).
+
 ## In progress
 (none)
 
 ## Pending / deferred
-- `AuthPage` (Connexion + Mobile) — not yet reviewed this pass.
 - `LabResults`, `PendingLabs`, `NotificationSent` (Laboratory sub-flows) — `LaboratoryPage` reviewed at a lint-warning level only (no unused-import issues found); not compared screen-by-screen against these three Banani mocks yet.
 - `Gestion des abonnements` (+ Mobile) — Settings already has a working billing/subscription tab; not compared in detail against Banani's dedicated subscription screens.
 - Shared components not yet individually reviewed: FinancialSummaryCard, InvoiceItemRow, MedicineInputRow, MiniCalendar, PharmacyItem, PrescriptionCard, SettingToggle, AlertItem, TransactionRow, AppointmentCard, AppointmentRow, FilterChips — folded into their parent pages' light-polish pass rather than built as standalone primitives, since none of the parent pages were rebuilt from scratch.

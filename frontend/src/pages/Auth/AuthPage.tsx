@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { KeyRound, Mail, ArrowLeft, Loader2, Building2, User, Phone, Eye, EyeOff } from 'lucide-react';
+import { KeyRound, Mail, ArrowLeft, Loader2, Building2, User, Phone, Eye, EyeOff, Calendar, Pill, Receipt, Activity } from 'lucide-react';
+
+const brandFeatures = [
+  { icon: Calendar, label: 'Gestion des rendez-vous' },
+  { icon: Pill, label: 'Pharmacie & Laboratoire' },
+  { icon: Receipt, label: 'Facturation FCFA' },
+];
 
 interface AuthPageProps {
   initialTab?: 'login' | 'register';
@@ -94,15 +100,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
   };
 
   return (
-    <div style={{
+    <div className="auth-shell" style={{
       backgroundColor: '#05080f',
-      backgroundImage: 'radial-gradient(circle at 50% 120%, rgba(13, 148, 136, 0.15), rgba(5, 8, 15, 0))',
       color: '#f9fafb',
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem 1.5rem',
       fontFamily: 'var(--font-primary)'
     }}>
       {/* Inline styles to bypass global light/dark variables and ensure high readability */}
@@ -148,14 +148,65 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
         }
       `}</style>
 
+      {/* Brand panel: compact top bar on mobile, full left panel on desktop */}
+      <div className="auth-brand-panel">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            backgroundColor: 'rgb(13, 148, 136)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Activity size={18} color="white" />
+          </div>
+          <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'white', fontFamily: 'var(--font-secondary)' }}>MediClinic</span>
+        </div>
+
+        <div className="auth-brand-extra">
+          <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'white', fontFamily: 'var(--font-secondary)', lineHeight: 1.2 }}>
+            La gestion de votre clinique,<br />
+            <span style={{ color: 'rgb(13, 148, 136)' }}>simplifiée.</span>
+          </h2>
+          <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '1rem', maxWidth: '320px', lineHeight: 1.6 }}>
+            Rendez-vous, ordonnances, pharmacie, laboratoire et comptabilité — tout en un seul endroit.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '2rem' }}>
+            {brandFeatures.map(({ icon: Icon, label }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(13, 148, 136, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Icon size={14} color="rgb(13, 148, 136)" />
+                </div>
+                <span style={{ fontSize: '0.85rem', color: '#e5e7eb' }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="auth-brand-copyright">© 2026 MediClinic · Abidjan, Côte d'Ivoire</p>
+      </div>
+
+      <div className="auth-form-panel">
       <div className="auth-card" style={{
-        maxWidth: '480px',
+        maxWidth: '440px',
         width: '100%',
         padding: '2.5rem',
         position: 'relative'
       }}>
         {/* Back to Home Link */}
-        <button 
+        <button
           onClick={() => onNavigate('landing')}
           style={{
             background: 'none',
@@ -540,6 +591,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

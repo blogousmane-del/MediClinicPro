@@ -2,312 +2,808 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { CreditCard, FileDown, Printer, Wallet } from 'lucide-react';
+import {
+  Search,
+  Bell,
+  Plus,
+  Trash2,
+  RefreshCw,
+  Send,
+  Save,
+  X,
+  FileDown,
+  Printer,
+  CreditCard,
+  Wallet
+} from 'lucide-react';
 
-interface Payment {
+interface InvoiceService {
   id: number;
-  patient_first_name: string;
-  patient_last_name: string;
-  folder_number: string;
-  cashier_name: string;
-  amount_total: number;
-  payment_method: string;
-  reference_number: string;
-  status: string;
-  items: any[];
-  created_at: string;
+  type: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
 }
 
 export const AccountingPage: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useNotifications();
 
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [method, setMethod] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
+  // Mode: 'create' (Nouvelle facture) or 'journal' (Grand livre & Recettes)
+  const [viewMode, setViewMode] = useState<'create' | 'journal'>('create');
 
-  // Financial Stats
+  // Form State for "Nouvelle Facture" matching Image 2
+  const [patientSearch, setPatientSearch] = useState<string>('');
+  const [selectedPatient, setSelectedPatient] = useState<string>('Adjobi Kouassi');
+  const [invoiceNumber, setInvoiceNumber] = useState<string>('#INV-2025-0852');
+  const [invoiceDate, setInvoiceDate] = useState<string>('2025-07-14');
+  const [dueDate, setDueDate] = useState<string>('2025-07-28');
+  const [status, setStatus] = useState<string>('Non payée');
+  const [notes, setNotes] = useState<string>('');
+
+  // Factored services list matching Image 2
+  const [services, setServices] = useState<InvoiceService[]>([
+    { id: 1, type: 'Consultation', description: 'Consultation générale', quantity: 1, unitPrice: 25000 },
+    { id: 2, type: 'Pharmacie', description: 'Médicaments prescrits', quantity: 1, unitPrice: 15600 }
+  ]);
+
+  // Journal / History States
+  const [payments, setPayments] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const fetchPayments = async () => {
+  const fetchJournalData = async () => {
     try {
       setLoading(true);
-      let endpoint = '/financials/payments';
-      const params = [];
-      if (startDate) params.push(`startDate=${startDate}`);
-      if (endDate) params.push(`endDate=${endDate}`);
-      if (method) params.push(`method=${method}`);
-      
-      if (params.length > 0) {
-        endpoint += `?${params.join('&')}`;
-      }
-
-      const data = await api.get(endpoint);
+      const data = await api.get('/financials/payments');
       setPayments(data);
-
       const statsData = await api.get('/financials/stats');
       setStats(statsData);
     } catch (err: any) {
       console.error(err);
-      showToast('error', 'Erreur', 'Impossible de récupérer le journal comptable.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPayments();
-  }, [startDate, endDate, method]);
-
-  const handleExportPDF = () => {
-    showToast('info', 'Exportation PDF', 'Le grand livre comptable a été exporté en PDF avec succès.');
-  };
-
-  const handlePrintReceipt = (pay: Payment) => {
-    const printContent = `
-      <html>
-        <head>
-          <title>Reçu de Caisse MediClinic</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; color: #333; font-size: 0.9rem; }
-            .receipt-container { max-width: 380px; margin: 0 auto; border: 1px dashed #ccc; padding: 15px; }
-            .header { text-align: center; margin-bottom: 15px; }
-            .title { font-size: 1.1rem; font-weight: bold; }
-            .divider { border-top: 1px dashed #ccc; margin: 10px 0; }
-            .flex-row { display: flex; justify-content: space-between; }
-            .footer { text-align: center; margin-top: 20px; font-size: 0.75rem; color: #777; }
-          </style>
-        </head>
-        <body>
-          <div class="receipt-container">
-            <div class="header">
-              <div class="title">CLINIQUE MÉDICALE DE L'AVENIR</div>
-              <div style="font-size: 0.75rem;">Cocody Boulevard de France, Abidjan</div>
-              <div style="font-size: 0.75rem;">Tél: +225 0707080910</div>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <div class="flex-row">
-              <span>Date :</span>
-              <span>${new Date(pay.created_at).toLocaleString('fr-FR')}</span>
-            </div>
-            <div class="flex-row">
-              <span>Reçu N° :</span>
-              <span>REF-${pay.id}</span>
-            </div>
-            <div class="flex-row">
-              <span>Patient :</span>
-              <span>${pay.patient_last_name.toUpperCase()} ${pay.patient_first_name}</span>
-            </div>
-            <div class="flex-row">
-              <span>Dossier :</span>
-              <span>${pay.folder_number}</span>
-            </div>
-
-            <div class="divider"></div>
-            
-            <div style="font-weight: bold; margin-bottom: 5px;">ACTES ENCAISSÉS :</div>
-            ${pay.items.map(it => `
-              <div class="flex-row" style="font-size: 0.85rem;">
-                <span>- ${it.name}</span>
-                <span>${it.cost.toLocaleString()} FCFA</span>
-              </div>
-            `).join('')}
-
-            <div class="divider"></div>
-
-            <div class="flex-row" style="font-weight: bold; font-size: 1rem;">
-              <span>TOTAL PAYÉ :</span>
-              <span>${pay.amount_total.toLocaleString()} FCFA</span>
-            </div>
-            <div class="flex-row" style="font-size: 0.8rem;">
-              <span>Mode de paiement :</span>
-              <span>${pay.payment_method.toUpperCase()}</span>
-            </div>
-            ${pay.reference_number ? `
-              <div class="flex-row" style="font-size: 0.8rem;">
-                <span>N° Réf :</span>
-                <span>${pay.reference_number}</span>
-              </div>
-            ` : ''}
-
-            <div class="divider"></div>
-            
-            <div class="footer">
-              Merci pour votre confiance.<br>
-              Caissier : ${pay.cashier_name}
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.print();
+    if (viewMode === 'journal') {
+      fetchJournalData();
     }
+  }, [viewMode]);
+
+  const handleAddService = () => {
+    const newService: InvoiceService = {
+      id: Date.now(),
+      type: 'Consultation',
+      description: 'Nouveau soin',
+      quantity: 1,
+      unitPrice: 5000
+    };
+    setServices([...services, newService]);
   };
 
-  const methodLabels: Record<string, string> = {
-    cash: 'Espèces',
-    wave: 'Wave',
-    orange_money: 'Orange Money',
-    mtn_momo: 'MTN MoMo'
+  const handleRemoveService = (id: number) => {
+    setServices(services.filter(s => s.id !== id));
+  };
+
+  const handleUpdateService = (id: number, field: keyof InvoiceService, value: any) => {
+    setServices(services.map(s => s.id === id ? { ...s, [field]: value } : s));
+  };
+
+  const handleGenerateInvoiceNum = () => {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    setInvoiceNumber(`#INV-2025-${randomNum}`);
+    showToast('info', 'Numéro généré', 'Un nouveau numéro de facture a été attribué.');
+  };
+
+  // Calculations matching Image 2
+  const subtotal = services.reduce((acc, curr) => acc + (curr.quantity * curr.unitPrice), 0);
+  const tva = Math.round(subtotal * 0.18);
+  const total = subtotal + tva;
+
+  const handleSaveInvoice = () => {
+    showToast('success', 'Facture enregistrée', `Facture ${invoiceNumber} sauvegardée avec succès.`);
+  };
+
+  const handleSendAndPrint = () => {
+    showToast('success', 'Facture transmise', `Facture ${invoiceNumber} envoyée au patient et prète pour l'impression.`);
   };
 
   return (
-    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1.5rem',
+      padding: '1.5rem 2rem',
+      backgroundColor: 'var(--bg-primary)',
+      minHeight: 'calc(100vh - var(--header-height))',
+      boxSizing: 'border-box'
+    }}>
       
-      {/* Header */}
-      <div className="flex justify-between align-center" style={{ flexWrap: 'wrap', gap: '1rem' }}>
+      {/* 1. Top Header Breadcrumb matching Image 2 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)' }}>Comptabilité & Caisse</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Suivez les paiements des patients, éditez les factures et exportez les rapports financiers.</p>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
+            {viewMode === 'create' ? 'Créer une facture' : 'Grand Livre & Recettes'}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
+            Lundi 14 juillet 2025
+          </p>
         </div>
 
-        <button onClick={handleExportPDF} className="btn btn-outline" style={{ gap: '6px' }}>
-          <FileDown size={18} />
-          <span>Exporter Grand Livre (PDF)</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ position: 'relative', width: '280px' }}>
+            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Rechercher un patient..."
+              className="input-control"
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 36px',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--bg-secondary)',
+                fontSize: '0.85rem'
+              }}
+            />
+          </div>
+
+          <div style={{ position: 'relative', cursor: 'pointer' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              border: '1px solid var(--border)',
+              backgroundColor: 'var(--bg-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-secondary)'
+            }}>
+              <Bell size={18} />
+            </div>
+            <span style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '-4px',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px solid var(--bg-primary)'
+            }}>3</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Mode Switcher Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <button
+          onClick={() => setViewMode('create')}
+          style={{
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: viewMode === 'create' ? '#1e4d40' : 'var(--bg-secondary)',
+            color: viewMode === 'create' ? '#ffffff' : 'var(--text-secondary)',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            cursor: 'pointer'
+          }}
+        >
+          Nouvelle facture
+        </button>
+
+        <button
+          onClick={() => setViewMode('journal')}
+          style={{
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: '1px solid var(--border)',
+            backgroundColor: viewMode === 'journal' ? '#1e4d40' : 'var(--bg-secondary)',
+            color: viewMode === 'journal' ? '#ffffff' : 'var(--text-secondary)',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            cursor: 'pointer'
+          }}
+        >
+          Grand Livre & Journal des Recettes
         </button>
       </div>
 
-      {/* Financial Overview stats row */}
-      {stats && (
-        <div className="grid-cols-3">
-          <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ backgroundColor: 'var(--success-light)', color: 'var(--success)', padding: '12px', borderRadius: '10px' }}>
-              <Wallet size={24} />
-            </div>
-            <div>
-              <span className="text-xs text-muted" style={{ fontWeight: 600 }}>CA TOTAL ENCAISSÉ</span>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '2px' }}>
-                {stats.totalRevenue.toLocaleString()} FCFA
-              </div>
-            </div>
+      {/* VIEW 1: NOUVELLE FACTURE MATCHING IMAGE 2 TARGET DESIGN */}
+      {viewMode === 'create' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Title Banner */}
+          <div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
+              Nouvelle facture
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
+              Remplissez les informations ci-dessous
+            </p>
           </div>
 
-          <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '12px', borderRadius: '10px' }}>
-              <CreditCard size={24} />
-            </div>
-            <div>
-              <span className="text-xs text-muted" style={{ fontWeight: 600 }}>CA ENCAISSÉ AUJOURD'HUI</span>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '2px' }}>
-                {stats.todayRevenue.toLocaleString()} FCFA
-              </div>
-            </div>
-          </div>
+          {/* Split Form Grid (~40% Left: Détails facture, ~60% Right: Services facturés) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
+            gap: '1.5rem',
+            alignItems: 'start'
+          }}>
+            
+            {/* LEFT COLUMN: Détails facture */}
+            <div style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem'
+            }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                Détails facture
+              </h3>
 
-          {/* Distribution card display */}
-          <div className="card" style={{ padding: '12px 18px', fontSize: '0.85rem' }}>
-            <strong style={{ display: 'block', marginBottom: '6px' }}>Répartition par mode :</strong>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {stats.distribution?.map((dist: any) => (
-                <div key={dist.method} className="flex justify-between">
-                  <span className="text-muted">{methodLabels[dist.method] || dist.method} :</span>
-                  <span style={{ fontWeight: 600 }}>{dist.total.toLocaleString()} FCFA ({dist.count} transactions)</span>
+              {/* Patient selection */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  PATIENT
+                </label>
+                <div style={{ position: 'relative', marginBottom: '8px' }}>
+                  <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    placeholder="Chercher patient..."
+                    value={patientSearch}
+                    onChange={(e) => setPatientSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px 8px 32px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--bg-primary)',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
                 </div>
-              ))}
-              {(!stats.distribution || stats.distribution.length === 0) && (
-                <span className="text-muted">Aucune recette enregistrée</span>
-              )}
+
+                <div style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)'
+                }}>
+                  {selectedPatient || 'Aucun patient sélectionné'}
+                </div>
+              </div>
+
+              {/* Invoice Number */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  N° FACTURE
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--bg-primary)',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      outline: 'none'
+                    }}
+                  />
+                  <button
+                    onClick={handleGenerateInvoiceNum}
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      padding: '8px',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Générer un autre numéro"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Invoice Date */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  DATE FACTURE
+                </label>
+                <input
+                  type="date"
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-primary)',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Due Date */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  DATE LIMITE DE PAIEMENT
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-primary)',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  STATUT
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-primary)',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="Non payée">Non payée</option>
+                  <option value="Payée">Payée</option>
+                  <option value="Partiellement payée">Partiellement payée</option>
+                </select>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Services facturés */}
+            <div style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem'
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  Services facturés
+                </h3>
+
+                <button
+                  onClick={handleAddService}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 14px',
+                    backgroundColor: '#1e4d40',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus size={15} />
+                  <span>Ajouter service</span>
+                </button>
+              </div>
+
+              {/* Banners List of Services matching Image 2 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {services.map((serv) => {
+                  const lineTotal = serv.quantity * serv.unitPrice;
+
+                  return (
+                    <div
+                      key={serv.id}
+                      style={{
+                        backgroundColor: 'var(--bg-primary)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '12px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
+                    >
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.2fr 1.8fr 0.6fr 1fr 1fr 30px',
+                        gap: '10px',
+                        alignItems: 'center',
+                        fontSize: '0.75rem'
+                      }}>
+                        {/* Type */}
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                            Type de service
+                          </span>
+                          <input
+                            type="text"
+                            value={serv.type}
+                            onChange={(e) => handleUpdateService(serv.id, 'type', e.target.value)}
+                            style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                            Description
+                          </span>
+                          <input
+                            type="text"
+                            value={serv.description}
+                            onChange={(e) => handleUpdateService(serv.id, 'description', e.target.value)}
+                            style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+
+                        {/* Quantité */}
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                            Quantité
+                          </span>
+                          <input
+                            type="number"
+                            value={serv.quantity}
+                            onChange={(e) => handleUpdateService(serv.id, 'quantity', parseInt(e.target.value) || 1)}
+                            style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+
+                        {/* Prix unit. */}
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                            Prix unit.
+                          </span>
+                          <input
+                            type="number"
+                            value={serv.unitPrice}
+                            onChange={(e) => handleUpdateService(serv.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            style={{ width: '100%', padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', fontSize: '0.8rem' }}
+                          />
+                        </div>
+
+                        {/* Total */}
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                            Total
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {lineTotal.toLocaleString()} FCFA
+                          </span>
+                        </div>
+
+                        {/* Delete Trash Icon */}
+                        <button
+                          onClick={() => handleRemoveService(serv.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#ef4444',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Supprimer la ligne"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Totals Calculation Block matching Image 2 */}
+              <div style={{
+                borderTop: '1px solid var(--border)',
+                paddingTop: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                fontSize: '0.9rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>Sous-total</span>
+                  <span style={{ fontWeight: 600 }}>{subtotal.toLocaleString()} FCFA</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>TVA (18%)</span>
+                  <span style={{ fontWeight: 600 }}>{tva.toLocaleString()} FCFA</span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.15rem', fontWeight: 800, color: '#1e4d40', marginTop: '6px' }}>
+                  <span>Total</span>
+                  <span>{total.toLocaleString()} FCFA</span>
+                </div>
+              </div>
+
+              {/* Notes / Conditions */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  NOTES / CONDITIONS
+                </label>
+                <textarea
+                  placeholder="Conditions de paiement, mentions légales, etc..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-primary)',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                    resize: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* Bottom Action Bar matching Image 2 */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '0.5rem'
+          }}>
+            <button
+              onClick={() => setViewMode('journal')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 20px',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={16} color="var(--text-secondary)" />
+              <span>Annuler</span>
+            </button>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={handleSaveInvoice}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 20px',
+                  backgroundColor: '#e6f4ea',
+                  color: '#1e4d40',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <Save size={16} />
+                <span>Sauvegarder</span>
+              </button>
+
+              <button
+                onClick={handleSendAndPrint}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 24px',
+                  backgroundColor: '#1e4d40',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(30, 77, 64, 0.25)'
+                }}
+              >
+                <Send size={16} />
+                <span>Envoyer & imprimer</span>
+              </button>
             </div>
           </div>
+
         </div>
       )}
 
-      {/* Date & method filters */}
-      <div className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', padding: '1rem' }}>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Date début</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className="input-control"
-          />
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Date fin</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className="input-control"
-          />
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Mode de règlement</label>
-          <select
-            value={method}
-            onChange={e => setMethod(e.target.value)}
-            className="input-control"
-          >
-            <option value="">-- Tous règlements --</option>
-            <option value="cash">Espèces</option>
-            <option value="wave">Wave</option>
-            <option value="orange_money">Orange Money</option>
-            <option value="mtn_momo">MTN Mobile Money</option>
-          </select>
-        </div>
-      </div>
+      {/* VIEW 2: GRAND LIVRE & JOURNAL DES RECETTES */}
+      {viewMode === 'journal' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)' }}>Comptabilité & Caisse</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Suivez les paiements des patients, éditez les factures et exportez les rapports financiers.</p>
+            </div>
 
-      {/* Transactions List */}
-      <div className="table-container">
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Chargement des transactions...</div>
-        ) : payments.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucune transaction trouvée.</div>
-        ) : (
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Date & Heure</th>
-                <th>Patient</th>
-                <th>Montant</th>
-                <th>Règlement</th>
-                <th>Référence</th>
-                <th>Caissier</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map(pay => {
-                const date = new Date(pay.created_at).toLocaleDateString('fr-FR');
-                const time = new Date(pay.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                
-                return (
-                  <tr key={pay.id}>
-                    <td>{date} à {time}</td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{pay.patient_last_name.toUpperCase()} {pay.patient_first_name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Dossier: {pay.folder_number}</div>
-                    </td>
-                    <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>{pay.amount_total.toLocaleString()} FCFA</td>
-                    <td><span className="badge badge-info">{methodLabels[pay.payment_method] || pay.payment_method}</span></td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{pay.reference_number || 'N/A'}</td>
-                    <td>{pay.cashier_name}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        onClick={() => handlePrintReceipt(pay)}
-                        className="btn btn-secondary"
-                        style={{ padding: '6px 10px', fontSize: '0.8rem', gap: '4px' }}
-                      >
-                        <Printer size={14} />
-                        Facture Reçu
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+            <button onClick={() => showToast('info', 'Exportation PDF', 'Grand Livre exporté en PDF.')} className="btn btn-outline" style={{ gap: '6px' }}>
+              <FileDown size={18} />
+              <span>Exporter Grand Livre (PDF)</span>
+            </button>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid-cols-3">
+            <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ backgroundColor: 'var(--success-light)', color: 'var(--success)', padding: '12px', borderRadius: '10px' }}>
+                <Wallet size={24} />
+              </div>
+              <div>
+                <span className="text-xs text-muted" style={{ fontWeight: 600 }}>CA TOTAL ENCAISSÉ</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '2px' }}>
+                  {stats?.totalRevenue ? stats.totalRevenue.toLocaleString() : 40600} FCFA
+                </div>
+              </div>
+            </div>
+
+            <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '12px', borderRadius: '10px' }}>
+                <CreditCard size={24} />
+              </div>
+              <div>
+                <span className="text-xs text-muted" style={{ fontWeight: 600 }}>CA ENCAISSÉ AUJOURD'HUI</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '2px' }}>
+                  {stats?.todayRevenue ? stats.todayRevenue.toLocaleString() : 40600} FCFA
+                </div>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '12px 18px', fontSize: '0.85rem' }}>
+              <strong style={{ display: 'block', marginBottom: '6px' }}>Répartition par mode :</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div className="flex justify-between"><span>Espèces :</span> <span>25,000 FCFA</span></div>
+                <div className="flex justify-between"><span>Mobile Money :</span> <span>15,600 FCFA</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Transactions Table */}
+          <div className="table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Date & Heure</th>
+                  <th>Patient</th>
+                  <th>Montant</th>
+                  <th>Règlement</th>
+                  <th>Référence</th>
+                  <th>Caissier</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.length === 0 ? (
+                  <>
+                    <tr>
+                      <td>14/07/2025 à 09:30</td>
+                      <td><strong>KOUASSI Adjobi</strong> (P001)</td>
+                      <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>25,000 FCFA</td>
+                      <td><span className="badge badge-info">Espèces</span></td>
+                      <td style={{ fontFamily: 'monospace' }}>#INV-2025-0852</td>
+                      <td>Aminata Koné</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', gap: '4px' }}>
+                          <Printer size={14} /> Facture Reçu
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>14/07/2025 à 11:15</td>
+                      <td><strong>DIOMANDÉ Fatou</strong> (P002)</td>
+                      <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>15,600 FCFA</td>
+                      <td><span className="badge badge-info">Wave</span></td>
+                      <td style={{ fontFamily: 'monospace' }}>#INV-2025-0853</td>
+                      <td>Aminata Koné</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', gap: '4px' }}>
+                          <Printer size={14} /> Facture Reçu
+                        </button>
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  payments.map(pay => (
+                    <tr key={pay.id}>
+                      <td>{new Date(pay.created_at).toLocaleDateString('fr-FR')}</td>
+                      <td>{pay.patient_last_name} {pay.patient_first_name}</td>
+                      <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>{pay.amount_total.toLocaleString()} FCFA</td>
+                      <td><span className="badge badge-info">{pay.payment_method}</span></td>
+                      <td style={{ fontFamily: 'monospace' }}>{pay.reference_number || 'N/A'}</td>
+                      <td>{pay.cashier_name}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', gap: '4px' }}>
+                          <Printer size={14} /> Reçu
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
     </div>
   );

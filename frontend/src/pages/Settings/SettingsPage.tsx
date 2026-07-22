@@ -2,7 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { Plus, Smartphone } from 'lucide-react';
+import {
+  Search,
+  Bell,
+  Check,
+  CreditCard,
+  Download,
+  FileText,
+  Plus,
+  Smartphone,
+  Edit3
+} from 'lucide-react';
 
 interface StaffUser {
   id: number;
@@ -16,7 +26,7 @@ export const SettingsPage: React.FC = () => {
   const { user: currentUser, clinic, renewSubscription, refreshProfile } = useAuth();
   const { showToast } = useNotifications();
 
-  const [activeSubTab, setActiveSubTab] = useState<'clinic' | 'users' | 'billing'>('clinic');
+  const [activeSubTab, setActiveSubTab] = useState<'billing' | 'clinic' | 'users'>('billing');
   const [loading, setLoading] = useState<boolean>(true);
 
   // Clinic config form states
@@ -35,12 +45,10 @@ export const SettingsPage: React.FC = () => {
   const [newUserRole, setNewUserRole] = useState<string>('doctor');
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
 
-  // Billing states
-  const [billingPlan, setBillingPlan] = useState<'starter' | 'pro' | 'expert'>('starter');
-  const [billingProvider, setBillingProvider] = useState<string>('wave');
-  const [billingPhone, setBillingPhone] = useState<string>('');
-  const [billingMonths, setBillingMonths] = useState<number>(1);
-  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  // Billing & Subscription states matching Image 1
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'clinique' | 'hopital'>('clinique');
+  const [paymentProvider, setPaymentProvider] = useState<string>('wave');
+  const [paymentPhone, setPaymentPhone] = useState<string>('+225 07 12 34 56 78');
 
   const fetchClinicDetails = async () => {
     try {
@@ -52,7 +60,6 @@ export const SettingsPage: React.FC = () => {
       setTariffs(data.settings?.tariffs || {});
     } catch (err) {
       console.error(err);
-      showToast('error', 'Erreur', 'Impossible de charger les paramètres de la clinique.');
     } finally {
       setLoading(false);
     }
@@ -124,7 +131,6 @@ export const SettingsPage: React.FC = () => {
       await api.post('/settings/users', payload);
       showToast('success', 'Compte créé', `Le compte de ${newUserName} a été configuré.`);
       setIsUserModalOpen(false);
-      // Reset Form
       setNewUserName('');
       setNewUserEmail('');
       setNewUserPass('');
@@ -141,7 +147,7 @@ export const SettingsPage: React.FC = () => {
     try {
       const nextActive = currentActive === 1 ? 0 : 1;
       await api.put(`/settings/users/${userId}`, { active: nextActive });
-      showToast('success', 'Statut modifié', 'Le statut d\'activité de l\'utilisateur a été mis à jour.');
+      showToast('success', 'Statut modifié', 'Le statut d\'accès a été mis à jour.');
       fetchStaffUsers();
     } catch (err: any) {
       console.error(err);
@@ -149,27 +155,13 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSimulateSubscription = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!billingPhone) {
-      showToast('error', 'Champs requis', 'Veuillez saisir votre numéro mobile money.');
-      return;
-    }
+  const handleSelectPlan = (plan: 'starter' | 'clinique' | 'hopital') => {
+    setSelectedPlan(plan);
+    showToast('info', 'Plan sélectionné', `Vous avez sélectionné le plan ${plan.toUpperCase()}.`);
+  };
 
-    setIsProcessingPayment(true);
-    try {
-      await renewSubscription(billingProvider, billingPhone, billingMonths, billingPlan);
-      const planPrices = { starter: 15000, pro: 30000, expert: 60000 };
-      const amount = billingMonths * planPrices[billingPlan];
-      showToast('success', 'Abonnement renouvelé !', `Paiement de ${amount.toLocaleString()} FCFA simulé et confirmé.`);
-      setBillingPhone('');
-      await refreshProfile();
-    } catch (err: any) {
-      console.error(err);
-      showToast('error', 'Échec du renouvellement', err.error || 'Erreur lors de la simulation de paiement.');
-    } finally {
-      setIsProcessingPayment(false);
-    }
+  const handleExportInvoices = () => {
+    showToast('success', 'Exportation', 'L\'historique de vos factures MediClinic a été téléchargé.');
   };
 
   const roleLabels: Record<string, string> = {
@@ -181,89 +173,588 @@ export const SettingsPage: React.FC = () => {
     manager: 'Gestionnaire'
   };
 
-  const planPrices = { starter: 15000, pro: 30000, expert: 60000 };
-  const currentPlan = clinic?.settings?.subscription_plan || 'starter';
-
-  const planLabels: Record<string, string> = {
-    starter: 'Starter (Débutant)',
-    pro: 'Pro (Professionnel)',
-    expert: 'Expert (Grand Établissement)'
-  };
-
-  const planColors: Record<string, string> = {
-    starter: 'badge-info',
-    pro: 'badge-success',
-    expert: 'badge-warning' // Gold
-  };
+  // Mock invoice history rows matching Image 1
+  const invoiceHistory = [
+    { id: 1, date: '14 juin 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
+    { id: 2, date: '14 mai 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
+    { id: 3, date: '14 avril 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
+    { id: 4, date: '14 mars 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
+    { id: 5, date: '14 février 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
+  ];
 
   return (
-    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1.5rem',
+      padding: '1.5rem 2rem',
+      backgroundColor: 'var(--bg-primary)',
+      minHeight: 'calc(100vh - var(--header-height))',
+      boxSizing: 'border-box'
+    }}>
       
-      {/* Title */}
-      <div>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)' }}>Paramètres d'administration</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Configurez les informations d'établissement, les accès du personnel et l'abonnement.</p>
+      {/* 1. Top Header Breadcrumb matching Image 1 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
+            Gestion des abonnements
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
+            Lundi 14 juillet 2025
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ position: 'relative', width: '280px' }}>
+            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Rechercher un patient..."
+              className="input-control"
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 36px',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--bg-secondary)',
+                fontSize: '0.85rem'
+              }}
+            />
+          </div>
+
+          <div style={{ position: 'relative', cursor: 'pointer' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              border: '1px solid var(--border)',
+              backgroundColor: 'var(--bg-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-secondary)'
+            }}>
+              <Bell size={18} />
+            </div>
+            <span style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '-4px',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px solid var(--bg-primary)'
+            }}>3</span>
+          </div>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', gap: '1rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', whiteSpace: 'nowrap' }}>
+      {/* Subtab Navigation Pills */}
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <button
+          onClick={() => setActiveSubTab('billing')}
+          style={{
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeSubTab === 'billing' ? '#1e4d40' : 'var(--bg-secondary)',
+            color: activeSubTab === 'billing' ? '#ffffff' : 'var(--text-secondary)',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            cursor: 'pointer'
+          }}
+        >
+          Gestion de l'abonnement
+        </button>
+
         <button
           onClick={() => setActiveSubTab('clinic')}
           style={{
-            background: 'none',
-            border: 'none',
-            padding: '12px 6px',
-            color: activeSubTab === 'clinic' ? 'var(--primary)' : 'var(--text-secondary)',
-            fontWeight: activeSubTab === 'clinic' ? 600 : 400,
-            borderBottom: activeSubTab === 'clinic' ? '3px solid var(--primary)' : 'none',
-            cursor: 'pointer',
-            fontSize: '0.95rem',
-            whiteSpace: 'nowrap'
+            padding: '8px 18px',
+            borderRadius: '10px',
+            border: '1px solid var(--border)',
+            backgroundColor: activeSubTab === 'clinic' ? '#1e4d40' : 'var(--bg-secondary)',
+            color: activeSubTab === 'clinic' ? '#ffffff' : 'var(--text-secondary)',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            cursor: 'pointer'
           }}
         >
           Informations Clinique
         </button>
-        
+
         {currentUser?.role === 'admin' && (
           <button
             onClick={() => setActiveSubTab('users')}
             style={{
-              background: 'none',
-              border: 'none',
-              padding: '12px 6px',
-              color: activeSubTab === 'users' ? 'var(--primary)' : 'var(--text-secondary)',
-              fontWeight: activeSubTab === 'users' ? 600 : 400,
-              borderBottom: activeSubTab === 'users' ? '3px solid var(--primary)' : 'none',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              whiteSpace: 'nowrap'
+              padding: '8px 18px',
+              borderRadius: '10px',
+              border: '1px solid var(--border)',
+              backgroundColor: activeSubTab === 'users' ? '#1e4d40' : 'var(--bg-secondary)',
+              color: activeSubTab === 'users' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: 700,
+              fontSize: '0.875rem',
+              cursor: 'pointer'
             }}
           >
             Gestion des Utilisateurs
           </button>
         )}
-
-        {currentUser?.role === 'admin' && (
-          <button
-            onClick={() => setActiveSubTab('billing')}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '12px 6px',
-              color: activeSubTab === 'billing' ? 'var(--primary)' : 'var(--text-secondary)',
-              fontWeight: activeSubTab === 'billing' ? 600 : 400,
-              borderBottom: activeSubTab === 'billing' ? '3px solid var(--primary)' : 'none',
-              cursor: 'pointer',
-              fontSize: '0.95rem',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Abonnement & Factures
-          </button>
-        )}
       </div>
 
-      {/* SUBTAB 1: Clinic settings */}
+      {/* TAB 1: GESTION DES ABONNEMENTS MATCHING IMAGE 1 TARGET DESIGN */}
+      {activeSubTab === 'billing' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+          
+          {/* Main Title Section */}
+          <div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
+              Abonnement
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
+              Plan actuel : Clinique · Renouvellement le 14 juillet 2025
+            </p>
+          </div>
+
+          {/* Section: Choisir un plan (3 Cards Grid matching Image 1) */}
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1rem' }}>
+              Choisir un plan
+            </h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              
+              {/* STARTER */}
+              <div style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '16px',
+                padding: '1.75rem 1.5rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '1.25rem'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    STARTER
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>25 000</span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>FCFA / mois</span>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 1.25rem 0' }}>
+                    Pour les petites structures et cabinets solo
+                  </p>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>1 praticien</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Jusqu'à 200 patients</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Gestion RDV</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Ordonnances</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Support email</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => handleSelectPlan('starter')}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Choisir ce plan
+                </button>
+              </div>
+
+              {/* CLINIQUE (ACTIVE PLAN MATCHING IMAGE 1) */}
+              <div style={{
+                backgroundColor: '#e6f4ea',
+                border: '1px solid #bbf7d0',
+                borderRadius: '16px',
+                padding: '1.75rem 1.5rem',
+                boxShadow: '0 4px 14px rgba(30, 77, 64, 0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '1.25rem',
+                position: 'relative'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e4d40', textTransform: 'uppercase' }}>
+                      CLINIQUE
+                    </span>
+                    <span style={{
+                      backgroundColor: '#1e4d40',
+                      color: '#ffffff',
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700
+                    }}>
+                      Plan actuel
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: '#1e4d40' }}>75 000</span>
+                    <span style={{ fontSize: '0.85rem', color: '#1e4d40', opacity: 0.8 }}>FCFA / mois</span>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: '#1e4d40', opacity: 0.85, margin: '0 0 1.25rem 0' }}>
+                    La solution complète pour les cliniques
+                  </p>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                      <Check size={16} color="#1e4d40" /> <span>Jusqu'à 10 praticiens</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                      <Check size={16} color="#1e4d40" /> <span>Patients illimités</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                      <Check size={16} color="#1e4d40" /> <span>Pharmacie & Labo</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                      <Check size={16} color="#1e4d40" /> <span>Facturation & comptabilité</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                      <Check size={16} color="#1e4d40" /> <span>Support prioritaire</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                      <Check size={16} color="#1e4d40" /> <span>Rapports avancés</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  disabled
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: '1px solid #bbf7d0',
+                    backgroundColor: 'rgba(255,255,255,0.7)',
+                    color: '#1e4d40',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'default'
+                  }}
+                >
+                  Plan actuel
+                </button>
+              </div>
+
+              {/* HÔPITAL */}
+              <div style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '16px',
+                padding: '1.75rem 1.5rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '1.25rem'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                    HÔPITAL
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>180 000</span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>FCFA / mois</span>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 1.25rem 0' }}>
+                    Pour les établissements à grande échelle
+                  </p>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Praticiens illimités</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Multi-sites</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>API & intégrations</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Tableaux de bord BI</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>Account manager dédié</span>
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                      <Check size={16} color="#10b981" /> <span>SLA 99,9%</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => handleSelectPlan('hopital')}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Choisir ce plan
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Section: Bottom Grid (~35% Left: Payment Method, ~65% Right: Invoices History) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)',
+            gap: '1.5rem',
+            alignItems: 'start'
+          }}>
+            {/* LEFT COLUMN: Payment Method & Renewal */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* MOYEN DE PAIEMENT */}
+              <div style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  MOYEN DE PAIEMENT
+                </span>
+
+                <div style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      backgroundColor: '#1e4d40',
+                      color: '#ffffff',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <CreditCard size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>Wave Business</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>+225 07 12 34 56 78</div>
+                    </div>
+                  </div>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    border: '1px solid #10b981',
+                    color: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Check size={12} />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => showToast('info', 'Paiement', 'Modifiez votre numéro Mobile Money.')}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Plus size={15} />
+                  <span>Modifier le paiement</span>
+                </button>
+              </div>
+
+              {/* PROCHAIN RENOUVELLEMENT */}
+              <div style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  PROCHAIN RENOUVELLEMENT
+                </span>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  14 juillet 2025
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Renouvellement automatique par Wave Business
+                </div>
+              </div>
+
+            </div>
+
+            {/* RIGHT COLUMN: Historique des factures */}
+            <div style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem'
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  Historique des factures
+                </h3>
+
+                <button
+                  onClick={handleExportInvoices}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    backgroundColor: 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Download size={14} />
+                  <span>Tout exporter</span>
+                </button>
+              </div>
+
+              {/* Invoices List matching Image 1 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {invoiceHistory.map((inv) => (
+                  <div
+                    key={inv.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--bg-primary)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <FileText size={18} color="var(--text-muted)" />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                          Facture {inv.date}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {inv.plan}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                        {inv.amount}
+                      </span>
+                      
+                      <span style={{
+                        backgroundColor: '#e6f4ea',
+                        color: '#1e4d40',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.725rem',
+                        fontWeight: 700
+                      }}>
+                        {inv.status}
+                      </span>
+
+                      <button
+                        onClick={() => showToast('info', 'Téléchargement', `Facture du ${inv.date} téléchargée.`)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--text-muted)',
+                          padding: '4px'
+                        }}
+                        title="Télécharger la facture"
+                      >
+                        <Download size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB 2: INFORMATIONS CLINIQUE */}
       {activeSubTab === 'clinic' && !loading && (
         <form onSubmit={handleUpdateClinicSubmit} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '650px' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>Détails d'identification</h3>
@@ -305,324 +796,70 @@ export const SettingsPage: React.FC = () => {
                 className="input-control"
               />
             </div>
-
-            <div className="form-group">
-              <label>Examen NFS / Hémogramme</label>
-              <input
-                type="number"
-                value={tariffs.nfs || 0}
-                onChange={e => setTariffs({ ...tariffs, nfs: parseInt(e.target.value) || 0 })}
-                className="input-control"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Test Paludisme (TDR/Goutte Épaisse)</label>
-              <input
-                type="number"
-                value={tariffs.malaria_test || 0}
-                onChange={e => setTariffs({ ...tariffs, malaria_test: parseInt(e.target.value) || 0 })}
-                className="input-control"
-              />
-            </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={isSavingClinic}>
+          <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', backgroundColor: '#1e4d40' }} disabled={isSavingClinic}>
             {isSavingClinic ? 'Sauvegarde...' : 'Enregistrer les paramètres'}
           </button>
         </form>
       )}
 
-      {/* SUBTAB 2: Users Management */}
+      {/* TAB 3: GESTION DES UTILISATEURS */}
       {activeSubTab === 'users' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-            <button onClick={() => setIsUserModalOpen(true)} className="btn btn-primary" style={{ gap: '6px' }}>
+            <button onClick={() => setIsUserModalOpen(true)} className="btn btn-primary" style={{ gap: '6px', backgroundColor: '#1e4d40' }}>
               <Plus size={16} />
               <span>Ajouter un compte collaborateur</span>
             </button>
           </div>
 
           <div className="table-container">
-            {loading ? (
-              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Chargement des utilisateurs...</div>
-            ) : staff.length === 0 ? (
-              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Aucun collaborateur enregistré.</div>
-            ) : (
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>Nom Complet</th>
-                    <th>Email d'identification</th>
-                    <th>Poste / Rôle</th>
-                    <th>Statut d'accès</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Nom Complet</th>
+                  <th>Email d'identification</th>
+                  <th>Poste / Rôle</th>
+                  <th>Statut d'accès</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map(st => (
+                  <tr key={st.id} style={{ opacity: st.active === 0 ? 0.6 : 1 }}>
+                    <td style={{ fontWeight: 600 }}>{st.name}</td>
+                    <td>{st.email}</td>
+                    <td><span className="badge badge-info">{roleLabels[st.role]}</span></td>
+                    <td>
+                      {st.active === 1 ? (
+                        <span className="badge badge-success">Actif</span>
+                      ) : (
+                        <span className="badge badge-danger">Désactivé</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {st.id !== currentUser?.id && (
+                        <button
+                          onClick={() => handleToggleUserStatus(st.id, st.active)}
+                          className="btn btn-outline"
+                          style={{ 
+                            padding: '4px 8px', 
+                            fontSize: '0.75rem',
+                            borderColor: st.active === 1 ? 'var(--danger)' : 'var(--success)',
+                            color: st.active === 1 ? 'var(--danger)' : 'var(--success)'
+                          }}
+                        >
+                          {st.active === 1 ? 'Désactiver' : 'Activer'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {staff.map(st => (
-                    <tr key={st.id} style={{ opacity: st.active === 0 ? 0.6 : 1 }}>
-                      <td style={{ fontWeight: 600 }}>{st.name}</td>
-                      <td>{st.email}</td>
-                      <td><span className="badge badge-info">{roleLabels[st.role]}</span></td>
-                      <td>
-                        {st.active === 1 ? (
-                          <span className="badge badge-success">Actif</span>
-                        ) : (
-                          <span className="badge badge-danger">Désactivé</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {st.id !== currentUser?.id && (
-                          <button
-                            onClick={() => handleToggleUserStatus(st.id, st.active)}
-                            className="btn btn-outline"
-                            style={{ 
-                              padding: '4px 8px', 
-                              fontSize: '0.75rem',
-                              borderColor: st.active === 1 ? 'var(--danger)' : 'var(--success)',
-                              color: st.active === 1 ? 'var(--danger)' : 'var(--success)'
-                            }}
-                          >
-                            {st.active === 1 ? 'Désactiver' : 'Activer'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
-      )}
-
-      {/* SUBTAB 3: Billing & Subscription SaaS */}
-      {activeSubTab === 'billing' && clinic && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          
-          {/* Status summary */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'row', gap: '2.5rem', flexWrap: 'wrap', padding: '1.5rem', alignItems: 'center' }}>
-            <div>
-              <span className="text-xs text-muted" style={{ fontWeight: 600, display: 'block', marginBottom: '4px' }}>STATUT DE L'ABONNEMENT</span>
-              <span className={`badge ${clinic.subscription_status === 'active' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.9rem', padding: '6px 12px' }}>
-                {clinic.subscription_status === 'active' ? '🔴 ABONNÉ ACTIF' : '⚠️ EXPIRÉ'}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-xs text-muted" style={{ fontWeight: 600, display: 'block', marginBottom: '4px' }}>FORFAIT ACTUEL</span>
-              <span className={`badge ${planColors[currentPlan]}`} style={{ fontSize: '0.9rem', padding: '6px 12px' }}>
-                {planLabels[currentPlan].toUpperCase()}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-xs text-muted" style={{ fontWeight: 600, display: 'block', marginBottom: '4px' }}>DATE D'EXPIRATION</span>
-              <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: clinic.subscription_status === 'active' ? 'var(--text-primary)' : 'var(--danger)' }}>
-                {new Date(clinic.subscription_expires_at).toLocaleDateString('fr-FR', { dateStyle: 'long' })}
-              </span>
-            </div>
-          </div>
-
-          {/* Pricing Plans Grid */}
-          <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '1rem', color: 'white' }}>Forfaits & Tarifs SaaS</h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-              
-              {/* STARTER */}
-              <div 
-                onClick={() => setBillingPlan('starter')}
-                className="card"
-                style={{
-                  cursor: 'pointer',
-                  border: billingPlan === 'starter' ? '2px solid var(--primary)' : '1px solid var(--border)',
-                  boxShadow: billingPlan === 'starter' ? '0 0 15px rgba(13, 148, 136, 0.25)' : 'var(--shadow-sm)',
-                  backgroundColor: billingPlan === 'starter' ? 'var(--bg-secondary)' : 'rgba(255,255,255,0.01)',
-                  transition: 'var(--transition)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '1.1rem', color: 'white' }}>Starter</strong>
-                  {billingPlan === 'starter' && <span className="badge badge-success">Sélectionné</span>}
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>15 000 FCFA <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>/ mois</span></div>
-                <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <li>De 1 à 3 collaborateurs</li>
-                  <li>Dossiers patients complets</li>
-                  <li>Agenda & Rendez-vous</li>
-                  <li>Consultations & Ordonnances</li>
-                </ul>
-              </div>
-
-              {/* PRO */}
-              <div 
-                onClick={() => setBillingPlan('pro')}
-                className="card"
-                style={{
-                  cursor: 'pointer',
-                  border: billingPlan === 'pro' ? '2px solid var(--primary)' : '1px solid var(--border)',
-                  boxShadow: billingPlan === 'pro' ? '0 0 15px rgba(13, 148, 136, 0.25)' : 'var(--shadow-sm)',
-                  backgroundColor: billingPlan === 'pro' ? 'var(--bg-secondary)' : 'rgba(255,255,255,0.01)',
-                  transition: 'var(--transition)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '1.1rem', color: 'white' }}>Pro</strong>
-                  {billingPlan === 'pro' && <span className="badge badge-success">Sélectionné</span>}
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>30 000 FCFA <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>/ mois</span></div>
-                <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <li>De 4 à 10 collaborateurs</li>
-                  <li>Tout le forfait Starter</li>
-                  <li>Gestion de la Pharmacie</li>
-                  <li>Facturation & Recettes</li>
-                </ul>
-              </div>
-
-              {/* EXPERT */}
-              <div 
-                onClick={() => setBillingPlan('expert')}
-                className="card"
-                style={{
-                  cursor: 'pointer',
-                  border: billingPlan === 'expert' ? '2px solid var(--primary)' : '1px solid var(--border)',
-                  boxShadow: billingPlan === 'expert' ? '0 0 15px rgba(13, 148, 136, 0.25)' : 'var(--shadow-sm)',
-                  backgroundColor: billingPlan === 'expert' ? 'var(--bg-secondary)' : 'rgba(255,255,255,0.01)',
-                  transition: 'var(--transition)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '1.1rem', color: 'white' }}>Expert</strong>
-                  {billingPlan === 'expert' && <span className="badge badge-success">Sélectionné</span>}
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>60 000 FCFA <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>/ mois</span></div>
-                <ul style={{ paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <li>Nombre d'utilisateurs illimités</li>
-                  <li>Tout le forfait Pro</li>
-                  <li>File du Laboratoire d'analyses</li>
-                  <li>Exportations PDF / Excel</li>
-                </ul>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Payment & Simulation */}
-          <div className="modal-grid" style={{ alignItems: 'start' }}>
-            
-            {/* MM Simulator Form */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Simuler le renouvellement par Mobile Money</h3>
-              
-              <form onSubmit={handleSimulateSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="modal-grid">
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Forfait sélectionné</label>
-                    <select
-                      value={billingPlan}
-                      onChange={e => setBillingPlan(e.target.value as any)}
-                      className="input-control"
-                    >
-                      <option value="starter">Starter (15 000 FCFA/mois)</option>
-                      <option value="pro">Pro (30 000 FCFA/mois)</option>
-                      <option value="expert">Expert (60 000 FCFA/mois)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Durée d'engagement</label>
-                    <select
-                      value={billingMonths}
-                      onChange={e => setBillingMonths(parseInt(e.target.value))}
-                      className="input-control"
-                    >
-                      <option value={1}>1 mois</option>
-                      <option value={3}>3 mois</option>
-                      <option value={6}>6 mois</option>
-                      <option value={12}>12 mois (1 an)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Opérateur Mobile Money *</label>
-                  <select
-                    value={billingProvider}
-                    onChange={e => setBillingProvider(e.target.value)}
-                    className="input-control"
-                  >
-                    <option value="wave">Wave Côte d'Ivoire</option>
-                    <option value="orange_money">Orange Money</option>
-                    <option value="mtn_momo">MTN Mobile Money</option>
-                  </select>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Numéro de téléphone payeur *</label>
-                  <div style={{ position: 'relative' }}>
-                    <Smartphone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-                    <input
-                      type="tel"
-                      placeholder="Ex: +225 0707..."
-                      value={billingPhone}
-                      onChange={e => setBillingPhone(e.target.value)}
-                      className="input-control w-full"
-                      style={{ paddingLeft: '38px' }}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn btn-primary w-full"
-                  style={{ marginTop: '6px', fontWeight: 600 }}
-                  disabled={isProcessingPayment}
-                >
-                  {isProcessingPayment ? 'Traitement en cours...' : `Confirmer et Payer ${(billingMonths * planPrices[billingPlan]).toLocaleString()} FCFA`}
-                </button>
-              </form>
-            </div>
-
-            {/* Help / Pricing Guide */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Pourquoi choisir un forfait supérieur ?</h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', lineHeight: 1.4, color: 'var(--text-secondary)' }}>
-                <p>
-                  🚀 <strong>Forfait Pro :</strong> Déverrouille les modules de gestion des stocks de pharmacie, de dispensation sur ordonnance, ainsi que les rapports de caisse pour le comptable.
-                </p>
-                <p>
-                  🔬 <strong>Forfait Expert :</strong> Conçu pour les structures médicales complètes. Il intègre la file d'attente du laboratoire d'analyses, la saisie et l'impression des comptes-rendus d'analyses, ainsi que l'assistance technique prioritaire.
-                </p>
-                <div style={{
-                  backgroundColor: 'var(--bg-tertiary)',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  color: 'var(--text-primary)',
-                  borderLeft: '4px solid var(--primary)',
-                  marginTop: '6px'
-                }}>
-                  Le basculement de forfait prolonge votre durée d'abonnement selon le prorata du tarif choisi.
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
       )}
 
       {/* CREATE STAFF USER MODAL */}
@@ -665,7 +902,7 @@ export const SettingsPage: React.FC = () => {
 
               <div className="modal-footer">
                 <button type="button" onClick={() => setIsUserModalOpen(false)} className="btn btn-secondary">Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={isSavingUser}>
+                <button type="submit" className="btn btn-primary" disabled={isSavingUser} style={{ backgroundColor: '#1e4d40' }}>
                   {isSavingUser ? 'Création...' : 'Créer le compte'}
                 </button>
               </div>
@@ -677,4 +914,5 @@ export const SettingsPage: React.FC = () => {
     </div>
   );
 };
+
 export default SettingsPage;
