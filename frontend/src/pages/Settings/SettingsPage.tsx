@@ -7,11 +7,8 @@ import {
   Bell,
   Check,
   CreditCard,
-  Download,
-  FileText,
   Plus,
-  Smartphone,
-  Edit3
+  Loader2
 } from 'lucide-react';
 
 interface StaffUser {
@@ -45,10 +42,11 @@ export const SettingsPage: React.FC = () => {
   const [newUserRole, setNewUserRole] = useState<string>('doctor');
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
 
-  // Billing & Subscription states matching Image 1
-  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'clinique' | 'hopital'>('clinique');
+  // Billing & Subscription states
   const [paymentProvider, setPaymentProvider] = useState<string>('wave');
-  const [paymentPhone, setPaymentPhone] = useState<string>('+225 07 12 34 56 78');
+  const [paymentPhone, setPaymentPhone] = useState<string>('');
+  const [renewMonths, setRenewMonths] = useState<number>(1);
+  const [isRenewing, setIsRenewing] = useState<boolean>(false);
 
   const fetchClinicDetails = async () => {
     try {
@@ -155,13 +153,23 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSelectPlan = (plan: 'starter' | 'clinique' | 'hopital') => {
-    setSelectedPlan(plan);
-    showToast('info', 'Plan sélectionné', `Vous avez sélectionné le plan ${plan.toUpperCase()}.`);
-  };
+  const handleRenewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentPhone) {
+      showToast('error', 'Numéro requis', 'Veuillez saisir votre numéro Mobile Money.');
+      return;
+    }
 
-  const handleExportInvoices = () => {
-    showToast('success', 'Exportation', 'L\'historique de vos factures MediClinic a été téléchargé.');
+    setIsRenewing(true);
+    try {
+      await renewSubscription(paymentProvider, paymentPhone, renewMonths, 'starter');
+      showToast('success', 'Abonnement renouvelé', `Paiement confirmé via ${paymentProvider.toUpperCase()}. Votre abonnement a été prolongé de ${renewMonths} mois.`);
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Échec du paiement', err.error || 'Impossible de traiter le renouvellement.');
+    } finally {
+      setIsRenewing(false);
+    }
   };
 
   const roleLabels: Record<string, string> = {
@@ -172,15 +180,6 @@ export const SettingsPage: React.FC = () => {
     lab_tech: 'Laborantin',
     manager: 'Gestionnaire'
   };
-
-  // Mock invoice history rows matching Image 1
-  const invoiceHistory = [
-    { id: 1, date: '14 juin 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
-    { id: 2, date: '14 mai 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
-    { id: 3, date: '14 avril 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
-    { id: 4, date: '14 mars 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
-    { id: 5, date: '14 février 2025', plan: 'Plan Clinique', amount: '75 000 FCFA', status: 'Payée' },
-  ];
 
   return (
     <div style={{
@@ -309,348 +308,68 @@ export const SettingsPage: React.FC = () => {
         )}
       </div>
 
-      {/* TAB 1: GESTION DES ABONNEMENTS MATCHING IMAGE 1 TARGET DESIGN */}
+      {/* TAB 1: GESTION DE L'ABONNEMENT */}
       {activeSubTab === 'billing' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-          
+
           {/* Main Title Section */}
           <div>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
               Abonnement
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
-              Plan actuel : Clinique · Renouvellement le 14 juillet 2025
+              {clinic?.subscription_status === 'expired' ? (
+                <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Abonnement expiré — renouvelez ci-dessous pour réactiver l'écriture des données.</span>
+              ) : clinic?.subscription_expires_at ? (
+                `Statut : ${clinic.subscription_status === 'trial' ? 'Période d\'essai' : 'Actif'} · Renouvellement le ${new Date(clinic.subscription_expires_at).toLocaleDateString('fr-FR')}`
+              ) : (
+                'Statut abonnement non disponible.'
+              )}
             </p>
           </div>
 
-          {/* Section: Choisir un plan (3 Cards Grid matching Image 1) */}
-          <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1rem' }}>
-              Choisir un plan
-            </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.3fr)', gap: '1.5rem', alignItems: 'start' }}>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-              
-              {/* STARTER */}
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '16px',
-                padding: '1.75rem 1.5rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '1.25rem'
-              }}>
-                <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    STARTER
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
-                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>25 000</span>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>FCFA / mois</span>
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 1.25rem 0' }}>
-                    Pour les petites structures et cabinets solo
-                  </p>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>1 praticien</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Jusqu'à 200 patients</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Gestion RDV</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Ordonnances</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Support email</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <button
-                  onClick={() => handleSelectPlan('starter')}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Choisir ce plan
-                </button>
-              </div>
-
-              {/* CLINIQUE (ACTIVE PLAN MATCHING IMAGE 1) */}
-              <div style={{
-                backgroundColor: '#e6f4ea',
-                border: '1px solid #bbf7d0',
-                borderRadius: '16px',
-                padding: '1.75rem 1.5rem',
-                boxShadow: '0 4px 14px rgba(30, 77, 64, 0.08)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '1.25rem',
-                position: 'relative'
-              }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e4d40', textTransform: 'uppercase' }}>
-                      CLINIQUE
-                    </span>
-                    <span style={{
-                      backgroundColor: '#1e4d40',
-                      color: '#ffffff',
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.7rem',
-                      fontWeight: 700
-                    }}>
-                      Plan actuel
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
-                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: '#1e4d40' }}>75 000</span>
-                    <span style={{ fontSize: '0.85rem', color: '#1e4d40', opacity: 0.8 }}>FCFA / mois</span>
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: '#1e4d40', opacity: 0.85, margin: '0 0 1.25rem 0' }}>
-                    La solution complète pour les cliniques
-                  </p>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
-                      <Check size={16} color="#1e4d40" /> <span>Jusqu'à 10 praticiens</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
-                      <Check size={16} color="#1e4d40" /> <span>Patients illimités</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
-                      <Check size={16} color="#1e4d40" /> <span>Pharmacie & Labo</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
-                      <Check size={16} color="#1e4d40" /> <span>Facturation & comptabilité</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
-                      <Check size={16} color="#1e4d40" /> <span>Support prioritaire</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
-                      <Check size={16} color="#1e4d40" /> <span>Rapports avancés</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <button
-                  disabled
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '10px',
-                    border: '1px solid #bbf7d0',
-                    backgroundColor: 'rgba(255,255,255,0.7)',
-                    color: '#1e4d40',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'default'
-                  }}
-                >
-                  Plan actuel
-                </button>
-              </div>
-
-              {/* HÔPITAL */}
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '16px',
-                padding: '1.75rem 1.5rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '1.25rem'
-              }}>
-                <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    HÔPITAL
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
-                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>180 000</span>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>FCFA / mois</span>
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 1.25rem 0' }}>
-                    Pour les établissements à grande échelle
-                  </p>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Praticiens illimités</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Multi-sites</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>API & intégrations</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Tableaux de bord BI</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>Account manager dédié</span>
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-                      <Check size={16} color="#10b981" /> <span>SLA 99,9%</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <button
-                  onClick={() => handleSelectPlan('hopital')}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Choisir ce plan
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Section: Bottom Grid (~35% Left: Payment Method, ~65% Right: Invoices History) */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)',
-            gap: '1.5rem',
-            alignItems: 'start'
-          }}>
-            {/* LEFT COLUMN: Payment Method & Renewal */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              
-              {/* MOYEN DE PAIEMENT */}
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '16px',
-                padding: '1.5rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem'
-              }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  MOYEN DE PAIEMENT
-                </span>
-
-                <div style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      backgroundColor: '#1e4d40',
-                      color: '#ffffff',
-                      padding: '8px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <CreditCard size={18} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>Wave Business</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>+225 07 12 34 56 78</div>
-                    </div>
-                  </div>
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    border: '1px solid #10b981',
-                    color: '#10b981',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Check size={12} />
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => showToast('info', 'Paiement', 'Modifiez votre numéro Mobile Money.')}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Plus size={15} />
-                  <span>Modifier le paiement</span>
-                </button>
-              </div>
-
-              {/* PROCHAIN RENOUVELLEMENT */}
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '16px',
-                padding: '1.5rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  PROCHAIN RENOUVELLEMENT
-                </span>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  14 juillet 2025
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Renouvellement automatique par Wave Business
-                </div>
-              </div>
-
-            </div>
-
-            {/* RIGHT COLUMN: Historique des factures */}
+            {/* Plan card — single real plan, matches Landing Page pricing */}
             <div style={{
+              backgroundColor: '#e6f4ea',
+              border: '1px solid #bbf7d0',
+              borderRadius: '16px',
+              padding: '1.75rem 1.5rem',
+              boxShadow: '0 4px 14px rgba(30, 77, 64, 0.08)'
+            }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e4d40', textTransform: 'uppercase' }}>
+                PLAN CLINIQUE
+              </span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', margin: '0.5rem 0' }}>
+                <span style={{ fontSize: '1.85rem', fontWeight: 800, color: '#1e4d40' }}>15 000</span>
+                <span style={{ fontSize: '0.85rem', color: '#1e4d40', opacity: 0.8 }}>FCFA / mois</span>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#1e4d40', opacity: 0.85, margin: '0 0 1.25rem 0' }}>
+                La solution complète pour votre clinique
+              </p>
+
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                  <Check size={16} color="#1e4d40" /> <span>Jusqu'à 15 collaborateurs</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                  <Check size={16} color="#1e4d40" /> <span>Dossiers patients illimités</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                  <Check size={16} color="#1e4d40" /> <span>Pharmacie & Laboratoire inclus</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                  <Check size={16} color="#1e4d40" /> <span>Encaissements & Facturation</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 500 }}>
+                  <Check size={16} color="#1e4d40" /> <span>Mode déconnecté basique</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Real renewal form, wired to renewSubscription() -> POST /financials/subscription-pay */}
+            <form onSubmit={handleRenewSubmit} style={{
               backgroundColor: 'var(--bg-secondary)',
               border: '1px solid var(--border)',
               borderRadius: '16px',
@@ -658,96 +377,73 @@ export const SettingsPage: React.FC = () => {
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1.25rem'
+              gap: '1rem'
             }}>
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                  Historique des factures
-                </h3>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                RENOUVELER PAR MOBILE MONEY
+              </span>
 
-                <button
-                  onClick={handleExportInvoices}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 14px',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Download size={14} />
-                  <span>Tout exporter</span>
-                </button>
-              </div>
-
-              {/* Invoices List matching Image 1 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {invoiceHistory.map((inv) => (
-                  <div
-                    key={inv.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      backgroundColor: 'var(--bg-primary)'
-                    }}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Opérateur</label>
+                  <select
+                    value={paymentProvider}
+                    onChange={(e) => setPaymentProvider(e.target.value)}
+                    className="input-control"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px' }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <FileText size={18} color="var(--text-muted)" />
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                          Facture {inv.date}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {inv.plan}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                        {inv.amount}
-                      </span>
-                      
-                      <span style={{
-                        backgroundColor: '#e6f4ea',
-                        color: '#1e4d40',
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        fontSize: '0.725rem',
-                        fontWeight: 700
-                      }}>
-                        {inv.status}
-                      </span>
-
-                      <button
-                        onClick={() => showToast('info', 'Téléchargement', `Facture du ${inv.date} téléchargée.`)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--text-muted)',
-                          padding: '4px'
-                        }}
-                        title="Télécharger la facture"
-                      >
-                        <Download size={15} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                    <option value="wave">Wave</option>
+                    <option value="orange">Orange Money</option>
+                    <option value="mtn">MTN MoMo</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Durée</label>
+                  <select
+                    value={renewMonths}
+                    onChange={(e) => setRenewMonths(parseInt(e.target.value))}
+                    className="input-control"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px' }}
+                  >
+                    <option value={1}>1 mois — 15 000 FCFA</option>
+                    <option value={3}>3 mois — 45 000 FCFA</option>
+                    <option value={6}>6 mois — 90 000 FCFA</option>
+                    <option value={12}>12 mois — 180 000 FCFA</option>
+                  </select>
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Numéro Mobile Money</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
+                  <CreditCard size={16} color="var(--text-muted)" />
+                  <input
+                    type="tel"
+                    placeholder="Ex: +225 07 12 34 56 78"
+                    value={paymentPhone}
+                    onChange={(e) => setPaymentPhone(e.target.value)}
+                    style={{ border: 'none', outline: 'none', background: 'none', flex: 1, fontSize: '0.875rem', color: 'var(--text-primary)' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isRenewing}
+                className="btn btn-primary"
+                style={{ backgroundColor: '#1e4d40', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                {isRenewing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Traitement du paiement...</span>
+                  </>
+                ) : (
+                  <span>Payer et renouveler ({(renewMonths * 15000).toLocaleString()} FCFA)</span>
+                )}
+              </button>
+            </form>
 
           </div>
 

@@ -13,10 +13,7 @@ import {
   Check,
   AlertTriangle,
   Plus,
-  Trash2,
-  X,
-  FileText,
-  Pencil
+  Trash2
 } from 'lucide-react';
 
 // Comprehensive catalog of pharmacy medications in CIV & West Africa
@@ -405,14 +402,26 @@ export const OrdonnancesPage: React.FC = () => {
     showToast('info', 'Duplication', `Ordonnance de ${presc.patient_name} dupliquée.`);
   };
 
-  const handleConfirmDispense = (presc: Prescription) => {
-    setPrescriptions(itemsToRender.map(p => p.id === presc.id ? {
-      ...p,
-      status: 'remise',
-      items: p.items.map(it => ({ ...it, quantity_dispensed: it.quantity_prescribed }))
-    } : p));
-    showToast('success', 'Délivrance effectuée', `L'ordonnance de ${presc.patient_name} a été marquée comme entièrement délivrée.`);
-    setDispenseModalPresc(null);
+  const handleConfirmDispense = async (presc: Prescription) => {
+    const dispensations = presc.items
+      .filter(it => it.quantity_dispensed < it.quantity_prescribed)
+      .map(it => ({ itemId: it.id, qty: it.quantity_prescribed - it.quantity_dispensed }));
+
+    if (dispensations.length === 0) {
+      showToast('info', 'Rien à délivrer', 'Toutes les quantités ont déjà été délivrées pour cette ordonnance.');
+      setDispenseModalPresc(null);
+      return;
+    }
+
+    try {
+      await api.post(`/pharmacy/dispense/${presc.id}`, { dispensations });
+      showToast('success', 'Délivrance effectuée', `L'ordonnance de ${presc.patient_name} a été marquée comme délivrée et le stock a été décrémenté.`);
+      setDispenseModalPresc(null);
+      fetchPrescriptions();
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Échec de la délivrance', err.error || 'Impossible de délivrer l\'ordonnance. Vérifiez le stock disponible.');
+    }
   };
 
   // Default sample prescriptions data matching Image 1 exact UI wireframe
@@ -427,8 +436,8 @@ export const OrdonnancesPage: React.FC = () => {
       status: 'remise',
       notes: "À prendre avec de la nourriture. Éviter l'alcool.",
       items: [
-        { id: 101, medication_name: 'Amoxicilline 500mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 7 jours', durationDays: 7, quantity_prescribed: 21, quantity_dispensed: 21 },
-        { id: 102, medication_name: 'Paracétamol 500mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 8 jours', durationDays: 8, quantity_prescribed: 10, quantity_dispensed: 10 }
+        { id: 101, medication_name: 'Amoxicilline 500mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 7 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 7, quantity_prescribed: 21, quantity_dispensed: 21 },
+        { id: 102, medication_name: 'Paracétamol 500mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 8 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 8, quantity_prescribed: 10, quantity_dispensed: 10 }
       ]
     },
     {
@@ -440,8 +449,8 @@ export const OrdonnancesPage: React.FC = () => {
       diagnostic: 'Suivi Diabète type 2',
       status: 'remise',
       items: [
-        { id: 201, medication_name: 'Métformine 850mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 30 jours', durationDays: 30, quantity_prescribed: 60, quantity_dispensed: 48 },
-        { id: 202, medication_name: 'Linagliptine 5mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 30 }
+        { id: 201, medication_name: 'Métformine 850mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 30 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 30, quantity_prescribed: 60, quantity_dispensed: 48 },
+        { id: 202, medication_name: 'Linagliptine 5mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', frequency: 'x1/jour (Matin)', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 30 }
       ]
     },
     {
@@ -454,8 +463,8 @@ export const OrdonnancesPage: React.FC = () => {
       status: 'partielle',
       notes: 'Vérifier la tension tous les 3 jours.',
       items: [
-        { id: 301, medication_name: 'Lisinopril 10mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 18 },
-        { id: 302, medication_name: 'Amlodipine 5mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 30 }
+        { id: 301, medication_name: 'Lisinopril 10mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', frequency: 'x1/jour (Matin)', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 18 },
+        { id: 302, medication_name: 'Amlodipine 5mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', frequency: 'x1/jour (Matin)', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 30 }
       ]
     },
     {
@@ -467,9 +476,9 @@ export const OrdonnancesPage: React.FC = () => {
       diagnostic: 'Gastrite aiguë',
       status: 'validee',
       items: [
-        { id: 401, medication_name: 'Oméprazole 20mg', form: 'Gélule', posology: '1 comprimé - x1/jour - 14 jours', durationDays: 14, quantity_prescribed: 14, quantity_dispensed: 0 },
-        { id: 402, medication_name: 'Dompéridone 10mg', form: 'Comprimé', posology: '1 comprimé - x3/jour - 7 jours', durationDays: 7, quantity_prescribed: 21, quantity_dispensed: 0 },
-        { id: 403, medication_name: 'Sels de réhydratation', form: 'Sachet', posology: '1 sachet - x2/jour - 3 jours', durationDays: 3, quantity_prescribed: 6, quantity_dispensed: 0 }
+        { id: 401, medication_name: 'Oméprazole 20mg', form: 'Gélule', posology: '1 comprimé - x1/jour - 14 jours', frequency: 'x1/jour (Matin)', durationDays: 14, quantity_prescribed: 14, quantity_dispensed: 0 },
+        { id: 402, medication_name: 'Dompéridone 10mg', form: 'Comprimé', posology: '1 comprimé - x3/jour - 7 jours', frequency: 'x3/jour (Matin, Midi & Soir)', durationDays: 7, quantity_prescribed: 21, quantity_dispensed: 0 },
+        { id: 403, medication_name: 'Sels de réhydratation', form: 'Sachet', posology: '1 sachet - x2/jour - 3 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 3, quantity_prescribed: 6, quantity_dispensed: 0 }
       ]
     }
   ];
