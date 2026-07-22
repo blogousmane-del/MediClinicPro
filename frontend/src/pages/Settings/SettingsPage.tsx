@@ -206,7 +206,7 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', gap: '1rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch', whiteSpace: 'nowrap' }}>
         <button
           onClick={() => setActiveSubTab('clinic')}
           style={{
@@ -217,7 +217,8 @@ export const SettingsPage: React.FC = () => {
             fontWeight: activeSubTab === 'clinic' ? 600 : 400,
             borderBottom: activeSubTab === 'clinic' ? '3px solid var(--primary)' : 'none',
             cursor: 'pointer',
-            fontSize: '0.95rem'
+            fontSize: '0.95rem',
+            whiteSpace: 'nowrap'
           }}
         >
           Informations Clinique
@@ -234,7 +235,8 @@ export const SettingsPage: React.FC = () => {
               fontWeight: activeSubTab === 'users' ? 600 : 400,
               borderBottom: activeSubTab === 'users' ? '3px solid var(--primary)' : 'none',
               cursor: 'pointer',
-              fontSize: '0.95rem'
+              fontSize: '0.95rem',
+              whiteSpace: 'nowrap'
             }}
           >
             Gestion des Utilisateurs
@@ -252,7 +254,8 @@ export const SettingsPage: React.FC = () => {
               fontWeight: activeSubTab === 'billing' ? 600 : 400,
               borderBottom: activeSubTab === 'billing' ? '3px solid var(--primary)' : 'none',
               cursor: 'pointer',
-              fontSize: '0.95rem'
+              fontSize: '0.95rem',
+              whiteSpace: 'nowrap'
             }}
           >
             Abonnement & Factures
@@ -282,7 +285,7 @@ export const SettingsPage: React.FC = () => {
 
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginTop: '1rem' }}>Grille Tarifaire des Actes (FCFA)</h3>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="modal-grid">
             <div className="form-group">
               <label>Consultation Générale</label>
               <input
@@ -516,14 +519,14 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           {/* Payment & Simulation */}
-          <div style={{ display: 'grid', gridTemplateColumns: '6fr 5fr', gap: '1.5rem', alignItems: 'start' }}>
+          <div className="modal-grid" style={{ alignItems: 'start' }}>
             
             {/* MM Simulator Form */}
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Simuler le renouvellement par Mobile Money</h3>
               
               <form onSubmit={handleSimulateSubscription} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="modal-grid">
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label>Forfait sélectionné</label>
                     <select

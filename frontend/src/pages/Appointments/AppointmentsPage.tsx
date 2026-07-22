@@ -543,7 +543,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
                 </div>
 
                 {/* Date & Time */}
-                <div className="grid-responsive-2col">
+                <div className="modal-grid">
                   <div className="form-group">
                     <label>Date du RDV *</label>
                     <input
@@ -567,7 +567,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
                 </div>
 
                 {/* Duration & Motif */}
-                <div className="grid-responsive-1to2col">
+                <div className="modal-grid">
                   <div className="form-group">
                     <label>Durée (min)</label>
                     <input

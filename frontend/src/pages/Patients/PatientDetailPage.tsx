@@ -547,7 +547,7 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
                 </div>
 
                 {/* Constants row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                <div className="modal-grid">
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label style={{ fontSize: '0.75rem' }}>Tension</label>
                     <input type="text" placeholder="12/8" value={tension} onChange={e => setTension(e.target.value)} className="input-control" style={{ padding: '6px' }} />

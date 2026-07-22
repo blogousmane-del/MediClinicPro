@@ -214,7 +214,7 @@ export const PharmacyPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleReplenishSubmit}>
-              <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="modal-body modal-grid">
                 <div className="form-group">
                   <label>Nom du médicament *</label>
                   <input type="text" placeholder="Ex: Paracétamol" value={name} onChange={e => setName(e.target.value)} className="input-control" required />
@@ -254,7 +254,7 @@ export const PharmacyPage: React.FC = () => {
                   <label>Date d'expiration</label>
                   <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="input-control" />
                 </div>
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Fournisseur</label>
                   <input type="text" placeholder="Nom du grossiste..." value={supplier} onChange={e => setSupplier(e.target.value)} className="input-control" />
                 </div>

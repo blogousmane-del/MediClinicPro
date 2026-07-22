@@ -39,11 +39,11 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
   const isExpired = clinic?.subscription_status === 'expired' || (daysRemaining !== null && daysRemaining <= 0);
 
   return (
-    <header style={{
+    <header className="app-header" style={{
       height: 'var(--header-height)',
       backgroundColor: 'var(--bg-secondary)',
       borderBottom: '1px solid var(--border)',
-      padding: '0 2rem',
+      padding: '0 1.25rem',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -51,10 +51,13 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
       top: 0,
       zIndex: 90,
       boxShadow: 'var(--shadow-sm)',
-      transition: 'background-color 0.3s ease, border-color 0.3s ease'
+      transition: 'background-color 0.3s ease, border-color 0.3s ease',
+      width: '100%',
+      maxWidth: '100vw',
+      boxSizing: 'border-box'
     }}>
       {/* Left side title and menu button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, marginRight: '10px' }}>
         <button
           onClick={onToggleSidebar}
           className="sidebar-toggle-btn"
@@ -66,54 +69,63 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
             display: 'none', // Overridden in media query in index.css
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '4px'
+            padding: '6px',
+            flexShrink: 0
           }}
+          aria-label="Menu principal"
         >
           <Menu size={22} />
         </button>
-        <h1 style={{
-          fontSize: '1.25rem',
-          fontWeight: 600,
-          textTransform: 'capitalize',
-          fontFamily: 'var(--font-secondary)'
-        }}>{title}</h1>
+        <h1 
+          className="truncate-text" 
+          style={{
+            fontSize: '1.15rem',
+            fontWeight: 600,
+            textTransform: 'capitalize',
+            fontFamily: 'var(--font-secondary)',
+            margin: 0
+          }}
+          title={title}
+        >
+          {title}
+        </h1>
       </div>
 
       {/* Right side controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
         
         {/* Subscription Warn Banners */}
         {isExpired && (
-          <div style={{
+          <div className="header-sub-banner" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             backgroundColor: 'var(--danger-light)',
             color: 'var(--danger)',
-            padding: '6px 12px',
+            padding: '5px 10px',
             borderRadius: '6px',
-            fontSize: '0.8rem',
+            fontSize: '0.75rem',
             fontWeight: 600
           }}>
             <ShieldAlert size={16} />
-            <span>Abonnement Expiré (15 000 FCFA/mois)</span>
+            <span style={{ whiteSpace: 'nowrap' }}>Abonnement Expiré</span>
           </div>
         )}
 
         {isExpiringSoon && (
-          <div style={{
+          <div className="header-sub-banner" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             backgroundColor: 'var(--warning-light)',
             color: 'var(--warning)',
-            padding: '6px 12px',
+            padding: '5px 10px',
             borderRadius: '6px',
-            fontSize: '0.8rem',
+            fontSize: '0.75rem',
             fontWeight: 600
           }}>
             <AlertTriangle size={16} />
-            <span>Expire dans {daysRemaining} jours</span>
+            <span style={{ whiteSpace: 'nowrap' }}>{daysRemaining} j. restants</span>
           </div>
         )}
 
@@ -123,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
           style={{
             background: 'none',
             border: '1px solid var(--border)',
-            padding: '8px',
+            padding: '7px',
             borderRadius: '8px',
             cursor: 'pointer',
             display: 'flex',
@@ -139,13 +151,13 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
           {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
         </button>
 
-        {/* Mock Notification Bell */}
+        {/* Notification Bell */}
         <div style={{ position: 'relative' }}>
           <button
             style={{
               background: 'none',
               border: '1px solid var(--border)',
-              padding: '8px',
+              padding: '7px',
               borderRadius: '8px',
               cursor: 'pointer',
               display: 'flex',

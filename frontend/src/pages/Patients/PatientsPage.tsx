@@ -275,7 +275,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
             </div>
             
             <form onSubmit={handleCreatePatient}>
-              <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="modal-body modal-grid">
                 <div className="form-group">
                   <label>Nom de famille *</label>
                   <input
@@ -345,7 +345,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   />
                 </div>
 
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Adresse d'habitation</label>
                   <input
                     type="text"
@@ -356,7 +356,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   />
                 </div>
 
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Allergies connues</label>
                   <input
                     type="text"
@@ -368,7 +368,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   />
                 </div>
 
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Antécédents médicaux majeurs</label>
                   <textarea
                     placeholder="Ex: Diabète Type 2, Hypertension artérielle..."

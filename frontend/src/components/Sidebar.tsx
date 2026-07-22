@@ -195,7 +195,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
           return (
             <button
               key={item.id}
-              onClick={() => setCurrentTab(item.id)}
+              onClick={() => {
+                setCurrentTab(item.id);
+                onClose();
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',

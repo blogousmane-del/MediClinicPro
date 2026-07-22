@@ -552,7 +552,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                 boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.2)'
               }}>
                 <div style={{ fontWeight: 600, marginBottom: '8px', color: 'white' }}>🔑 Comptes Démo (Cliquer pour remplir) :</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                <div className="modal-grid" style={{ gap: '6px' }}>
                   {[
                     { label: 'Administrateur', email: 'admin@mediclinic.com', pass: 'adminpassword' },
                     { label: 'Médecin', email: 'aminata@mediclinic.com', pass: 'doctorpassword' },
