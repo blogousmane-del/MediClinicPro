@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { KeyRound, Mail, ArrowLeft, Loader2, Building2, User, Phone, Eye, EyeOff, Calendar, Pill, Receipt, Activity } from 'lucide-react';
+import { KeyRound, Mail, ArrowLeft, Loader2, Building2, User, Eye, EyeOff, Calendar, Pill, Receipt, Activity } from 'lucide-react';
+import { PhoneInput } from '../../components/PhoneInput';
 
 const brandFeatures = [
   { icon: Calendar, label: 'Gestion des rendez-vous' },
@@ -9,19 +10,67 @@ const brandFeatures = [
   { icon: Receipt, label: 'Facturation FCFA' },
 ];
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
+
 interface AuthPageProps {
   initialTab?: 'login' | 'register';
   onNavigate: (tab: 'landing' | 'login' | 'register') => void;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavigate }) => {
-  const { login, register } = useAuth();
+  const { login, loginWithGoogle, register } = useAuth();
   const { showToast } = useNotifications();
 
   // Navigation states
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab);
   const [isForgotView, setIsForgotView] = useState<boolean>(false);
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  const handleGoogleCredential = async (response: { credential: string }) => {
+    setIsGoogleSubmitting(true);
+    try {
+      await loginWithGoogle(response.credential);
+      showToast('success', 'Connexion réussie', 'Bienvenue sur MediClinic !');
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Échec de connexion Google', err.error || 'Impossible de vous connecter avec Google.');
+    } finally {
+      setIsGoogleSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || isForgotView) return;
+
+    let attempts = 0;
+    const tryRender = () => {
+      attempts += 1;
+      if (window.google?.accounts?.id && googleButtonRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCredential
+        });
+        googleButtonRef.current.innerHTML = '';
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          width: 340,
+          text: activeTab === 'register' ? 'signup_with' : 'signin_with'
+        });
+      } else if (attempts < 30) {
+        setTimeout(tryRender, 100);
+      }
+    };
+    tryRender();
+  }, [activeTab, isForgotView]);
 
   // Form states
   const [email, setEmail] = useState<string>('');
@@ -130,6 +179,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
         .auth-input::placeholder {
           color: #64748b !important;
           opacity: 1 !important;
+        }
+        .auth-phone .PhoneInput {
+          background-color: #090d16 !important;
+          border: 1px solid #1e293b !important;
+          border-radius: 8px !important;
+          padding: 0.625rem 0.875rem !important;
+        }
+        .auth-phone .PhoneInput--focus {
+          border-color: #14b8a6 !important;
+          box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+        }
+        .auth-phone .PhoneInputCountry {
+          border-right: 1px solid #1e293b !important;
+        }
+        .auth-phone .PhoneInputCountrySelect {
+          color: #ffffff !important;
+        }
+        .auth-phone .PhoneInputCountrySelect option {
+          color: #111827 !important;
+          background-color: #ffffff !important;
+        }
+        .auth-phone .PhoneInputCountrySelectArrow {
+          color: #64748b !important;
+        }
+        .auth-phone .PhoneInputInput {
+          background: none !important;
+          color: #ffffff !important;
+        }
+        .auth-phone .PhoneInputInput::placeholder {
+          color: #64748b !important;
         }
         .auth-label {
           color: #94a3b8 !important;
@@ -352,6 +431,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               </button>
             </div>
 
+            {/* Google Sign-In */}
+            {GOOGLE_CLIENT_ID && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', minHeight: '44px', opacity: isGoogleSubmitting ? 0.6 : 1, pointerEvents: isGoogleSubmitting ? 'none' : 'auto' }}>
+                  <div ref={googleButtonRef} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '1.25rem 0' }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#1e293b' }} />
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>ou</span>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#1e293b' }} />
+                </div>
+              </div>
+            )}
+
             {/* TAB 1: LOGIN FORM */}
             {activeTab === 'login' && (
               <form onSubmit={handleLoginSubmit}>
@@ -510,14 +603,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                 {/* Phone */}
                 <div className="form-group">
                   <span className="auth-label">Téléphone (Mobile Money) *</span>
-                  <div style={{ position: 'relative' }}>
-                    <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-                    <input
-                      type="tel"
-                      placeholder="Ex: +225 0707070707"
+                  <div className="auth-phone">
+                    <PhoneInput
                       value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      className="input-control auth-input w-full"
+                      onChange={setPhone}
                       disabled={isSubmitting}
                       required
                     />

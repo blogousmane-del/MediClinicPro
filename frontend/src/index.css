@@ -406,6 +406,80 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-muted);
 }
 
+/* Phone input with country/dial-code selector (react-phone-number-input) */
+.phone-input-wrapper .PhoneInput {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-color: var(--bg-secondary);
+  transition: var(--transition);
+}
+
+.phone-input-wrapper .PhoneInput--focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--border-focus);
+}
+
+.phone-input-wrapper .PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 0.5rem;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.phone-input-wrapper .PhoneInputCountrySelect {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+}
+
+/* The dropdown popup is rendered natively by the OS/browser with a light
+   background regardless of page theme — force readable dark-on-light text
+   for the option list itself, independent of the (invisible) closed select. */
+.phone-input-wrapper .PhoneInputCountrySelect option {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.phone-input-wrapper .PhoneInputCountryIcon {
+  width: 22px;
+  box-shadow: none;
+}
+
+.phone-input-wrapper .PhoneInputCountrySelectArrow {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.phone-input-wrapper .PhoneInputInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 0.125rem 0;
+}
+
+.phone-input-wrapper .PhoneInputInput::placeholder {
+  color: var(--text-muted);
+}
+
+.phone-input-wrapper .PhoneInput--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Scrollbar customization */
 ::-webkit-scrollbar {
   width: 8px;

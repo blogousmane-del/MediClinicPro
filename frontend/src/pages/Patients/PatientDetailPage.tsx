@@ -452,11 +452,11 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
                       {/* Timeline specifics */}
                       {item.type === 'consultation' && (
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {item.details.constants && (
+                          {item.details.constants && (item.details.constants.tension || item.details.constants.temp || item.details.constants.weight) && (
                             <div style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--primary)' }}>
-                              Constantes : {JSON.parse(item.details.constants).tension ? `Tension: ${JSON.parse(item.details.constants).tension} · ` : ''}
-                              {JSON.parse(item.details.constants).temp ? `Temp: ${JSON.parse(item.details.constants).temp}°C · ` : ''}
-                              {JSON.parse(item.details.constants).weight ? `Poids: ${JSON.parse(item.details.constants).weight}kg` : ''}
+                              Constantes : {item.details.constants.tension ? `Tension: ${item.details.constants.tension} · ` : ''}
+                              {item.details.constants.temp ? `Temp: ${item.details.constants.temp}°C · ` : ''}
+                              {item.details.constants.weight ? `Poids: ${item.details.constants.weight}kg` : ''}
                             </div>
                           )}
                           <div><strong>Diagnostic :</strong> {item.details.diagnosis || 'Non spécifié'}</div>

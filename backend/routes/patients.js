@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
+const { validateAndNormalizePhone } = require('../utils/phone');
 
 // GET /api/patients
 // Search and list patients
@@ -43,6 +44,12 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: "Les champs obligatoires doivent être renseignés." });
     }
 
+    const phoneCheck = validateAndNormalizePhone(phone);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ error: phoneCheck.error });
+    }
+    const normalizedPhone = phoneCheck.e164;
+
     // Check for exact duplicate (same name + birthdate + phone)
     const { data: duplicate, error: checkError } = await supabase
       .from('patients')
@@ -51,7 +58,7 @@ router.post('/', auth, async (req, res) => {
       .eq('first_name', firstName)
       .eq('last_name', lastName)
       .eq('birth_date', birthDate)
-      .eq('phone', phone)
+      .eq('phone', normalizedPhone)
       .maybeSingle();
 
     if (checkError) throw checkError;
@@ -92,7 +99,7 @@ router.post('/', auth, async (req, res) => {
         last_name: lastName,
         birth_date: birthDate,
         gender,
-        phone,
+        phone: normalizedPhone,
         email: email || '',
         address: address || '',
         allergies: allergies || '',
@@ -292,6 +299,12 @@ router.put('/:id', auth, async (req, res) => {
     const { firstName, lastName, birthDate, gender, phone, email, address, allergies, antecedents } = req.body;
     const patientId = req.params.id;
 
+    const phoneCheck = validateAndNormalizePhone(phone);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ error: phoneCheck.error });
+    }
+    const normalizedPhone = phoneCheck.e164;
+
     // Verify patient belongs to the clinic
     const { data: patient, error: checkError } = await supabase
       .from('patients')
@@ -312,7 +325,7 @@ router.put('/:id', auth, async (req, res) => {
         last_name: lastName,
         birth_date: birthDate,
         gender,
-        phone,
+        phone: normalizedPhone,
         email: email || '',
         address: address || '',
         allergies: allergies || '',

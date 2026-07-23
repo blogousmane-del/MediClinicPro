@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { useAuth } from '../../contexts/AuthContext';
 import {
   Search,
   Bell,
@@ -31,7 +30,6 @@ interface Exam {
 }
 
 export const LaboratoryPage: React.FC = () => {
-  const { user } = useAuth();
   const { showToast } = useNotifications();
 
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
@@ -104,61 +102,30 @@ export const LaboratoryPage: React.FC = () => {
     showToast('success', 'Notification envoyée', 'Tous les médecins prescripteurs ont été notifiés de l\'avancement des analyses.');
   };
 
-  // Sample pending exams fallback matching Image 1 exact UI wireframe
-  const defaultMockExams = [
-    {
-      id: 1,
-      isMock: true,
-      test_name: 'Test de coagulation',
-      requested_time: 'Demandé il y a 6 heures · Depuis 14 juillet 2025 08:30',
-      patient_name: 'Fatou Diomandé',
-      doctor_name: 'Dr. Soro Mariam',
-      lab_name: 'Lab Central',
-      priority: 'Normale',
-      urgent: false
-    },
-    {
-      id: 2,
-      isMock: true,
-      test_name: 'Fonction hépatique',
-      requested_time: 'Demandé il y a 12 heures · Depuis 13 juillet 2025 20:30',
-      patient_name: 'Serge-Patrick Bah',
-      doctor_name: 'Dr. Yao Bernard',
-      lab_name: 'Lab Central',
-      priority: 'Haute',
-      urgent: false
-    },
-    {
-      id: 3,
-      isMock: true,
-      test_name: 'Hématologie avancée',
-      requested_time: 'Demandé il y a 24 heures · Depuis 12 juillet 2025 08:45',
-      patient_name: 'Youssef Traoré',
-      doctor_name: 'Dr. Coulibaly A.',
-      lab_name: 'Lab Central',
-      priority: 'Urgente',
-      urgent: true
-    }
-  ];
-
-  const examsToRender = (exams && exams.length > 0)
-    ? exams.map(e => ({
-        id: e.id,
-        isMock: false,
-        test_name: e.test_name,
-        requested_time: `Depuis ${new Date(e.created_at).toLocaleDateString('fr-FR')} ${new Date(e.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
-        patient_name: `${e.patient_first_name} ${e.patient_last_name}`,
-        doctor_name: e.doctor_name || 'Dr. Aminata Koné',
-        lab_name: 'Lab Central',
-        priority: e.status === 'pending' ? 'Haute' : 'Normale',
-        urgent: false
-      }))
-    : defaultMockExams;
+  const examsToRender = (exams || []).map(e => ({
+    id: e.id,
+    isMock: false,
+    test_name: e.test_name,
+    requested_time: `Depuis ${new Date(e.created_at).toLocaleDateString('fr-FR')} ${new Date(e.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
+    patient_name: `${e.patient_first_name} ${e.patient_last_name}`,
+    doctor_name: e.doctor_name || 'Médecin non renseigné',
+    lab_name: 'Lab Central',
+    priority: e.status === 'pending' ? 'Haute' : 'Normale',
+    urgent: false
+  }));
 
   const filteredExams = examsToRender.filter(e =>
     e.test_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     e.patient_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: 'var(--text-secondary)' }}>
+        Chargement des analyses...
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -218,22 +185,25 @@ export const LaboratoryPage: React.FC = () => {
             }}>
               <Bell size={18} />
             </div>
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--bg-primary)'
-            }}>3</span>
+            {examsToRender.length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                minWidth: '18px',
+                height: '18px',
+                borderRadius: '9999px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px solid var(--bg-primary)',
+                padding: '0 3px'
+              }}>{examsToRender.length}</span>
+            )}
           </div>
         </div>
       </div>
@@ -242,10 +212,10 @@ export const LaboratoryPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
-            Analyses en attente
+            {activeTab === 'pending' ? 'Analyses en attente' : 'Analyses terminées'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
-            {filteredExams.length} analyses en cours de traitement
+            {filteredExams.length} analyse{filteredExams.length > 1 ? 's' : ''} {activeTab === 'pending' ? 'en cours de traitement' : 'terminées'}
           </p>
         </div>
 
@@ -256,35 +226,39 @@ export const LaboratoryPage: React.FC = () => {
               alignItems: 'center',
               gap: '6px',
               padding: '8px 16px',
-              backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
+              backgroundColor: activeTab === 'completed' ? '#1e4d40' : 'var(--bg-secondary)',
+              color: activeTab === 'completed' ? '#ffffff' : 'var(--text-primary)',
               border: '1px solid var(--border)',
               borderRadius: '10px',
               fontWeight: 600,
               fontSize: '0.85rem',
               cursor: 'pointer'
             }}
+            onClick={() => setActiveTab(activeTab === 'pending' ? 'completed' : 'pending')}
           >
-            <Filter size={15} color="var(--text-secondary)" />
-            <span>Filtrer</span>
+            <Filter size={15} color={activeTab === 'completed' ? '#ffffff' : 'var(--text-secondary)'} />
+            <span>{activeTab === 'pending' ? 'Voir terminées' : 'Voir en attente'}</span>
           </button>
 
           <button
+            disabled
+            title="Bientôt disponible"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               padding: '8px 16px',
               backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
+              color: 'var(--text-muted)',
               border: '1px solid var(--border)',
               borderRadius: '10px',
               fontWeight: 600,
               fontSize: '0.85rem',
-              cursor: 'pointer'
+              cursor: 'not-allowed',
+              opacity: 0.6
             }}
           >
-            <Download size={15} color="var(--text-secondary)" />
+            <Download size={15} color="var(--text-muted)" />
             <span>Exporter</span>
           </button>
         </div>
@@ -292,6 +266,11 @@ export const LaboratoryPage: React.FC = () => {
 
       {/* 3. Analyses List Cards Stack matching Image 1 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {filteredExams.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+            {activeTab === 'pending' ? 'Aucune analyse en attente.' : 'Aucune analyse terminée.'}
+          </div>
+        )}
         {filteredExams.map((ex) => (
           <div
             key={ex.id}
@@ -380,6 +359,7 @@ export const LaboratoryPage: React.FC = () => {
             {/* Bottom Actions Row matching Image 1 */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
               <button
+                onClick={() => handleOpenResultsForm(ex)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

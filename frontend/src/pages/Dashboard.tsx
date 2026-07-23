@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Users,
   Calendar as CalendarIcon,
-  Clock,
+  CreditCard,
   AlertTriangle,
   UserPlus,
   FileText,
@@ -14,7 +14,6 @@ import {
   Bell,
   ChevronRight,
   ChevronLeft,
-  Info,
 } from 'lucide-react';
 
 interface Stats {
@@ -41,7 +40,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Calendar month state
-  const [calendarDate, setCalendarDate] = useState<Date>(new Date(2025, 6, 14));
+  const today = new Date();
+  const [calendarDate, setCalendarDate] = useState<Date>(today);
 
   const fetchDashboardData = async () => {
     try {
@@ -54,6 +54,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
       setTodayAppts(appts);
     } catch (err: any) {
       console.error(err);
+      showToast('error', 'Erreur de chargement', 'Impossible de récupérer les données du tableau de bord.');
     } finally {
       setLoading(false);
     }
@@ -63,30 +64,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
     fetchDashboardData();
   }, []);
 
-  const defaultMockAppts = [
-    { id: 1, time: '08:00', name: 'Adjobi Kouassi', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80', detail: 'Consultation générale · Dr. Yao Bernard', status: 'completed' },
-    { id: 2, time: '08:45', name: 'Fatou Diomandé', avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=100&auto=format&fit=crop&q=80', detail: 'Suivi diabète · Dr. Soro Mariam', status: 'completed' },
-    { id: 3, time: '09:30', name: 'Ange-Marie Koffi', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80', detail: 'Pédiatrie — 4 ans · Dr. Yao Bernard', status: 'in_progress' },
-    { id: 4, time: '10:15', name: 'Brahima Ouattara', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80', detail: 'Cardiologie · Dr. Coulibaly A.', status: 'waiting' },
-    { id: 5, time: '11:00', name: 'Raïssa Gnahore', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80', detail: 'Consultation générale · Dr. Soro Mariam', status: 'waiting' },
-    { id: 6, time: '11:45', name: 'Serge-Patrick Bah', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80', detail: 'Bilan biologique · Dr. Yao Bernard', status: 'waiting' },
-    { id: 7, time: '14:00', name: 'Natacha Yéo', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80', detail: 'Gynécologie · Dr. Coulibaly A.', status: 'waiting' },
-  ];
+  const apptListToRender = (todayAppts || []).map((a: any) => ({
+    id: a.id,
+    time: new Date(a.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    name: `${a.patient_first_name || ''} ${a.patient_last_name || ''}`.trim() || 'Patient',
+    detail: `Motif: ${a.motif} · ${a.practitioner_name || 'Praticien'}`,
+    status: a.status === 'completed' ? 'completed' : a.status === 'cancelled' ? 'cancelled' : 'waiting'
+  }));
 
-  const apptListToRender = todayAppts && todayAppts.length > 0
-    ? todayAppts.map((a: any) => ({
-        id: a.id,
-        time: new Date(a.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        name: `${a.patient_first_name || ''} ${a.patient_last_name || ''}`.trim() || 'Patient',
-        avatar: null,
-        detail: `Motif: ${a.motif} · ${a.practitioner_name || 'Dr. Koné'}`,
-        status: a.status === 'completed' ? 'completed' : a.status === 'cancelled' ? 'cancelled' : 'waiting'
-      }))
-    : defaultMockAppts;
-
-  const totalPatientsCount = (stats?.patientsTotal && stats.patientsTotal > 0) ? stats.patientsTotal : 27;
-  const confirmedRdvCount = (todayAppts && todayAppts.length > 0) ? todayAppts.length : 19;
-  const activeAlertsCount = (stats?.lowStockCount || 0) + (stats?.nearExpiryCount || 0) || 3;
+  const totalPatientsCount = stats?.patientsTotal ?? 0;
+  const confirmedRdvCount = todayAppts.length;
+  const activeAlertsCount = (stats?.lowStockCount || 0) + (stats?.nearExpiryCount || 0);
 
   const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
@@ -103,11 +91,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
     calendarDays.push(d);
   }
 
-  const activeSelectedDay = 14;
+  const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
+  const activeSelectedDay = isCurrentMonth ? today.getDate() : null;
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: 'var(--text-secondary)' }}>
+        Chargement du tableau de bord...
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">
-      
+
       {/* Top Header / Greeting & Search Bar Row */}
       <div className="dashboard-top-bar">
         {/* Left Greeting */}
@@ -122,10 +119,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
             alignItems: 'center',
             gap: '8px'
           }}>
-            Bonjour, {user?.name?.split(' ')[0] || 'Aminata'} 👋
+            Bonjour, {user?.name?.split(' ')[0] || 'Docteur'} 👋
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px', margin: 0 }}>
-            Lundi 14 juillet 2025
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px', margin: 0, textTransform: 'capitalize' }}>
+            {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
 
@@ -158,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
             />
           </div>
 
-          {/* Bell Icon with Badge 3 */}
+          {/* Bell Icon — badge reflects real pharmacy alert count */}
           <div style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
             <div style={{
               width: '36px',
@@ -173,22 +170,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
             }}>
               <Bell size={18} />
             </div>
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--bg-primary)'
-            }}>3</span>
+            {activeAlertsCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                minWidth: '18px',
+                height: '18px',
+                borderRadius: '9999px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px solid var(--bg-primary)',
+                padding: '0 3px'
+              }}>{activeAlertsCount}</span>
+            )}
           </div>
         </div>
       </div>
@@ -322,7 +322,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               {totalPatientsCount}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              +4 par rapport à hier
+              Dossiers actifs configurés
             </div>
           </div>
         </div>
@@ -363,18 +363,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               {confirmedRdvCount}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              8 en attente de confirmation
+              Planifiés aujourd'hui
             </div>
           </div>
         </div>
 
-        {/* Card 3 */}
-        <div 
+        {/* Card 3 — real today's revenue (replaces a fully-fabricated "temps d'attente" card) */}
+        <div
+          onClick={() => ['admin', 'manager', 'secretary'].includes(user?.role || '') && setCurrentTab('accounting')}
           style={{
             backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             borderRadius: '16px',
             padding: '1.25rem 1.5rem',
+            cursor: ['admin', 'manager', 'secretary'].includes(user?.role || '') ? 'pointer' : 'default',
             boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             display: 'flex',
             flexDirection: 'column',
@@ -383,7 +385,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
-              TEMPS D'ATTENTE MOYEN
+              RECETTES DU JOUR
             </span>
             <div style={{
               backgroundColor: '#e6f4ea',
@@ -394,15 +396,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Clock size={20} />
+              <CreditCard size={20} />
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              18 min
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
+              {(stats?.todayRevenue || 0).toLocaleString()} FCFA
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Objectif : moins de 20 min
+              Paiements encaissés
             </div>
           </div>
         </div>
@@ -467,7 +469,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                 Rendez-vous du jour
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
-                {apptListToRender.length} patients · 7 praticiens
+                {apptListToRender.length} rendez-vous planifiés
               </span>
             </div>
 
@@ -490,6 +492,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
 
           {/* Appointments List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {apptListToRender.length === 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '160px', color: 'var(--text-muted)' }}>
+                <CalendarIcon size={32} style={{ marginBottom: '10px', opacity: 0.6 }} />
+                <span style={{ fontSize: '0.9rem' }}>Aucun rendez-vous planifié aujourd'hui.</span>
+              </div>
+            )}
             {apptListToRender.map((appt) => {
               let statusBadge = null;
               if (appt.status === 'completed') {
@@ -569,11 +577,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                       fontSize: '0.9rem',
                       flexShrink: 0
                     }}>
-                      {appt.avatar ? (
-                        <img src={appt.avatar} alt={appt.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        appt.name.charAt(0)
-                      )}
+                      {appt.name.charAt(0)}
                     </div>
 
                     {/* Patient info */}
@@ -688,36 +692,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               {calendarDays.map((day, idx) => {
                 if (!day) return <div key={`empty-${idx}`} />;
                 const isSelected = day === activeSelectedDay;
-                const hasApptDot = [8, 14, 17, 21].includes(day);
 
                 return (
-                  <div 
+                  <div
                     key={`day-${day}`}
                     style={{
                       height: '32px',
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderRadius: '50%',
                       backgroundColor: isSelected ? '#1e4d40' : 'transparent',
                       color: isSelected ? '#ffffff' : 'inherit',
-                      fontWeight: isSelected ? 700 : 500,
-                      cursor: 'pointer',
-                      position: 'relative'
+                      fontWeight: isSelected ? 700 : 500
                     }}
                   >
                     <span>{day}</span>
-                    {hasApptDot && !isSelected && (
-                      <span style={{
-                        position: 'absolute',
-                        bottom: '3px',
-                        width: '3px',
-                        height: '3px',
-                        borderRadius: '50%',
-                        backgroundColor: '#1e4d40'
-                      }} />
-                    )}
                   </div>
                 );
               })}
@@ -736,103 +726,79 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                 Alertes
               </h3>
-              <span style={{
-                backgroundColor: '#ef4444',
-                color: 'white',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '12px'
-              }}>
-                3
-              </span>
+              {activeAlertsCount > 0 && (
+                <span style={{
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: '12px'
+                }}>
+                  {activeAlertsCount}
+                </span>
+              )}
             </div>
 
-            {/* Alert List */}
+            {/* Alert List — driven by real stats.lowStockCount / nearExpiryCount */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Alert 1 */}
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <div style={{
-                  backgroundColor: '#fef2f2',
-                  color: '#ef4444',
-                  padding: '8px',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <AlertTriangle size={18} />
-                </div>
-                <div style={{ flexGrow: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      Stock critique : Amoxicilline 500mg
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Il y a 5 min</span>
-                  </div>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                    8 unités restantes — commande urgente recommandée
-                  </p>
-                </div>
-              </div>
-
-              {/* Alert 2 */}
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <div style={{
-                  backgroundColor: '#fff7ed',
-                  color: '#ea580c',
-                  padding: '8px',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <AlertTriangle size={18} />
-                </div>
-                <div style={{ flexGrow: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      RDV non confirmé — Kouamé Éric
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Il y a 22 min</span>
-                  </div>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                    Rendez-vous 14h30 sans confirmation patient
-                  </p>
-                </div>
-              </div>
-
-              {/* Alert 3 */}
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <div style={{
-                  backgroundColor: '#f0f9ff',
-                  color: '#0284c7',
-                  padding: '8px',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Info size={18} />
-                </div>
-                <div style={{ flexGrow: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      Résultat labo disponible
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Il y a 1h</span>
-                  </div>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                    NFS — Fatou Diomandé · Dossier #00847
-                  </p>
-                </div>
-              </div>
+              {(stats?.lowStockCount || 0) === 0 && (stats?.nearExpiryCount || 0) === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Aucune alerte de stock active.</p>
+              ) : (
+                <>
+                  {(stats?.lowStockCount || 0) > 0 && (
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                      <div style={{
+                        backgroundColor: '#fef2f2',
+                        color: '#ef4444',
+                        padding: '8px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <AlertTriangle size={18} />
+                      </div>
+                      <div style={{ flexGrow: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {stats?.lowStockCount} médicament{(stats?.lowStockCount || 0) > 1 ? 's' : ''} en stock bas
+                        </span>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                          Vérifiez la pharmacie pour réapprovisionner.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {(stats?.nearExpiryCount || 0) > 0 && (
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                      <div style={{
+                        backgroundColor: '#fff7ed',
+                        color: '#ea580c',
+                        padding: '8px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <AlertTriangle size={18} />
+                      </div>
+                      <div style={{ flexGrow: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {stats?.nearExpiryCount} médicament{(stats?.nearExpiryCount || 0) > 1 ? 's' : ''} proche{(stats?.nearExpiryCount || 0) > 1 ? 's' : ''} de péremption
+                        </span>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                          Péremption sous 30 jours.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
-            <button 
+            <button
               onClick={() => setCurrentTab('pharmacy')}
               style={{
                 width: '100%',
@@ -847,56 +813,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                 textAlign: 'left'
               }}
             >
-              Voir toutes les alertes →
+              Voir la pharmacie →
             </button>
-          </div>
-
-          {/* WIDGET 3: Occupation des salles */}
-          <div style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '16px',
-            padding: '1.25rem',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-          }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 1rem 0' }}>
-              Occupation des salles
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {/* Salle 1 */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 600, marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-primary)' }}>Salle 1 — Consultation</span>
-                  <span style={{ color: '#ea580c' }}>85%</span>
-                </div>
-                <div style={{ height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: '85%', height: '100%', backgroundColor: '#ea580c', borderRadius: '3px' }} />
-                </div>
-              </div>
-
-              {/* Salle 2 */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 600, marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-primary)' }}>Salle 2 — Pédiatrie</span>
-                  <span style={{ color: '#1e4d40' }}>60%</span>
-                </div>
-                <div style={{ height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: '60%', height: '100%', backgroundColor: '#1e4d40', borderRadius: '3px' }} />
-                </div>
-              </div>
-
-              {/* Salle 3 */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 600, marginBottom: '4px' }}>
-                  <span style={{ color: 'var(--text-primary)' }}>Salle 3 — Cardiologie</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>40%</span>
-                </div>
-                <div style={{ height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: '40%', height: '100%', backgroundColor: '#94a3b8', borderRadius: '3px' }} />
-                </div>
-              </div>
-            </div>
           </div>
 
         </div>

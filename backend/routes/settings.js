@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
+const { validateAndNormalizePhone } = require('../utils/phone');
 
 // GET /api/settings/users
 // Get all staff users
@@ -181,12 +182,21 @@ router.put('/clinic', auth, checkRole(['admin', 'manager']), async (req, res) =>
   try {
     const { name, address, phone, logo, settings } = req.body;
 
+    let normalizedPhone = undefined;
+    if (phone) {
+      const phoneCheck = validateAndNormalizePhone(phone);
+      if (!phoneCheck.valid) {
+        return res.status(400).json({ error: phoneCheck.error });
+      }
+      normalizedPhone = phoneCheck.e164;
+    }
+
     const { error: updateError } = await supabase
       .from('clinics')
       .update({
         name: name || undefined,
         address: address || undefined,
-        phone: phone || undefined,
+        phone: normalizedPhone,
         logo: logo || undefined,
         settings: settings || undefined // PostgreSQL JSONB handles it natively
       })

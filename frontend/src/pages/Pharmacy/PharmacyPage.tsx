@@ -66,9 +66,6 @@ interface Medication {
   expiry_date: string;
   batch_number: string;
   supplier: string;
-  isLowStock: boolean;
-  isNearExpiry: boolean;
-  isExpired: boolean;
 }
 
 export const PharmacyPage: React.FC = () => {
@@ -155,25 +152,24 @@ export const PharmacyPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      if (editingMedId) {
-        // Edit existing in state
-        showToast('success', 'Stock mis à jour', `Le médicament ${finalMedName} a été mis à jour avec succès.`);
-      } else {
-        const payload = {
-          name: finalMedName,
-          form,
-          dosage: '500mg',
-          quantity: parseInt(quantity),
-          pricePurchase: parseFloat(pricePurchase),
-          priceSale: parseFloat(priceSale),
-          expiryDate: expiryDate || '2026-12-31',
-          batchNumber: batchNumber || 'U3KFJT',
-          supplier: supplier || 'Pharmaliv'
-        };
+      const payload = {
+        name: finalMedName,
+        form,
+        dosage: '500mg',
+        qty: parseInt(quantity),
+        pricePurchase: parseFloat(pricePurchase),
+        priceSale: parseFloat(priceSale),
+        expiryDate: expiryDate || '2026-12-31',
+        batchNumber: batchNumber || 'U3KFJT',
+        supplier: supplier || 'Pharmaliv'
+      };
 
-        await api.post('/pharmacy/replenish', payload);
-        showToast('success', 'Médicament ajouté', `Le médicament ${finalMedName} (${form}) a été enregistré.`);
-      }
+      await api.post('/pharmacy/replenish', payload);
+      showToast(
+        'success',
+        editingMedId ? 'Stock mis à jour' : 'Médicament ajouté',
+        `Le médicament ${finalMedName} (${form}) a été ${editingMedId ? 'mis à jour' : 'enregistré'}.`
+      );
 
       handleCloseModal();
       fetchMedications();
@@ -185,136 +181,31 @@ export const PharmacyPage: React.FC = () => {
     }
   };
 
-  // Sample medications data matching Image 2 exact UI fallback
-  const defaultMockMeds = [
-    {
-      id: 1,
-      name: 'Amoxicilline 500mg',
-      form: 'Comprimé',
-      ref: '#U3KFJT',
-      supplier: 'Pharmaliv',
-      packaging: 'Boîte de 10',
-      stock_min: 20,
-      price_purchase: 850,
-      price_sale: 1200,
-      margin: '41%',
-      expiry: '2025-12-15',
-      replenish_time: 'Il y a 3 semaines',
-      stock_quantity: 8,
-      status: 'Critique',
-      near_expiry: true
-    },
-    {
-      id: 2,
-      name: 'Paracétamol 500mg',
-      form: 'Comprimé',
-      ref: '#QOAX18',
-      supplier: 'Novpharma',
-      packaging: 'Boîte de 100',
-      stock_min: 30,
-      price_purchase: 450,
-      price_sale: 800,
-      margin: '78%',
-      expiry: '2026-03-20',
-      replenish_time: 'Il y a 1 semaine',
-      stock_quantity: 47,
-      status: 'OK',
-      near_expiry: true
-    },
-    {
-      id: 3,
-      name: 'Métformine 850mg',
-      form: 'Comprimé',
-      ref: '#9IX8P',
-      supplier: 'Pharmaliv',
-      packaging: 'Boîte de 30',
-      stock_min: 25,
-      price_purchase: 1800,
-      price_sale: 2500,
-      margin: '39%',
-      expiry: '2025-11-30',
-      replenish_time: 'Il y a 2 jours',
-      stock_quantity: 18,
-      status: 'Faible',
-      near_expiry: true
-    },
-    {
-      id: 4,
-      name: 'Lisinopril 10mg',
-      form: 'Comprimé',
-      ref: '#HBO209',
-      supplier: 'Cipla',
-      packaging: 'Boîte de 30',
-      stock_min: 25,
-      price_purchase: 2200,
-      price_sale: 3200,
-      margin: '45%',
-      expiry: '2026-06-10',
-      replenish_time: 'Il y a 5 jours',
-      stock_quantity: 42,
-      status: 'OK',
-      near_expiry: true
-    },
-    {
-      id: 5,
-      name: 'Amlodipine 5mg',
-      form: 'Comprimé',
-      ref: '#ZOQY38',
-      supplier: 'Novpharma',
-      packaging: 'Boîte de 30',
-      stock_min: 20,
-      price_purchase: 1900,
-      price_sale: 2800,
-      margin: '47%',
-      expiry: '2026-02-14',
-      replenish_time: 'Il y a 10 jours',
-      stock_quantity: 35,
-      status: 'OK',
-      near_expiry: true
-    },
-    {
-      id: 6,
-      name: 'Oméprazole 20mg',
-      form: 'Gélule',
-      ref: '#OMP020',
-      supplier: 'Pharmaliv',
-      packaging: 'Boîte de 14',
-      stock_min: 15,
-      price_purchase: 1200,
-      price_sale: 1900,
-      margin: '58%',
-      expiry: '2025-10-10',
-      replenish_time: 'Il y a 1 mois',
-      stock_quantity: 5,
-      status: 'Critique',
-      near_expiry: true
-    }
-  ];
+  const itemsToRender = (medications || []).map(m => {
+    const marginPct = m.price_purchase ? Math.round(((m.price_sale - m.price_purchase) / m.price_sale) * 100) : 0;
+    const status = m.stock_quantity <= Math.floor(m.min_stock_threshold / 2) ? 'Critique' : m.stock_quantity <= m.min_stock_threshold ? 'Faible' : 'OK';
+    const expiryDate = m.expiry_date ? new Date(m.expiry_date) : null;
+    const daysToExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+    const nearExpiry = daysToExpiry !== null && daysToExpiry <= 30;
 
-  const itemsToRender = (medications && medications.length > 0)
-    ? medications.map(m => {
-        const marginPct = m.price_purchase ? Math.round(((m.price_sale - m.price_purchase) / m.price_sale) * 100) : 40;
-        const status = m.stock_quantity <= Math.floor(m.min_stock_threshold / 2) ? 'Critique' : m.stock_quantity <= m.min_stock_threshold ? 'Faible' : 'OK';
-        
-        return {
-          id: m.id,
-          name: `${m.name} ${m.dosage || ''}`.trim(),
-          form: m.form || 'Comprimé',
-          ref: m.batch_number ? `#${m.batch_number}` : '#U3KFJT',
-          supplier: m.supplier || 'Pharmaliv',
-          packaging: 'Boîte standard',
-          stock_min: m.min_stock_threshold || 20,
-          price_purchase: m.price_purchase || 850,
-          price_sale: m.price_sale || 1200,
-          margin: `${marginPct}%`,
-          expiry: m.expiry_date ? m.expiry_date.split('T')[0] : '2026-06-30',
-          replenish_time: 'Récemment',
-          stock_quantity: m.stock_quantity,
-          status,
-          near_expiry: m.isNearExpiry
-        };
-      })
-    : defaultMockMeds;
+    return {
+      id: m.id,
+      name: `${m.name} ${m.dosage || ''}`.trim(),
+      form: m.form || 'Comprimé',
+      ref: m.batch_number ? `#${m.batch_number}` : 'N/A',
+      supplier: m.supplier || 'Non renseigné',
+      packaging: 'Boîte standard',
+      stock_min: m.min_stock_threshold,
+      price_purchase: m.price_purchase,
+      price_sale: m.price_sale,
+      margin: `${marginPct}%`,
+      expiry: m.expiry_date ? m.expiry_date.split('T')[0] : null,
+      replenish_time: 'Récemment',
+      stock_quantity: m.stock_quantity,
+      status,
+      near_expiry: nearExpiry
+    };
+  });
 
   // Filter items based on tab & search
   const filteredItems = itemsToRender.filter(item => {
@@ -325,9 +216,12 @@ export const PharmacyPage: React.FC = () => {
     return true;
   });
 
-  const totalStockValue = itemsToRender.reduce((acc, curr) => acc + (curr.stock_quantity * curr.price_sale), 0) || 847400;
-  const criticalCount = itemsToRender.filter(i => i.status === 'Critique').length || 2;
-  const expiringCount = itemsToRender.filter(i => i.near_expiry).length || 1;
+  const totalStockValue = itemsToRender.reduce((acc, curr) => acc + (curr.stock_quantity * curr.price_sale), 0);
+  const criticalCount = itemsToRender.filter(i => i.status === 'Critique').length;
+  const expiringCount = itemsToRender.filter(i => i.near_expiry).length;
+  const avgMarginPct = itemsToRender.length > 0
+    ? Math.round(itemsToRender.reduce((acc, curr) => acc + parseInt(curr.margin), 0) / itemsToRender.length)
+    : 0;
 
   return (
     <div style={{
@@ -572,7 +466,7 @@ export const PharmacyPage: React.FC = () => {
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10b981' }}>
-            38%
+            {avgMarginPct}%
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>
             Marge moyenne
@@ -582,6 +476,11 @@ export const PharmacyPage: React.FC = () => {
 
       {/* 5. Medication Cards List matching Image 2 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {filteredItems.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+            Aucun médicament trouvé.
+          </div>
+        )}
         {filteredItems.map((med) => {
           let statusBadge = null;
           if (med.status === 'Critique') {

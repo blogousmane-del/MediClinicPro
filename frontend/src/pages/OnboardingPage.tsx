@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { Building, MapPin, Phone, UserPlus, Trash, ChevronRight, Check } from 'lucide-react';
+import { Building, MapPin, UserPlus, Trash, ChevronRight, Check } from 'lucide-react';
+import { PhoneInput } from '../components/PhoneInput';
 
 export const OnboardingPage: React.FC = () => {
   const { onboardClinic } = useAuth();
@@ -130,6 +131,35 @@ export const OnboardingPage: React.FC = () => {
           margin-bottom: 0.375rem !important;
           display: inline-block !important;
         }
+        .onboard-phone .PhoneInput {
+          background-color: #0b0f19 !important;
+          border: 1px solid #1f2937 !important;
+          border-radius: 8px !important;
+        }
+        .onboard-phone .PhoneInput--focus {
+          border-color: #14b8a6 !important;
+          box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+        }
+        .onboard-phone .PhoneInputCountry {
+          border-right: 1px solid #1f2937 !important;
+        }
+        .onboard-phone .PhoneInputCountrySelect {
+          color: #ffffff !important;
+        }
+        .onboard-phone .PhoneInputCountrySelect option {
+          color: #111827 !important;
+          background-color: #ffffff !important;
+        }
+        .onboard-phone .PhoneInputCountrySelectArrow {
+          color: #64748b !important;
+        }
+        .onboard-phone .PhoneInputInput {
+          background: none !important;
+          color: #ffffff !important;
+        }
+        .onboard-phone .PhoneInputInput::placeholder {
+          color: #64748b !important;
+        }
         /* Specific override for browser autofill background */
         .onboard-input:-webkit-autofill,
         .onboard-input:-webkit-autofill:hover, 
@@ -206,16 +236,8 @@ export const OnboardingPage: React.FC = () => {
 
               <div className="form-group">
                 <span className="onboard-label">Téléphone de contact</span>
-                <div style={{ position: 'relative' }}>
-                  <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-                  <input
-                    type="tel"
-                    placeholder="Ex: +225 27 22 45 45 45"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    className="input-control onboard-input w-full"
-                    style={{ paddingLeft: '38px' }}
-                  />
+                <div className="onboard-phone">
+                  <PhoneInput value={phone} onChange={setPhone} />
                 </div>
               </div>
 

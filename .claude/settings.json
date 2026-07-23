@@ -1,7 +1,22 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(powershell -Command 'Get-Process node -ErrorAction SilentlyContinue | Where-Object {$_.Path -like '\\\\''*MediClinicPro*'\\\\''} | Stop-Process -Force')",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -m 3 http://localhost:5173)",
+      "Bash(nohup node server.js)",
+      "Bash(disown)",
+      "Bash(curl -s http://localhost:5000/health)",
+      "Bash(cat /tmp/backend.log 2>&1)",
+      "Read(//tmp/**)",
+      "Bash(wmic process *)",
+      "Bash(xargs grep -ln -i \"tel\\\\|phone\\\\|téléphone\\\\|telephone\")",
+      "Bash(node -c routes/patients.js)",
+      "Bash(node -c routes/settings.js)",
+      "Bash(node -c routes/financials.js)",
+      "Bash(node -c utils/phone.js)",
+      "Bash(npm run *)"
     ]
   }
 }

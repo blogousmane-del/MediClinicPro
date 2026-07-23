@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
+const { validateAndNormalizePhone } = require('../utils/phone');
 
 // GET /api/financials/payments
 // List payments / receipts
@@ -223,6 +224,12 @@ router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) =>
       return res.status(400).json({ error: "Fournisseur mobile money et numéro de téléphone requis." });
     }
 
+    const phoneCheck = validateAndNormalizePhone(phoneNumber);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ error: phoneCheck.error });
+    }
+    const normalizedPhoneNumber = phoneCheck.e164;
+
     const selectedPlan = plan || 'starter';
     const planPrices = {
       starter: 15000,
@@ -235,7 +242,7 @@ router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) =>
     const amount = qtyMonths * pricePerMonth;
 
     // Simulate Payment confirmation
-    console.log(`[MOBILE MONEY SIMULATOR] Push request sent to provider "${provider}" for number "${phoneNumber}" of amount "${amount} FCFA" on plan "${selectedPlan}".`);
+    console.log(`[MOBILE MONEY SIMULATOR] Push request sent to provider "${provider}" for number "${normalizedPhoneNumber}" of amount "${amount} FCFA" on plan "${selectedPlan}".`);
     console.log(`[MOBILE MONEY SIMULATOR] User confirmed PIN code. Payment successful!`);
 
     // Fetch current clinic details

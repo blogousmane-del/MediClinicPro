@@ -6,10 +6,10 @@ import {
   Search,
   Bell,
   Check,
-  CreditCard,
   Plus,
   Loader2
 } from 'lucide-react';
+import { PhoneInput } from '../../components/PhoneInput';
 
 interface StaffUser {
   id: number;
@@ -415,17 +415,7 @@ export const SettingsPage: React.FC = () => {
 
               <div>
                 <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Numéro Mobile Money</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
-                  <CreditCard size={16} color="var(--text-muted)" />
-                  <input
-                    type="tel"
-                    placeholder="Ex: +225 07 12 34 56 78"
-                    value={paymentPhone}
-                    onChange={(e) => setPaymentPhone(e.target.value)}
-                    style={{ border: 'none', outline: 'none', background: 'none', flex: 1, fontSize: '0.875rem', color: 'var(--text-primary)' }}
-                    required
-                  />
-                </div>
+                <PhoneInput value={paymentPhone} onChange={setPaymentPhone} required />
               </div>
 
               <button
@@ -467,7 +457,7 @@ export const SettingsPage: React.FC = () => {
 
           <div className="form-group">
             <label>Téléphone professionnel</label>
-            <input type="text" value={clinicPhone} onChange={e => setClinicPhone(e.target.value)} className="input-control" />
+            <PhoneInput value={clinicPhone} onChange={setClinicPhone} />
           </div>
 
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginTop: '1rem' }}>Grille Tarifaire des Actes (FCFA)</h3>

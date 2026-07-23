@@ -25,6 +25,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (clinicName: string, adminName: string, email: string, password: string, phone: string) => Promise<void>;
   logout: () => void;
   onboardClinic: (address: string, phone: string, staff: any[], modules: string[]) => Promise<void>;
@@ -70,6 +71,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const data = await api.post('/auth/login', { email, password });
+      localStorage.setItem('mediclinic_token', data.token);
+      setUser(data.user);
+      setClinic(data.clinic);
+    } catch (err) {
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async (idToken: string) => {
+    setLoading(true);
+    try {
+      const data = await api.post('/auth/google', { idToken });
       localStorage.setItem('mediclinic_token', data.token);
       setUser(data.user);
       setClinic(data.clinic);
@@ -138,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         loading,
         login,
+        loginWithGoogle,
         register,
         logout,
         onboardClinic,

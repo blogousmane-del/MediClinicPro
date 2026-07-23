@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { PhoneInput } from '../../components/PhoneInput';
 import {
   Search,
   UserPlus,
@@ -168,30 +169,16 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
     return `${age > 0 ? age : 35} ans`;
   };
 
-  // Default sample patient rows matching Image 1 exact UI mock when API list is empty
-  const defaultMockPatients = [
-    { id: 1, folder_number: 'P001', first_name: 'Adjobi', last_name: 'Kouassi', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80', age: '67 ans', phone: '+225 07 XX XX XX', allergy: 'Pénicilline', last_visit: '14 juil. 2025', status: 'Actif' },
-    { id: 2, folder_number: 'P002', first_name: 'Fatou', last_name: 'Diomandé', avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=100&auto=format&fit=crop&q=80', age: '48 ans', phone: '+225 05 XX XX XX', allergy: 'Aucune', last_visit: '14 juil. 2025', status: 'Actif' },
-    { id: 3, folder_number: 'P003', first_name: 'Brahima', last_name: 'Ouattara', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80', age: '52 ans', phone: '+225 06 XX XX XX', allergy: 'AINS', last_visit: '13 juil. 2025', status: 'Actif' },
-    { id: 4, folder_number: 'P004', first_name: 'Raïssa', last_name: 'Gnahore', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80', age: '31 ans', phone: '+225 08 XX XX XX', allergy: 'Aucune', last_visit: '12 juil. 2025', status: 'Actif' },
-    { id: 5, folder_number: 'P005', first_name: 'Mamadou', last_name: 'Coulibaly', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80', age: '45 ans', phone: '+225 09 XX XX XX', allergy: 'Sulfamides', last_visit: '11 juil. 2025', status: 'Inactif' },
-    { id: 6, folder_number: 'P006', first_name: 'Aïsatou', last_name: 'Traoré', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80', age: '29 ans', phone: '+225 04 XX XX XX', allergy: 'Aucune', last_visit: '10 juil. 2025', status: 'Actif' },
-  ];
-
-  const patientRowsToRender = (patients && patients.length > 0)
-    ? patients.map(p => ({
-        id: p.id,
-        folder_number: p.folder_number || `P00${p.id}`,
-        first_name: p.first_name,
-        last_name: p.last_name,
-        avatar: null,
-        age: calculateAge(p.birth_date),
-        phone: p.phone,
-        allergy: p.allergies || 'Aucune',
-        last_visit: '14 juil. 2025',
-        status: p.archived ? 'Inactif' : 'Actif'
-      }))
-    : defaultMockPatients;
+  const patientRowsToRender = (patients || []).map(p => ({
+    id: p.id,
+    folder_number: p.folder_number || `P00${p.id}`,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    age: calculateAge(p.birth_date),
+    phone: p.phone,
+    allergy: p.allergies || 'Aucune',
+    status: p.archived ? 'Inactif' : 'Actif'
+  }));
 
   // IF CREATING PATIENT: RENDER THE "Nouveau patient" VIEW
   if (isCreating) {
@@ -349,7 +336,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>TÉLÉPHONE</label>
-                    <input type="tel" placeholder="+225 XX XX XX XX" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} required />
+                    <PhoneInput value={phone} onChange={setPhone} required />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>EMAIL (OPTIONNEL)</label>
@@ -438,11 +425,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
               <div style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Patients dans le système</span>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '0.75rem 0 4px 0' }}>
-                  <span style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>{patients.length > 0 ? patients.length : 247}</span>
+                  <span style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>{patients.length}</span>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>patients actifs</span>
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '10px' }}>
-                  Nouveaux ce mois : 12
                 </div>
               </div>
 
@@ -466,11 +450,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                     </div>
                   ))}
                   {patients.length === 0 && (
-                    <>
-                      <div style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>Adjobi Kouassi</div>
-                      <div style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>Fatou Diomandé</div>
-                      <div style={{ padding: '6px 0' }}>Brahima Ouattara</div>
-                    </>
+                    <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>Aucun patient enregistré.</span>
                   )}
                 </div>
               </div>
@@ -778,11 +758,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                           fontSize: '0.85rem',
                           flexShrink: 0
                         }}>
-                          {pat.avatar ? (
-                            <img src={pat.avatar} alt={pat.first_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            pat.first_name.charAt(0)
-                          )}
+                          {pat.first_name.charAt(0)}
                         </div>
                         <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                           {pat.first_name} {pat.last_name}
@@ -827,9 +803,9 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                       )}
                     </td>
 
-                    {/* Dernière visite */}
-                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '0.825rem' }}>
-                      {pat.last_visit}
+                    {/* Dernière visite — pas de source de données réelle (nécessiterait une jointure consultations côté backend) */}
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
+                      —
                     </td>
 
                     {/* Statut Pill */}
