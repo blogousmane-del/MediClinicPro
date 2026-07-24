@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 import {
   Users,
   Calendar as CalendarIcon,
@@ -287,8 +288,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
       {/* 4 Stat Cards Row */}
       <div className="dashboard-stats-grid">
         {/* Card 1 */}
-        <div 
+        <div
           onClick={() => setCurrentTab('patients')}
+          className="stat-card-animate"
           style={{
             backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
@@ -319,7 +321,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
           </div>
           <div>
             <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              {totalPatientsCount}
+              <AnimatedNumber value={totalPatientsCount} />
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
               Dossiers actifs configurés
@@ -328,8 +330,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
         </div>
 
         {/* Card 2 */}
-        <div 
+        <div
           onClick={() => setCurrentTab('appointments')}
+          className="stat-card-animate"
           style={{
             backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
@@ -360,7 +363,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
           </div>
           <div>
             <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              {confirmedRdvCount}
+              <AnimatedNumber value={confirmedRdvCount} />
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
               Planifiés aujourd'hui
@@ -371,6 +374,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
         {/* Card 3 — real today's revenue (replaces a fully-fabricated "temps d'attente" card) */}
         <div
           onClick={() => ['admin', 'manager', 'secretary'].includes(user?.role || '') && setCurrentTab('accounting')}
+          className="stat-card-animate"
           style={{
             backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
@@ -401,7 +405,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
           </div>
           <div>
             <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              {(stats?.todayRevenue || 0).toLocaleString()} FCFA
+              <AnimatedNumber value={stats?.todayRevenue || 0} formatter={(n) => `${n.toLocaleString('fr-FR')} FCFA`} />
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
               Paiements encaissés
@@ -410,8 +414,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
         </div>
 
         {/* Card 4 */}
-        <div 
+        <div
           onClick={() => setCurrentTab('pharmacy')}
+          className="stat-card-animate"
           style={{
             backgroundColor: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
@@ -442,10 +447,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
           </div>
           <div>
             <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              {activeAlertsCount}
+              <AnimatedNumber value={activeAlertsCount} />
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              1 critique, 2 avertissements
+              {activeAlertsCount === 0
+                ? 'Aucune alerte active'
+                : `${stats?.lowStockCount || 0} stock bas, ${stats?.nearExpiryCount || 0} péremption proche`}
             </div>
           </div>
         </div>

@@ -11,7 +11,7 @@ router.get('/', auth, async (req, res) => {
     
     let queryBuilder = supabase
       .from('appointments')
-      .select('*, patient:patients(first_name, last_name, phone), practitioner:users(name)')
+      .select('*, patient:patients(first_name, last_name, phone, birth_date), practitioner:users(name)')
       .eq('clinic_id', req.user.clinicId);
 
     if (date) {
@@ -35,6 +35,7 @@ router.get('/', auth, async (req, res) => {
       patient_first_name: appt.patient ? appt.patient.first_name : 'Inconnu',
       patient_last_name: appt.patient ? appt.patient.last_name : 'Inconnu',
       patient_phone: appt.patient ? appt.patient.phone : '',
+      patient_birth_date: appt.patient ? appt.patient.birth_date : null,
       practitioner_name: appt.practitioner ? appt.practitioner.name : 'Inconnu'
     }));
 
@@ -49,7 +50,7 @@ router.get('/', auth, async (req, res) => {
 // Book a new appointment
 router.post('/', auth, async (req, res) => {
   try {
-    const { patientId, practitionerId, dateTime, duration, motif } = req.body;
+    const { patientId, practitionerId, dateTime, duration, motif, room, notes } = req.body;
 
     if (!patientId || !practitionerId || !dateTime || !motif) {
       return res.status(400).json({ error: "Tous les champs obligatoires doivent être renseignés." });
@@ -109,6 +110,8 @@ router.post('/', auth, async (req, res) => {
         date_time: dateTime,
         duration: duration || 30,
         motif,
+        room: room || null,
+        notes: notes || null,
         status: 'scheduled'
       })
       .select()
@@ -169,7 +172,7 @@ router.post('/', auth, async (req, res) => {
 // Update / Reschedule or Cancel appointment
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { dateTime, duration, motif, status } = req.body;
+    const { dateTime, duration, motif, status, room, notes } = req.body;
     const apptId = req.params.id;
 
     const { data: appt, error: checkError } = await supabase
@@ -208,7 +211,9 @@ router.put('/:id', auth, async (req, res) => {
         date_time: dateTime || appt.date_time,
         duration: duration !== undefined ? duration : appt.duration,
         motif: motif || appt.motif,
-        status: status || appt.status
+        status: status || appt.status,
+        room: room !== undefined ? room : appt.room,
+        notes: notes !== undefined ? notes : appt.notes
       })
       .eq('id', apptId)
       .eq('clinic_id', req.user.clinicId);

@@ -40,7 +40,13 @@ async function auth(req, res, next) {
       // If subscription is expired and user is trying to perform a write operation
       // Allow only settings/billing update or GET requests.
       const isReadRequest = req.method === 'GET';
-      const isBillingRoute = req.originalUrl.includes('/settings/subscription') || req.originalUrl.includes('/auth/logout');
+      // A clinic that's actually expired must still be able to reach the renewal
+      // endpoint itself — otherwise paying to unlock is blocked by the very
+      // gate it's supposed to lift. (/settings/subscription never existed as a
+      // real route; this previously meant expired clinics had NO way to renew.)
+      const isBillingRoute =
+        req.originalUrl.includes('/financials/subscription') ||
+        req.originalUrl.includes('/auth/logout');
 
       const now = new Date();
       const expiresAt = clinic.subscription_expires_at ? new Date(clinic.subscription_expires_at) : null;

@@ -3,13 +3,19 @@ const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
+const { initiateCheckoutWithFailover } = require('../services/payments');
+
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+const API_PUBLIC_URL = process.env.API_PUBLIC_URL || 'http://localhost:5000';
+const ONLINE_METHODS = ['wave', 'orange_money', 'mtn_momo'];
+const SUBSCRIPTION_MONTHLY_PRICE = 15000; // FCFA — single plan, matches CLAUDE.md
 
 // GET /api/financials/payments
 // List payments / receipts
 router.get('/payments', auth, async (req, res) => {
   try {
     const { startDate, endDate, method, status } = req.query;
-    
+
     let queryBuilder = supabase
       .from('payments')
       .select('*, patient:patients(first_name, last_name, folder_number), cashier:users(name)')
@@ -48,7 +54,10 @@ router.get('/payments', auth, async (req, res) => {
 });
 
 // POST /api/financials/checkout
-// Process a patient billing payment (checkout)
+// Process a patient billing payment. Cash is recorded immediately (paid at the
+// counter). Mobile Money methods create a pending row and return a hosted
+// checkout URL — the payment is only marked 'paid' once the provider's
+// webhook confirms it (see routes/webhooks.js).
 router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), async (req, res) => {
   try {
     const { patientId, amountTotal, paymentMethod, referenceNumber, items } = req.body;
@@ -70,6 +79,8 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
       return res.status(404).json({ error: "Patient non trouvé dans cette clinique." });
     }
 
+    const isOnline = ONLINE_METHODS.includes(paymentMethod);
+
     const { data: paymentResult, error: insertError } = await supabase
       .from('payments')
       .insert({
@@ -79,30 +90,88 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
         amount_total: amountTotal,
         payment_method: paymentMethod,
         reference_number: referenceNumber || `REF-${Date.now()}`,
-        status: 'paid',
-        items: items // Handled natively as JSONB
+        status: isOnline ? 'pending' : 'paid',
+        provider: isOnline ? null : 'manual',
+        items
       })
       .select()
       .single();
 
     if (insertError) throw insertError;
 
-    // Log Activity
-    await supabase.from('activity_logs').insert({
-      clinic_id: req.user.clinicId,
-      user_id: req.user.userId,
-      action: 'PAYMENT_RECORD',
-      details: `Encaissement de ${amountTotal} FCFA pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`
-    });
+    if (!isOnline) {
+      await supabase.from('activity_logs').insert({
+        clinic_id: req.user.clinicId,
+        user_id: req.user.userId,
+        action: 'PAYMENT_RECORD',
+        details: `Encaissement de ${amountTotal} FCFA pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`
+      });
+
+      return res.status(201).json({
+        success: true,
+        paymentId: paymentResult.id,
+        message: "Paiement enregistré avec succès."
+      });
+    }
+
+    const checkout = await initiateCheckoutWithFailover(
+      {
+        amount: amountTotal,
+        currency: 'XOF',
+        description: `Facture patient ${patient.first_name} ${patient.last_name}`,
+        reference: `pay-${paymentResult.id}`,
+        returnUrl: `${APP_URL}/`,
+        cancelUrl: `${APP_URL}/`,
+        customerName: `${patient.first_name} ${patient.last_name}`
+      },
+      { itemName: 'Facture MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
+    );
+
+    if (!checkout.ok) {
+      await supabase.from('payments').update({ status: 'failed' }).eq('id', paymentResult.id);
+      return res.status(502).json({ error: checkout.error });
+    }
+
+    await supabase
+      .from('payments')
+      .update({
+        provider: checkout.provider,
+        provider_reference: checkout.providerReference,
+        checkout_url: checkout.checkoutUrl
+      })
+      .eq('id', paymentResult.id);
 
     res.status(201).json({
       success: true,
+      pending: true,
       paymentId: paymentResult.id,
-      message: "Paiement enregistré avec succès."
+      checkoutUrl: checkout.checkoutUrl,
+      provider: checkout.provider
     });
   } catch (error) {
     console.error("Checkout Payment Error:", error);
     res.status(500).json({ error: "Erreur lors de l'enregistrement de l'encaissement." });
+  }
+});
+
+// GET /api/financials/payments/:id/status
+// Polled by the frontend while a Mobile Money checkout is pending confirmation.
+router.get('/payments/:id/status', auth, async (req, res) => {
+  try {
+    const { data: payment, error } = await supabase
+      .from('payments')
+      .select('id, status, checkout_url')
+      .eq('id', req.params.id)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!payment) return res.status(404).json({ error: "Paiement introuvable." });
+
+    res.json({ status: payment.status, checkoutUrl: payment.checkout_url });
+  } catch (error) {
+    console.error("Get Payment Status Error:", error);
+    res.status(500).json({ error: "Erreur lors de la vérification du paiement." });
   }
 });
 
@@ -120,8 +189,9 @@ router.get('/stats', auth, async (req, res) => {
     if (hasFinancialsAccess) {
       const { data: allPayments, error: payError } = await supabase
         .from('payments')
-        .select('amount_total, payment_method, created_at')
-        .eq('clinic_id', req.user.clinicId);
+        .select('amount_total, payment_method, created_at, status')
+        .eq('clinic_id', req.user.clinicId)
+        .eq('status', 'paid');
 
       if (payError) throw payError;
 
@@ -214,100 +284,122 @@ router.get('/stats', auth, async (req, res) => {
   }
 });
 
-// POST /api/financials/subscription-pay
-// Mobile Money subscription simulator (Starter, Pro, Expert plans)
-router.post('/subscription-pay', auth, checkRole(['admin']), async (req, res) => {
+// POST /api/financials/subscription/checkout
+// Real Mobile Money / card subscription renewal. Creates a pending
+// subscription_payments row and returns a hosted checkout URL — the clinic's
+// subscription is only extended once the provider's webhook confirms payment.
+router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { provider, phoneNumber, months, plan } = req.body;
+    const { months, phoneNumber } = req.body;
+    const qtyMonths = parseInt(months, 10);
 
-    if (!provider || !phoneNumber) {
-      return res.status(400).json({ error: "Fournisseur mobile money et numéro de téléphone requis." });
+    if (![1, 3, 6, 12].includes(qtyMonths)) {
+      return res.status(400).json({ error: "Durée d'abonnement invalide (1, 3, 6 ou 12 mois)." });
     }
 
-    const phoneCheck = validateAndNormalizePhone(phoneNumber);
-    if (!phoneCheck.valid) {
-      return res.status(400).json({ error: phoneCheck.error });
+    let normalizedPhone;
+    if (phoneNumber) {
+      const phoneCheck = validateAndNormalizePhone(phoneNumber);
+      if (!phoneCheck.valid) {
+        return res.status(400).json({ error: phoneCheck.error });
+      }
+      normalizedPhone = phoneCheck.e164;
     }
-    const normalizedPhoneNumber = phoneCheck.e164;
 
-    const selectedPlan = plan || 'starter';
-    const planPrices = {
-      starter: 15000,
-      pro: 30000,
-      expert: 60000
-    };
-    const pricePerMonth = planPrices[selectedPlan] || 15000;
-
-    const qtyMonths = parseInt(months) || 1;
-    const amount = qtyMonths * pricePerMonth;
-
-    // Simulate Payment confirmation
-    console.log(`[MOBILE MONEY SIMULATOR] Push request sent to provider "${provider}" for number "${normalizedPhoneNumber}" of amount "${amount} FCFA" on plan "${selectedPlan}".`);
-    console.log(`[MOBILE MONEY SIMULATOR] User confirmed PIN code. Payment successful!`);
-
-    // Fetch current clinic details
     const { data: clinic, error: clinicError } = await supabase
       .from('clinics')
-      .select('subscription_expires_at, subscription_status, settings')
+      .select('name')
       .eq('id', req.user.clinicId)
       .single();
-
     if (clinicError) throw clinicError;
 
-    let baseDate = new Date();
-    // If the clinic is active and hasn't expired yet, extend from expiry date
-    if (clinic.subscription_status === 'active' && clinic.subscription_expires_at) {
-      const currentExpiry = new Date(clinic.subscription_expires_at);
-      if (currentExpiry > baseDate) {
-        baseDate = currentExpiry;
-      }
+    const { data: adminUser } = await supabase
+      .from('users')
+      .select('name, email')
+      .eq('id', req.user.userId)
+      .maybeSingle();
+
+    const amount = qtyMonths * SUBSCRIPTION_MONTHLY_PRICE;
+
+    const { data: subPayment, error: insertError } = await supabase
+      .from('subscription_payments')
+      .insert({
+        clinic_id: req.user.clinicId,
+        user_id: req.user.userId,
+        months: qtyMonths,
+        amount,
+        provider: 'pending',
+        status: 'pending'
+      })
+      .select()
+      .single();
+    if (insertError) throw insertError;
+
+    const checkout = await initiateCheckoutWithFailover(
+      {
+        amount,
+        currency: 'XOF',
+        description: `Abonnement MediClinic — ${clinic.name} (${qtyMonths} mois)`,
+        reference: `sub-${subPayment.id}`,
+        returnUrl: `${APP_URL}/`,
+        cancelUrl: `${APP_URL}/`,
+        customerName: adminUser?.name || clinic.name,
+        customerEmail: adminUser?.email,
+        customerPhone: normalizedPhone
+      },
+      { itemName: 'Abonnement MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
+    );
+
+    if (!checkout.ok) {
+      await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
+      return res.status(502).json({ error: checkout.error });
     }
 
-    // Add months
-    baseDate.setMonth(baseDate.getMonth() + qtyMonths);
-    const newExpiryStr = baseDate.toISOString();
-
-    const updatedSettings = {
-      ...(clinic.settings || {}),
-      subscription_plan: selectedPlan
-    };
-
-    // Update Clinic subscription status
-    const { error: updateError } = await supabase
-      .from('clinics')
+    await supabase
+      .from('subscription_payments')
       .update({
-        subscription_status: 'active',
-        subscription_expires_at: newExpiryStr,
-        settings: updatedSettings
+        provider: checkout.provider,
+        provider_reference: checkout.providerReference,
+        checkout_url: checkout.checkoutUrl
       })
-      .eq('id', req.user.clinicId);
+      .eq('id', subPayment.id);
 
-    if (updateError) throw updateError;
-
-    // Log payment record in clinic activity log
-    await supabase.from('activity_logs').insert({
-      clinic_id: req.user.clinicId,
-      user_id: req.user.userId,
-      action: 'SUBSCRIPTION_RENEW',
-      details: `Abonnement ${selectedPlan.toUpperCase()} renouvelé pour ${qtyMonths} mois (${amount} FCFA) via ${provider.toUpperCase()}`
-    });
-
-    const { data: updatedClinic, error: loadUpdatedError } = await supabase
-      .from('clinics')
-      .select('*')
-      .eq('id', req.user.clinicId)
-      .single();
-
-    if (loadUpdatedError) throw loadUpdatedError;
-
-    res.json({
+    res.status(201).json({
       success: true,
-      message: `Abonnement ${selectedPlan.toUpperCase()} de ${amount} FCFA traité avec succès via ${provider.toUpperCase()}.`,
-      clinic: updatedClinic
+      subscriptionPaymentId: subPayment.id,
+      checkoutUrl: checkout.checkoutUrl,
+      provider: checkout.provider
     });
   } catch (error) {
-    console.error("Subscription renewal failed:", error);
-    res.status(500).json({ error: "Erreur lors du traitement de l'abonnement." });
+    console.error("Subscription checkout error:", error);
+    res.status(500).json({ error: "Erreur lors de l'initialisation du paiement d'abonnement." });
+  }
+});
+
+// GET /api/financials/subscription/status/:id
+// Polled by the frontend while a subscription renewal is pending confirmation.
+router.get('/subscription/status/:id', auth, checkRole(['admin']), async (req, res) => {
+  try {
+    const { data: subPayment, error } = await supabase
+      .from('subscription_payments')
+      .select('id, status, checkout_url')
+      .eq('id', req.params.id)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!subPayment) return res.status(404).json({ error: "Paiement d'abonnement introuvable." });
+
+    let clinic = null;
+    if (subPayment.status === 'paid') {
+      const { data } = await supabase.from('clinics').select('*').eq('id', req.user.clinicId).single();
+      clinic = data;
+    }
+
+    res.json({ status: subPayment.status, checkoutUrl: subPayment.checkout_url, clinic });
+  } catch (error) {
+    console.error("Get Subscription Payment Status Error:", error);
+    res.status(500).json({ error: "Erreur lors de la vérification du paiement." });
   }
 });
 

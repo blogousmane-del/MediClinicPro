@@ -71,18 +71,7 @@ export const TermsOfServicePage: React.FC<TermsOfServicePageProps> = ({ onBack, 
       {/* Nav */}
       <nav className="landing-nav">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={onBack}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            backgroundColor: 'rgb(13, 148, 136)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: '1.3rem'
-          }}>M</div>
+          <img src="/logo-icon.svg" alt="MediClinic" width={36} height={36} style={{ display: 'block', flexShrink: 0 }} />
           <span style={{ fontWeight: 700, fontSize: '1.25rem', fontFamily: 'var(--font-secondary)' }}>MediClinic</span>
         </div>
 

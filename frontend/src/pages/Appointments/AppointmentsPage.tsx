@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { Clock, User, Plus, X, Check, Phone } from 'lucide-react';
+import { Clock, User, Plus, X, Check, Phone, CalendarCheck, Download, DoorOpen, Stethoscope } from 'lucide-react';
 
 interface Patient {
   id: number;
@@ -23,27 +23,45 @@ interface Appointment {
   patient_first_name: string;
   patient_last_name: string;
   patient_phone: string;
+  patient_birth_date: string | null;
   practitioner_id: number;
   practitioner_name: string;
   date_time: string;
   duration: number;
   motif: string;
   status: 'scheduled' | 'completed' | 'cancelled';
+  room: string | null;
+  notes: string | null;
 }
 
 interface AppointmentsPageProps {
   triggerOpenModal?: boolean;
   onModalClosed?: () => void;
+  onViewPatient?: (patientId: number) => void;
 }
 
-export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenModal = false, onModalClosed }) => {
+const computeAge = (birthDate: string | null): number | null => {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+};
+
+const todayISO = () => new Date().toISOString().split('T')[0];
+
+export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenModal = false, onModalClosed, onViewPatient }) => {
   const { user } = useAuth();
   const { showToast } = useNotifications();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [filterDate, setFilterDate] = useState<string>(todayISO());
   const [practitioners, setPractitioners] = useState<Practitioner[]>([]);
   const [selectedPractitioner, setSelectedPractitioner] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [loading, setLoading] = useState<boolean>(true);
 
   // Booking Modal Form states
@@ -56,6 +74,8 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
   const [bookingTime, setBookingTime] = useState<string>('');
   const [bookingDuration, setBookingDuration] = useState<number>(30);
   const [bookingMotif, setBookingMotif] = useState<string>('');
+  const [bookingRoom, setBookingRoom] = useState<string>('');
+  const [bookingNotes, setBookingNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [smsPopup, setSmsPopup] = useState<any | null>(null);
 
@@ -82,11 +102,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
       const docs = data.filter((u: any) => u.role === 'doctor' && u.active === 1);
       setPractitioners(docs);
     } catch (err) {
-      // Fallback in case settings is restricted
-      setPractitioners([
-        { id: 2, name: 'Dr. Aminata Koné' },
-        { id: 3, name: 'Dr. Ibrahim Traoré' }
-      ]);
+      console.error(err);
     }
   };
 
@@ -124,6 +140,12 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
     }
   }, [triggerOpenModal]);
 
+  useEffect(() => {
+    // Reset the status filter whenever the underlying appointment set changes
+    // (new date/practitioner) so a stale filter doesn't hide everything.
+    setStatusFilter('all');
+  }, [filterDate, selectedPractitioner]);
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedPatientId('');
@@ -133,7 +155,9 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
     setBookingTime('');
     setBookingDuration(30);
     setBookingMotif('');
-    
+    setBookingRoom('');
+    setBookingNotes('');
+
     if (onModalClosed) {
       onModalClosed();
     }
@@ -154,13 +178,14 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
         practitionerId: parseInt(bookingPractitionerId),
         dateTime,
         duration: bookingDuration,
-        motif: bookingMotif
+        motif: bookingMotif,
+        room: bookingRoom || undefined,
+        notes: bookingNotes || undefined
       };
 
       const response = await api.post('/appointments', payload);
       showToast('success', 'Rendez-vous planifié', 'Le rendez-vous a été enregistré.');
-      
-      // Save SMS details to display verification popup
+
       if (response.smsSimulated) {
         setSmsPopup(response.smsSimulated);
       }
@@ -202,117 +227,120 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
     cancelled: 'badge-danger'
   };
 
+  const statusChips: { id: 'all' | 'scheduled' | 'completed' | 'cancelled'; label: string }[] = [
+    { id: 'all', label: 'Tous' },
+    { id: 'scheduled', label: 'Planifiés' },
+    { id: 'completed', label: 'Terminés' },
+    { id: 'cancelled', label: 'Annulés' }
+  ];
+
+  const statusCounts = appointments.reduce((acc: Record<string, number>, a) => {
+    acc[a.status] = (acc[a.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  const visibleAppointments = statusFilter === 'all'
+    ? appointments
+    : appointments.filter(a => a.status === statusFilter);
+
+  const uniquePractitionerCount = new Set(appointments.map(a => a.practitioner_id)).size;
+  const isTodaySelected = filterDate === todayISO();
+  const formattedFilterDate = new Date(`${filterDate}T00:00:00`).toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
-      {/* Header */}
-      <div className="flex justify-between align-center" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)' }}>Gestion de l'Agenda</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Planifiez et gérez les consultations et visites des patients.</p>
-        </div>
 
-        {['admin', 'secretary'].includes(user?.role || '') && (
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="btn btn-primary"
-            style={{ gap: '6px' }}
-          >
-            <Plus size={18} />
-            <span>Prendre un Rendez-vous</span>
-          </button>
-        )}
-      </div>
-
-      {/* Filters */}
-      <div className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', padding: '1rem' }}>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Filtrer par date</label>
-          <input
-            type="date"
-            value={filterDate}
-            onChange={e => setFilterDate(e.target.value)}
-            className="input-control"
-          />
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Filtrer par médecin</label>
-          <select
-            value={selectedPractitioner}
-            onChange={e => setSelectedPractitioner(e.target.value)}
-            className="input-control"
-          >
-            <option value="">-- Tous les médecins --</option>
-            {practitioners.map(doc => (
-              <option key={doc.id} value={doc.id}>{doc.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* CSS Styles for responsive calendar list */}
+      {/* CSS Styles */}
       <style>{`
-        .appointments-wrapper {
-          width: 100%;
+        .rdv-header-row {
+          display: flex;
+          flex-direction: column;
+          gap: 0.85rem;
         }
-        
-        .grid-responsive-2col {
+        @media (min-width: 700px) {
+          .rdv-header-row {
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: space-between;
+          }
+        }
+
+        .rdv-filter-bar {
+          display: flex;
+          flex-direction: column;
+          gap: 0.85rem;
+        }
+        .rdv-filter-inputs {
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 0.75rem;
         }
-        
-        .grid-responsive-1to2col {
-          display: grid;
-          grid-template-columns: 1fr 2fr;
-          gap: 10px;
+        .rdv-chip-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
         }
-        
-        .appointment-card {
+        .rdv-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+        .rdv-chip {
+          padding: 6px 12px;
+          border-radius: 999px;
+          border: 1px solid var(--border);
+          background-color: var(--bg-tertiary);
+          color: var(--text-secondary);
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .rdv-chip.active {
+          background-color: var(--primary);
+          border-color: var(--primary);
+          color: #ffffff;
+        }
+        .rdv-quick-actions {
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        .rdv-card {
           background-color: var(--bg-secondary);
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
-          padding: 1.25rem;
+          padding: 1.1rem 1.25rem;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 0.9rem;
           box-shadow: var(--shadow-sm);
           transition: var(--transition);
         }
-        
-        .appointment-card:hover {
-          transform: translateY(-2px);
-          box-shadow: var(--shadow);
+        .rdv-card:hover {
           border-color: var(--primary);
+          box-shadow: var(--shadow);
         }
-        
-        /* Desktop & Mobile display switching */
-        @media (max-width: 768px) {
-          .desktop-table-container {
-            display: none !important;
+        @media (min-width: 700px) {
+          .rdv-card {
+            flex-direction: row;
+            align-items: flex-start;
           }
-          .mobile-cards-container {
-            display: flex !important;
+          .rdv-card-side {
+            flex-shrink: 0;
+            display: flex;
             flex-direction: column;
-            gap: 12px;
+            align-items: flex-end;
+            gap: 0.6rem;
+            min-width: 130px;
           }
         }
-        
-        @media (min-width: 769px) {
-          .desktop-table-container {
-            display: block !important;
-          }
-          .mobile-cards-container {
-            display: none !important;
-          }
-        }
-        
+
         @media (max-width: 500px) {
-          .grid-responsive-2col,
-          .grid-responsive-1to2col {
-            grid-template-columns: 1fr !important;
-          }
           .modal-content {
             width: 95% !important;
             margin: 10px !important;
@@ -320,147 +348,215 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
         }
       `}</style>
 
+      {/* Header */}
+      <div className="rdv-header-row">
+        <div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
+            {isTodaySelected ? "Rendez-vous du jour" : 'Rendez-vous'}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px', textTransform: 'capitalize' }}>
+            {formattedFilterDate} · {appointments.length} rendez-vous
+            {uniquePractitionerCount > 0 ? ` · ${uniquePractitionerCount} praticien${uniquePractitionerCount > 1 ? 's' : ''}` : ''}
+          </p>
+        </div>
+
+        {['admin', 'secretary'].includes(user?.role || '') && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="btn btn-primary"
+            style={{ gap: '6px', flexShrink: 0 }}
+          >
+            <Plus size={18} />
+            <span>Ajouter un RDV</span>
+          </button>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="card rdv-filter-bar" style={{ padding: '1rem' }}>
+        <div className="rdv-filter-inputs">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Filtrer par date</label>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={e => setFilterDate(e.target.value)}
+              className="input-control"
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Filtrer par médecin</label>
+            <select
+              value={selectedPractitioner}
+              onChange={e => setSelectedPractitioner(e.target.value)}
+              className="input-control"
+            >
+              <option value="">-- Tous les médecins --</option>
+              {practitioners.map(doc => (
+                <option key={doc.id} value={doc.id}>{doc.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="rdv-chip-row">
+          <div className="rdv-chips">
+            {statusChips.map(chip => (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => setStatusFilter(chip.id)}
+                className={`rdv-chip ${statusFilter === chip.id ? 'active' : ''}`}
+              >
+                {chip.label} ({chip.id === 'all' ? appointments.length : (statusCounts[chip.id] || 0)})
+              </button>
+            ))}
+          </div>
+
+          <div className="rdv-quick-actions">
+            <button
+              type="button"
+              onClick={() => setFilterDate(todayISO())}
+              className="btn btn-secondary"
+              style={{ gap: '6px', padding: '7px 12px', fontSize: '0.8rem' }}
+            >
+              <CalendarCheck size={14} />
+              <span>Aujourd'hui</span>
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Bientôt disponible"
+              className="btn btn-secondary"
+              style={{ gap: '6px', padding: '7px 12px', fontSize: '0.8rem', opacity: 0.6, cursor: 'not-allowed' }}
+            >
+              <Download size={14} />
+              <span>Exporter</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Appointments List */}
-      <div className="appointments-wrapper">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
             Chargement des créneaux...
           </div>
-        ) : appointments.length === 0 ? (
+        ) : visibleAppointments.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Aucun rendez-vous enregistré à cette date.
+            {appointments.length === 0 ? 'Aucun rendez-vous enregistré à cette date.' : 'Aucun rendez-vous ne correspond à ce filtre.'}
           </div>
         ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="table-container desktop-table-container">
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>Heure</th>
-                    <th>Patient</th>
-                    <th>Téléphone</th>
-                    <th>Praticien</th>
-                    <th>Motif de visite</th>
-                    <th>Durée</th>
-                    <th>Statut</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {appointments.map(appt => {
-                    const hour = new Date(appt.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                    return (
-                      <tr key={appt.id}>
-                        <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{hour}</td>
-                        <td style={{ fontWeight: 600 }}>{appt.patient_last_name.toUpperCase()} {appt.patient_first_name}</td>
-                        <td>{appt.patient_phone}</td>
-                        <td>{appt.practitioner_name}</td>
-                        <td style={{ fontSize: '0.9rem' }}>{appt.motif}</td>
-                        <td>{appt.duration} min</td>
-                        <td>
-                          <span className={`badge ${statusBadges[appt.status]}`}>
-                            {statusLabels[appt.status]}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          {appt.status === 'scheduled' && ['admin', 'secretary'].includes(user?.role || '') && (
-                            <div style={{ display: 'inline-flex', gap: '6px' }}>
-                              <button
-                                onClick={() => handleUpdateStatus(appt.id, 'completed')}
-                                className="btn btn-secondary"
-                                style={{ padding: '6px 10px', fontSize: '0.75rem', color: 'var(--success)', borderColor: 'var(--success)', backgroundColor: 'transparent' }}
-                                title="Marquer comme honoré"
-                              >
-                                <Check size={14} />
-                              </button>
-                              
-                              <button
-                                onClick={() => handleUpdateStatus(appt.id, 'cancelled')}
-                                className="btn btn-outline"
-                                style={{ padding: '6px 10px', fontSize: '0.75rem', borderColor: 'var(--danger)', color: 'var(--danger)' }}
-                                title="Annuler"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          visibleAppointments.map(appt => {
+            const hour = new Date(appt.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const age = computeAge(appt.patient_birth_date);
+            const canManage = appt.status === 'scheduled' && ['admin', 'secretary'].includes(user?.role || '');
 
-            {/* Mobile Cards View */}
-            <div className="mobile-cards-container">
-              {appointments.map(appt => {
-                const hour = new Date(appt.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                return (
-                  <div key={appt.id} className="appointment-card">
-                    {/* Time & Status Row */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                        <Clock size={16} />
-                        <span>{hour}</span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>({appt.duration} min)</span>
-                      </div>
-                      <span className={`badge ${statusBadges[appt.status]}`}>
-                        {statusLabels[appt.status]}
-                      </span>
-                    </div>
+            return (
+              <div key={appt.id} className="rdv-card">
+                {/* Avatar */}
+                <div style={{
+                  width: '48px', height: '48px', borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--primary-light, #e6f4ea)', color: 'var(--primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '1.1rem', flexShrink: 0
+                }}>
+                  {appt.patient_first_name.charAt(0).toUpperCase()}
+                </div>
 
-                    {/* Patient & Phone */}
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
-                        {appt.patient_last_name.toUpperCase()} {appt.patient_first_name}
-                      </div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                        <Phone size={14} style={{ color: 'var(--text-muted)' }} />
-                        <span>{appt.patient_phone}</span>
-                      </div>
-                    </div>
+                {/* Main content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                      {appt.patient_last_name.toUpperCase()} {appt.patient_first_name}
+                    </h3>
+                    {age !== null && (
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{age} ans</span>
+                    )}
+                  </div>
 
-                    {/* Practitioner Name */}
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <User size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span>{appt.practitioner_name}</span>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    <Phone size={13} style={{ color: 'var(--text-muted)' }} />
+                    <span>{appt.patient_phone}</span>
+                  </div>
 
-                    {/* Motif */}
-                    <div style={{ fontSize: '0.85rem', padding: '8px 10px', backgroundColor: 'var(--bg-primary)', borderRadius: '6px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.8rem' }}>Motif : </strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      <Stethoscope size={12} />
                       {appt.motif}
-                    </div>
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      <User size={12} />
+                      {appt.practitioner_name}
+                    </span>
+                    {appt.room && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '8px', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>
+                        <DoorOpen size={12} />
+                        {appt.room}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* Mobile Actions */}
-                    {appt.status === 'scheduled' && ['admin', 'secretary'].includes(user?.role || '') && (
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                  {appt.notes && (
+                    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      <strong style={{ color: 'var(--text-primary)' }}>Notes : </strong>
+                      {appt.notes}
+                    </div>
+                  )}
+                </div>
+
+                {/* Side: time, status, actions */}
+                <div className="rdv-card-side">
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'flex-end', fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary)' }}>
+                      <Clock size={15} />
+                      <span>{hour}</span>
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{appt.duration} min</span>
+                    <div style={{ marginTop: '4px' }}>
+                      <span className={`badge ${statusBadges[appt.status]}`}>{statusLabels[appt.status]}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {onViewPatient && (
+                      <button
+                        onClick={() => onViewPatient(appt.patient_id)}
+                        className="btn btn-primary"
+                        style={{ padding: '6px 12px', fontSize: '0.75rem', gap: '5px' }}
+                        title="Ouvrir le dossier patient"
+                      >
+                        <User size={13} />
+                        <span>Consulter</span>
+                      </button>
+                    )}
+                    {canManage && (
+                      <>
                         <button
                           onClick={() => handleUpdateStatus(appt.id, 'completed')}
                           className="btn btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: '0.75rem', color: 'var(--success)', borderColor: 'var(--success)', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          style={{ padding: '6px 10px', fontSize: '0.75rem', color: 'var(--success)', borderColor: 'var(--success)', backgroundColor: 'transparent' }}
+                          title="Marquer comme honoré"
                         >
                           <Check size={14} />
-                          <span>Confirmer</span>
                         </button>
-                        
                         <button
                           onClick={() => handleUpdateStatus(appt.id, 'cancelled')}
                           className="btn btn-outline"
-                          style={{ padding: '6px 12px', fontSize: '0.75rem', borderColor: 'var(--danger)', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          style={{ padding: '6px 10px', fontSize: '0.75rem', borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                          title="Annuler"
                         >
                           <X size={14} />
-                          <span>Annuler</span>
                         </button>
-                      </div>
+                      </>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          </>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -475,7 +571,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
 
             <form onSubmit={handleBookingSubmit}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                
+
                 {/* Search Patient */}
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label>Rechercher le patient *</label>
@@ -486,7 +582,6 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
                     onChange={e => setPatientSearch(e.target.value)}
                     className="input-control"
                   />
-                  {/* Result Box */}
                   {patients.length > 0 && (
                     <div style={{
                       position: 'absolute',
@@ -587,6 +682,30 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
                       onChange={e => setBookingMotif(e.target.value)}
                       className="input-control"
                       required
+                    />
+                  </div>
+                </div>
+
+                {/* Room & Notes (optional) */}
+                <div className="modal-grid">
+                  <div className="form-group">
+                    <label>Salle (optionnel)</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Salle 1"
+                      value={bookingRoom}
+                      onChange={e => setBookingRoom(e.target.value)}
+                      className="input-control"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Notes (optionnel)</label>
+                    <input
+                      type="text"
+                      placeholder="Note libre pour ce RDV"
+                      value={bookingNotes}
+                      onChange={e => setBookingNotes(e.target.value)}
+                      className="input-control"
                     />
                   </div>
                 </div>

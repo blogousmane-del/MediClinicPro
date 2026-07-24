@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { AnimatedNumber } from '../../components/AnimatedNumber';
+import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
 import {
   Search,
   Bell,
@@ -44,6 +46,7 @@ export const AccountingPage: React.FC = () => {
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState<boolean>(false);
+  const [pendingCheckout, setPendingCheckout] = useState<{ checkoutUrl: string; paymentId: number; provider: string; action: 'save' | 'print' } | null>(null);
 
   const [services, setServices] = useState<InvoiceService[]>([
     { id: 1, type: 'Consultation', description: 'Consultation générale', quantity: 1, unitPrice: 25000 },
@@ -136,42 +139,52 @@ export const AccountingPage: React.FC = () => {
     setInvoiceNumber(`#INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
   };
 
-  const submitInvoice = async (): Promise<boolean> => {
+  type SubmitInvoiceResult =
+    | { ok: false }
+    | { ok: true; pending: false }
+    | { ok: true; pending: true; checkoutUrl: string; paymentId: number; provider: string };
+
+  const submitInvoice = async (action: 'save' | 'print'): Promise<SubmitInvoiceResult> => {
     if (!selectedPatient) {
       showToast('error', 'Patient requis', 'Veuillez sélectionner un patient pour cette facture.');
-      return false;
+      return { ok: false };
     }
     if (services.length === 0 || total <= 0) {
       showToast('error', 'Facture vide', 'Ajoutez au moins un service facturé.');
-      return false;
+      return { ok: false };
     }
     if (paymentMethod !== 'cash' && !referenceNumber.trim()) {
       showToast('error', 'Référence requise', 'Indiquez le numéro de transaction pour ce mode de paiement.');
-      return false;
+      return { ok: false };
     }
 
     setIsSubmittingInvoice(true);
     try {
-      await api.post('/financials/checkout', {
+      const data = await api.post('/financials/checkout', {
         patientId: selectedPatient.id,
         amountTotal: total,
         paymentMethod,
         referenceNumber: referenceNumber || `${invoiceNumber}`,
         items: services.map(s => ({ type: s.type, name: s.description, cost: s.quantity * s.unitPrice }))
       });
-      return true;
+
+      if (data.pending) {
+        setPendingCheckout({ checkoutUrl: data.checkoutUrl, paymentId: data.paymentId, provider: data.provider, action });
+        return { ok: true, pending: true, checkoutUrl: data.checkoutUrl, paymentId: data.paymentId, provider: data.provider };
+      }
+      return { ok: true, pending: false };
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Échec de l\'enregistrement', err.error || 'Impossible d\'enregistrer la facture.');
-      return false;
+      return { ok: false };
     } finally {
       setIsSubmittingInvoice(false);
     }
   };
 
   const handleSaveInvoice = async () => {
-    const ok = await submitInvoice();
-    if (!ok) return;
+    const result = await submitInvoice('save');
+    if (!result.ok || result.pending) return;
     showToast('success', 'Facture enregistrée', `Facture ${invoiceNumber} sauvegardée et encaissée avec succès.`);
     resetInvoiceForm();
     setViewMode('journal');
@@ -235,15 +248,19 @@ export const AccountingPage: React.FC = () => {
     `;
   };
 
-  const handleSendAndPrint = async () => {
-    const ok = await submitInvoice();
-    if (!ok) return;
+  const printReceipt = () => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(buildInvoiceReceiptHtml());
       printWindow.document.close();
       printWindow.print();
     }
+  };
+
+  const handleSendAndPrint = async () => {
+    const result = await submitInvoice('print');
+    if (!result.ok || result.pending) return;
+    printReceipt();
     showToast('success', 'Facture transmise', `Facture ${invoiceNumber} encaissée et prête pour l'impression.`);
     resetInvoiceForm();
     setViewMode('journal');
@@ -875,31 +892,31 @@ export const AccountingPage: React.FC = () => {
 
             {/* Stats Cards */}
             <div className="grid-cols-3">
-              <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div className="card stat-card-animate" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <div style={{ backgroundColor: 'var(--success-light)', color: 'var(--success)', padding: '12px', borderRadius: '10px', flexShrink: 0 }}>
                   <Wallet size={24} />
                 </div>
                 <div>
                   <span className="text-xs text-muted" style={{ fontWeight: 600 }}>CA TOTAL ENCAISSÉ</span>
                   <div style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '2px' }}>
-                    {stats ? stats.totalRevenue.toLocaleString() : '—'} FCFA
+                    {stats ? <AnimatedNumber value={stats.totalRevenue} formatter={(n) => `${n.toLocaleString('fr-FR')} FCFA`} /> : '—'}
                   </div>
                 </div>
               </div>
 
-              <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div className="card stat-card-animate" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <div style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '12px', borderRadius: '10px', flexShrink: 0 }}>
                   <CreditCard size={24} />
                 </div>
                 <div>
                   <span className="text-xs text-muted" style={{ fontWeight: 600 }}>AUJOURD'HUI</span>
                   <div style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '2px' }}>
-                    {stats ? stats.todayRevenue.toLocaleString() : '—'} FCFA
+                    {stats ? <AnimatedNumber value={stats.todayRevenue} formatter={(n) => `${n.toLocaleString('fr-FR')} FCFA`} /> : '—'}
                   </div>
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '14px 18px', fontSize: '0.875rem' }}>
+              <div className="card stat-card-animate" style={{ padding: '14px 18px', fontSize: '0.875rem' }}>
                 <strong style={{ display: 'block', marginBottom: '8px' }}>Répartition :</strong>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {!stats || !stats.distribution || stats.distribution.length === 0 ? (
@@ -961,6 +978,27 @@ export const AccountingPage: React.FC = () => {
         )}
 
       </div>
+
+      {pendingCheckout && (
+        <PaymentCheckoutModal
+          checkoutUrl={pendingCheckout.checkoutUrl}
+          provider={pendingCheckout.provider}
+          amountLabel={`${total.toLocaleString()} FCFA`}
+          pollStatus={() => api.get(`/financials/payments/${pendingCheckout.paymentId}/status`)}
+          onSuccess={() => {
+            if (pendingCheckout.action === 'print') {
+              printReceipt();
+              showToast('success', 'Facture transmise', `Facture ${invoiceNumber} encaissée et prête pour l'impression.`);
+            } else {
+              showToast('success', 'Facture enregistrée', `Facture ${invoiceNumber} sauvegardée et encaissée avec succès.`);
+            }
+            setPendingCheckout(null);
+            resetInvoiceForm();
+            setViewMode('journal');
+          }}
+          onClose={() => setPendingCheckout(null)}
+        />
+      )}
     </>
   );
 };

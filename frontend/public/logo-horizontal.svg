@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 130" width="480" height="130" role="img" aria-label="MediClinic">
+  <defs>
+    <linearGradient id="leaf" x1="20" y1="12" x2="92" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B4D3E"></stop>
+      <stop offset="1" stop-color="#0F9E87"></stop>
+    </linearGradient>
+  </defs>
+  <g transform="translate(8 9)">
+    <g transform="rotate(-20 56 56)">
+      <path d="M56 8 C90 31 90 81 56 104 C22 81 22 31 56 8 Z" fill="url(#leaf)"></path>
+      <path d="M56 19 L56 93" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.26"></path>
+    </g>
+    <rect x="36" y="49" width="40" height="13" rx="6" fill="#ffffff"></rect>
+    <rect x="49" y="36" width="13" height="40" rx="6" fill="#ffffff"></rect>
+  </g>
+  <text x="138" y="86" font-family="&#39;Helvetica Neue&#39;,Helvetica,Arial,sans-serif" font-weight="700" font-size="60" letter-spacing="-2.5"><tspan fill="#0F2A43">Medi</tspan><tspan fill="#0F9E87">Clinic</tspan></text>
+</svg>

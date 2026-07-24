@@ -209,6 +209,46 @@ h1, h2, h3, h4, h5, h6 {
   border-color: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.2);
 }
 
+/* ===== Global ripple effect (see utils/ripple.ts) ===== */
+@keyframes ripple-anim {
+  from { transform: scale(0); opacity: 0.35; }
+  to { transform: scale(1); opacity: 0; }
+}
+
+.ripple-span {
+  position: absolute;
+  border-radius: 50%;
+  background-color: currentColor;
+  transform: scale(0);
+  opacity: 0.35;
+  animation: ripple-anim 600ms ease-out forwards;
+  pointer-events: none;
+}
+
+/* ===== Stat card entrance + hover lift (Dashboard, Accounting journal, etc.) ===== */
+@keyframes stat-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-card-animate {
+  animation: stat-card-in 450ms ease-out both;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card-animate:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07);
+}
+.stat-card-animate:nth-child(1) { animation-delay: 0ms; }
+.stat-card-animate:nth-child(2) { animation-delay: 60ms; }
+.stat-card-animate:nth-child(3) { animation-delay: 120ms; }
+.stat-card-animate:nth-child(4) { animation-delay: 180ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ripple-span { animation: none; display: none; }
+  .stat-card-animate { animation: none; }
+}
+
 .glass-card {
   background: var(--glass-bg);
   backdrop-filter: blur(16px);
@@ -1114,7 +1154,6 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: 1fr !important;
     gap: 2.5rem !important;
   }
-  .landing-testimonials-grid,
   .landing-pricing-grid {
     grid-template-columns: 1fr !important;
   }
@@ -1129,6 +1168,179 @@ h1, h2, h3, h4, h5, h6 {
   }
   .landing-feature-pills {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* ===== Landing Page: Infinite Module Marquee ===== */
+@keyframes landing-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.landing-marquee-wrapper {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+.landing-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 1rem;
+  animation: landing-marquee-scroll 28s linear infinite;
+}
+
+.landing-marquee-wrapper:hover .landing-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-marquee-track {
+    animation: none;
+  }
+}
+
+/* ===== Landing Page: Entrance & Hover Micro-interactions ===== */
+@keyframes landing-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Staggered entrance for the hero column's direct children */
+.landing-entrance > * {
+  opacity: 0;
+  animation: landing-fade-up 550ms ease-out forwards;
+}
+.landing-entrance > *:nth-child(1) { animation-delay: 60ms; }
+.landing-entrance > *:nth-child(2) { animation-delay: 140ms; }
+.landing-entrance > *:nth-child(3) { animation-delay: 220ms; }
+.landing-entrance > *:nth-child(4) { animation-delay: 300ms; }
+.landing-entrance > *:nth-child(5) { animation-delay: 380ms; }
+
+/* Scroll-reveal: JS toggles .is-visible via IntersectionObserver */
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.landing-reveal.landing-reveal-left { transform: translateX(-28px); }
+.landing-reveal.landing-reveal-right { transform: translateX(28px); }
+.landing-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Buttons: lift on hover */
+.landing-btn-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.landing-btn-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* Cards: lift + shadow grow on hover (pricing) */
+.landing-card-lift {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.landing-card-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px rgba(30, 77, 64, 0.16);
+}
+
+/* Feature pills: lift + tint on hover */
+.landing-pill-hover {
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.landing-pill-hover:hover {
+  transform: translateY(-2px);
+  background-color: #e6f4ea;
+  border-color: #bbf7d0;
+}
+
+/* Marquee cards: subtle lift on hover (in addition to the wrapper's pause-on-hover) */
+.landing-marquee-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.landing-marquee-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+}
+
+/* Nav / text links: sliding underline on hover */
+.landing-link {
+  position: relative;
+  transition: color 0.2s ease;
+}
+.landing-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0;
+  height: 2px;
+  background-color: #0d9488;
+  transition: width 0.25s ease;
+}
+.landing-link:hover {
+  color: #0f172a !important;
+}
+.landing-link:hover::after {
+  width: 100%;
+}
+
+/* Footer links: brighten on hover */
+.landing-footer-link {
+  transition: color 0.2s ease;
+}
+.landing-footer-link:hover {
+  color: #ffffff !important;
+}
+
+/* Logo mark: subtle pop on hover */
+.landing-logo-mark {
+  transition: transform 0.2s ease;
+}
+.landing-logo-mark:hover {
+  transform: scale(1.08);
+}
+
+/* Stat/highlight icons: pop on hover */
+.landing-highlight svg {
+  transition: transform 0.2s ease;
+}
+.landing-highlight:hover svg {
+  transform: scale(1.15);
+}
+
+/* Payment provider badges: lift on hover */
+.landing-payment-badge {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.landing-payment-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* Image zoom-on-hover frames (hero + showcase photos) */
+.landing-img-zoom img {
+  transition: transform 0.4s ease;
+}
+.landing-img-zoom:hover img {
+  transform: scale(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-entrance > * { animation: none; opacity: 1; transform: none; }
+  .landing-reveal { transition: none; opacity: 1; transform: none; }
+  .landing-btn-lift:hover,
+  .landing-card-lift:hover,
+  .landing-pill-hover:hover,
+  .landing-marquee-card:hover,
+  .landing-payment-badge:hover,
+  .landing-logo-mark:hover,
+  .landing-highlight:hover svg,
+  .landing-img-zoom:hover img {
+    transform: none;
   }
 }
 

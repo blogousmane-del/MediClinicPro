@@ -5,6 +5,9 @@ backend/mediclinic.db
 backend/mediclinic.db-journal
 frontend/dist/
 .env
+.env.*
+!.env.example
+__pycache__/
 .mcp.json
 .DS_Store
 *.log

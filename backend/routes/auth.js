@@ -103,7 +103,8 @@ router.post('/register', async (req, res) => {
         id: userId,
         name: adminName,
         email,
-        role: 'admin'
+        role: 'admin',
+        passwordSet: true
       },
       clinic: {
         id: clinicId,
@@ -172,7 +173,8 @@ router.post('/login', async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        passwordSet: user.password_set
       },
       clinic
     });
@@ -279,6 +281,7 @@ router.post('/google', async (req, res) => {
           name: displayName,
           email,
           password_hash: passwordHash,
+          password_set: false,
           role: 'admin',
           active: 1
         })
@@ -307,7 +310,8 @@ router.post('/google', async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        passwordSet: user.password_set
       },
       clinic
     });
@@ -322,7 +326,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, name, email, role, active')
+      .select('id, name, email, role, active, password_set')
       .eq('id', req.user.userId)
       .single();
 
@@ -337,12 +341,77 @@ router.get('/me', auth, async (req, res) => {
     if (clinicError) throw clinicError;
 
     res.json({
-      user,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        active: user.active,
+        passwordSet: user.password_set
+      },
       clinic
     });
   } catch (error) {
     console.error("Get Me Error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération du profil." });
+  }
+});
+
+// PUT /api/auth/password
+// Change password (requires currentPassword) or set a first password for a
+// Google-only account (currentPassword not required since none exists yet).
+router.put('/password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 6 caractères." });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, password_hash, password_set')
+      .eq('id', req.user.userId)
+      .single();
+
+    if (userError) throw userError;
+
+    if (user.password_set) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: "Mot de passe actuel requis." });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!isMatch) {
+        return res.status(400).json({ error: "Mot de passe actuel incorrect." });
+      }
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: newHash, password_set: true })
+      .eq('id', req.user.userId);
+
+    if (updateError) throw updateError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PASSWORD_SET',
+      details: user.password_set
+        ? 'Mot de passe modifié'
+        : 'Mot de passe défini pour activer la connexion par email/mot de passe'
+    });
+
+    res.json({
+      success: true,
+      message: user.password_set
+        ? "Mot de passe modifié avec succès."
+        : "Mot de passe défini avec succès. Vous pouvez désormais aussi vous connecter avec votre email et ce mot de passe."
+    });
+  } catch (error) {
+    console.error("Set Password Error:", error);
+    res.status(500).json({ error: "Erreur lors de la mise à jour du mot de passe." });
   }
 });
 

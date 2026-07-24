@@ -6,6 +6,7 @@ export interface User {
   name: string;
   email: string;
   role: 'admin' | 'doctor' | 'secretary' | 'pharmacist' | 'lab_tech' | 'manager';
+  passwordSet?: boolean;
 }
 
 export interface Clinic {
@@ -29,8 +30,10 @@ interface AuthContextType {
   register: (clinicName: string, adminName: string, email: string, password: string, phone: string) => Promise<void>;
   logout: () => void;
   onboardClinic: (address: string, phone: string, staff: any[], modules: string[]) => Promise<void>;
-  renewSubscription: (provider: string, phone: string, months: number, plan: string) => Promise<void>;
+  renewSubscription: (phone: string | undefined, months: number) => Promise<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string }>;
+  pollSubscriptionStatus: (subscriptionPaymentId: number) => Promise<{ status: 'pending' | 'paid' | 'failed'; clinic?: Clinic }>;
   refreshProfile: () => Promise<void>;
+  setPassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,20 +132,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const renewSubscription = async (provider: string, phone: string, months: number, plan: string) => {
+  const setPassword = async (currentPassword: string, newPassword: string) => {
     try {
-      const data = await api.post('/financials/subscription-pay', {
-        provider,
-        phoneNumber: phone,
-        months,
-        plan
-      });
-      if (data.success) {
-        setClinic(data.clinic);
-      }
+      await api.put('/auth/password', { currentPassword, newPassword });
+      await refreshProfile();
     } catch (err) {
       throw err;
     }
+  };
+
+  const renewSubscription = async (phone: string | undefined, months: number) => {
+    const data = await api.post('/financials/subscription/checkout', {
+      phoneNumber: phone,
+      months
+    });
+    return {
+      checkoutUrl: data.checkoutUrl,
+      subscriptionPaymentId: data.subscriptionPaymentId,
+      provider: data.provider
+    };
+  };
+
+  const pollSubscriptionStatus = async (subscriptionPaymentId: number) => {
+    const data = await api.get(`/financials/subscription/status/${subscriptionPaymentId}`);
+    if (data.status === 'paid' && data.clinic) {
+      setClinic(data.clinic);
+    }
+    return { status: data.status, clinic: data.clinic };
   };
 
   return (
@@ -158,7 +174,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         onboardClinic,
         renewSubscription,
-        refreshProfile
+        pollSubscriptionStatus,
+        refreshProfile,
+        setPassword
       }}
     >
       {children}

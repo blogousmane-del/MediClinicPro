@@ -1,17 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Users, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
   Pill,
   FlaskConical,
   FileText,
   Receipt,
+  ShieldCheck,
   Settings as SettingsIcon,
   LogOut,
-  WifiOff,
   X
 } from 'lucide-react';
 
@@ -25,10 +25,10 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isOpen, onClose }) => {
   const { user, clinic, logout } = useAuth();
   const { isOnline } = useOffline();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
 
   if (!user) return null;
 
-  // Filter tabs by role matching Image 1 design
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager'] },
     { id: 'patients', label: 'Patients', icon: Users, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager'] },
@@ -37,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
     { id: 'laboratory', label: 'Laboratoire', icon: FlaskConical, roles: ['admin', 'lab_tech', 'manager'] },
     { id: 'pharmacy', label: 'Pharmacie', icon: Pill, roles: ['admin', 'pharmacist', 'manager'] },
     { id: 'accounting', label: 'Comptabilité', icon: Receipt, roles: ['admin', 'secretary', 'manager'] },
+    { id: 'deposits', label: 'Dépôts de garantie', icon: ShieldCheck, roles: ['admin', 'secretary', 'manager'] },
     { id: 'settings', label: 'Paramètres', icon: SettingsIcon, roles: ['admin', 'manager'] },
   ];
 
@@ -51,9 +52,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
     manager: 'Gestionnaire'
   };
 
+  const formattedClinicName = (clinic?.name || 'Ma Clinique').toUpperCase();
+  const formattedClinicAddress = (clinic?.address || 'Abidjan, CI').toUpperCase();
+
   return (
     <>
-      {/* Backdrop overlay for mobile screens */}
+      {/* Mobile Backdrop */}
       {isOpen && (
         <div
           className="sidebar-overlay"
@@ -64,251 +68,275 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             left: 0,
             width: '100vw',
             height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
             backdropFilter: 'blur(3px)',
             zIndex: 99
           }}
         />
       )}
+
       <aside 
         className={`sidebar ${isOpen ? 'open' : ''}`}
         style={{
-          width: 'var(--sidebar-width)',
+          width: 'var(--sidebar-width, 240px)',
           height: '100vh',
-          backgroundColor: 'rgba(12, 18, 30, 0.95)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          color: '#94a3b8',
+          backgroundColor: '#0c131f',
+          color: '#8fa0b5',
           position: 'fixed',
           left: 0,
           top: 0,
           display: 'flex',
           flexDirection: 'column',
-          borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+          justifyContent: 'space-between',
+          borderRight: '1px solid rgba(255, 255, 255, 0.05)',
           zIndex: 100,
-          boxShadow: '8px 0 32px rgba(0,0,0,0.25)'
+          boxSizing: 'border-box',
+          boxShadow: '4px 0 24px rgba(0,0,0,0.3)'
         }}
       >
-        {/* Brand Header */}
+        <div>
+          {/* Top Brand Header */}
+          <div style={{
+            padding: '1.25rem 1.25rem 0.75rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <img src="/logo-icon.svg" alt="MediClinic" width={34} height={34} style={{ display: 'block', flexShrink: 0 }} />
+              <span style={{
+                fontWeight: 700,
+                fontSize: '1.25rem',
+                color: '#ffffff',
+                fontFamily: 'var(--font-secondary, "Plus Jakarta Sans", sans-serif)',
+                letterSpacing: '-0.02em'
+              }}>
+                MediClinic
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Green online ring indicator */}
+              <div style={{
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                border: '2px solid #10b981',
+                backgroundColor: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+              </div>
+
+              {/* Mobile Close Button */}
+              <button
+                onClick={onClose}
+                className="sidebar-close-btn"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#8fa0b5',
+                  display: 'none',
+                  padding: '4px'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Clinic Section Subheader */}
+          <div style={{
+            padding: '0.75rem 1.25rem 1rem 1.25rem',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.07)'
+          }}>
+            <div style={{
+              fontSize: '0.85rem',
+              fontWeight: 800,
+              color: '#ffffff',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase'
+            }}>
+              {formattedClinicName}
+            </div>
+            <div style={{
+              fontSize: '0.725rem',
+              fontWeight: 500,
+              color: '#64748b',
+              marginTop: '2px',
+              letterSpacing: '0.03em',
+              textTransform: 'uppercase'
+            }}>
+              {formattedClinicAddress}
+            </div>
+          </div>
+
+          {/* Navigation Items */}
+          <nav style={{
+            padding: '1.25rem 0.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          }}>
+            {filteredItems.map(item => {
+              const Icon = item.icon;
+              const isActive = currentTab === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setCurrentTab(item.id);
+                    onClose();
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '11px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: isActive ? '#1c4436' : 'transparent',
+                    color: isActive ? '#ffffff' : '#8fa0b5',
+                    textAlign: 'left',
+                    width: '100%',
+                    cursor: 'pointer',
+                    fontSize: '0.925rem',
+                    fontWeight: isActive ? 700 : 500,
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = '#ffffff';
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.color = '#8fa0b5';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  {/* Show icon when item is active or settings */}
+                  {isActive && <Icon size={18} color="#ffffff" />}
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* User Profile Footer */}
         <div style={{
-          height: 'var(--header-height)',
-          padding: '0 1.5rem',
+          padding: '1rem 1.25rem',
+          borderTop: '1px solid rgba(255, 255, 255, 0.07)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-          backgroundColor: 'rgba(9, 13, 22, 0.4)'
+          gap: '10px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+            {/* Avatar Circle */}
             <div style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              backgroundColor: '#172233',
+              border: '1.5px solid rgba(255, 255, 255, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'white',
+              color: '#ffffff',
               fontWeight: 700,
-              fontSize: '1.25rem',
-              boxShadow: '0 0 12px rgba(13, 148, 136, 0.4)'
-            }}>M</div>
-            <span style={{
-              fontWeight: 700,
-              fontSize: '1.2rem',
-              color: 'white',
-              fontFamily: 'var(--font-secondary)',
-              letterSpacing: '0.75px',
-              background: 'linear-gradient(135deg, #ffffff, #94a3b8)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>MediClinic</span>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Offline Badge indicator */}
-            <div title={isOnline ? "En ligne" : "Hors ligne (mode déconnecté)"} style={{ display: 'flex', alignItems: 'center' }}>
-              {isOnline ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--success)' }} />
-                  <span style={{ position: 'absolute', width: '14px', height: '14px', borderRadius: '50%', border: '2px solid var(--success)', animation: 'ping 1.5s infinite', opacity: 0.5 }} />
-                </div>
-              ) : (
-                <WifiOff size={16} color="var(--danger)" />
-              )}
+              fontSize: '0.875rem',
+              flexShrink: 0
+            }}>
+              {user.name.charAt(0).toUpperCase()}
             </div>
-            
-            {/* Mobile Close Button */}
-            <button
-              onClick={onClose}
-              className="sidebar-close-btn"
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#94a3b8',
-                display: 'none',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '4px'
-              }}
-            >
-              <X size={18} />
-            </button>
+
+            {/* Name and Role */}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                color: '#ffffff',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {user.name.toUpperCase()}
+              </div>
+              <div style={{
+                fontSize: '0.725rem',
+                color: '#64748b',
+                marginTop: '1px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {roleLabels[user.role] || user.role}
+              </div>
+            </div>
           </div>
+
+          {/* Logout Icon */}
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            title="Se déconnecter"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#64748b',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              flexShrink: 0
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+          >
+            <LogOut size={16} />
+          </button>
         </div>
 
-      {/* Clinic title info */}
-      <div style={{
-        padding: '1.25rem 1.5rem',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-        backgroundColor: 'rgba(12, 18, 30, 0.2)'
-      }}>
-        <div style={{
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          color: 'white',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }}>{clinic?.name || 'Ma Clinique'}</div>
-        <div style={{
-          fontSize: '0.78rem',
-          color: 'var(--text-muted)',
-          marginTop: '4px'
-        }}>{clinic?.address || 'Abidjan, CI'}</div>
-      </div>
+      </aside>
 
-      {/* Navigation list */}
-      <nav style={{
-        flexGrow: 1,
-        padding: '1.5rem 0.75rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '6px',
-        overflowY: 'auto'
-      }}>
-        {filteredItems.map(item => {
-          const Icon = item.icon;
-          const isActive = currentTab === item.id;
-          
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setCurrentTab(item.id);
-                onClose();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 14px',
-                paddingLeft: isActive ? '11px' : '14px',
-                borderRadius: '10px',
-                border: 'none',
-                background: isActive ? '#1e4d40' : 'transparent',
-                color: isActive ? '#ffffff' : '#94a3b8',
-                textAlign: 'left',
-                width: '100%',
-                cursor: 'pointer',
-                transition: 'var(--transition)',
-                fontWeight: isActive ? 600 : 500
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.color = 'white';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.color = '#94a3b8';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <Icon size={19} color={isActive ? '#ffffff' : 'inherit'} />
-              <span style={{ fontSize: '0.9375rem' }}>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* User profile footer */}
-      <div style={{
-        padding: '1.25rem 1rem',
-        borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-        backgroundColor: 'rgba(9, 13, 22, 0.4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02))',
-            border: '1px solid rgba(255,255,255,0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 600,
-            fontSize: '0.95rem'
-          }}>
-            {user.name.charAt(0)}
-          </div>
-          <div style={{ flexGrow: 1, overflow: 'hidden' }}>
-            <div style={{
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              color: 'white',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              overflow: 'hidden'
-            }}>{user.name}</div>
-            <div style={{
-              fontSize: '0.78rem',
-              color: 'var(--text-muted)',
-              marginTop: '1px'
-            }}>{roleLabels[user.role]}</div>
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="modal-backdrop" onClick={() => setShowLogoutConfirm(false)}>
+          <div className="modal-content" style={{ maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Se déconnecter</h3>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
+                Voulez-vous vous déconnecter ?
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowLogoutConfirm(false)} className="btn btn-secondary">Annuler</button>
+              <button
+                onClick={() => { setShowLogoutConfirm(false); logout(); }}
+                className="btn"
+                style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
+              >
+                Se déconnecter
+              </button>
+            </div>
           </div>
         </div>
-
-        <button
-          onClick={logout}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '10px',
-            borderRadius: 'var(--radius-full)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            background: 'rgba(239, 68, 68, 0.05)',
-            color: '#ff5a5a',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            width: '100%',
-            transition: 'var(--transition)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)';
-            e.currentTarget.style.transform = 'none';
-          }}
-        >
-          <LogOut size={16} />
-          Se déconnecter
-        </button>
-      </div>
-    </aside>
-  </>
-);
+      )}
+    </>
+  );
 };
+
+export default Sidebar;

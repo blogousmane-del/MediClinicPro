@@ -4,8 +4,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 
+const { authLimiter } = require('./middleware/rateLimiter');
 const { initDb } = require('./database');
 const authRoutes = require('./routes/auth');
 const patientRoutes = require('./routes/patients');
@@ -15,9 +15,15 @@ const pharmacyRoutes = require('./routes/pharmacy');
 const laboratoryRoutes = require('./routes/laboratory');
 const financialsRoutes = require('./routes/financials');
 const settingsRoutes = require('./routes/settings');
+const depositsRoutes = require('./routes/deposits');
+const webhooksRoutes = require('./routes/webhooks');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Trust the platform proxy (Vercel) so req.ip reflects the real client IP
+// from X-Forwarded-For instead of the proxy's address.
+app.set('trust proxy', 1);
 
 // Security Middlewares
 app.use(helmet({
@@ -45,23 +51,22 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+// Capture the raw request body bytes for payment webhook signature verification
+// (Bictorys HMAC, PayTech dual signature). PayTech IPNs ship form-encoded by
+// default, Bictorys ships JSON — both parsers need the same `verify` hook so
+// req.rawBody is populated whichever content-type actually matches.
+const captureRawBody = (req, _res, buf) => { req.rawBody = buf; };
+app.use(express.json({ verify: captureRawBody }));
+app.use(express.urlencoded({ extended: false, verify: captureRawBody }));
 
-// Anti Brute-force rate limiting on auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 login/register requests per windowMs
-  message: {
-    error: "Trop de requêtes de connexion depuis cette IP, veuillez réessayer après 15 minutes."
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
+// Anti Brute-force rate limiting on auth routes (Upstash Redis-backed when configured, see middleware/rateLimiter.js)
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/google', authLimiter);
 
+// Payment provider webhooks — public, no `auth` middleware (server-to-server
+// calls verified by provider signature, not a MediClinic user session).
+app.use('/api/webhooks', webhooksRoutes);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -72,6 +77,8 @@ app.use('/api/pharmacy', pharmacyRoutes);
 app.use('/api/laboratory', laboratoryRoutes);
 app.use('/api/financials', financialsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/deposits', depositsRoutes);
+// (webhooksRoutes is mounted earlier, before auth-adjacent middleware)
 
 // Health check endpoint
 app.get('/health', (req, res) => {

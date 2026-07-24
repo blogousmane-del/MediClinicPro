@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { OfflineProvider } from './contexts/OfflineContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
+import { initRippleEffect } from './utils/ripple';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
@@ -18,6 +19,7 @@ import { PharmacyPage } from './pages/Pharmacy/PharmacyPage';
 import { OrdonnancesPage } from './pages/Prescriptions/OrdonnancesPage';
 import { LaboratoryPage } from './pages/Laboratory/LaboratoryPage';
 import { AccountingPage } from './pages/Accounting/AccountingPage';
+import { DepositsPage } from './pages/Deposits/DepositsPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
 
 const MainAppContent: React.FC = () => {
@@ -78,6 +80,7 @@ const MainAppContent: React.FC = () => {
     prescriptions: 'Gestion des Ordonnances',
     laboratory: 'File du Laboratoire',
     accounting: 'Grand Livre & Recettes',
+    deposits: 'Dépôts de garantie',
     settings: 'Paramètres du cabinet'
   };
 
@@ -122,9 +125,10 @@ const MainAppContent: React.FC = () => {
         )}
         
         {currentTab === 'appointments' && (
-          <AppointmentsPage 
-            triggerOpenModal={openApptModal} 
-            onModalClosed={() => setOpenApptModal(false)} 
+          <AppointmentsPage
+            triggerOpenModal={openApptModal}
+            onModalClosed={() => setOpenApptModal(false)}
+            onViewPatient={(patientId) => { setSelectedPatientId(patientId); setCurrentTab('patients'); }}
           />
         )}
         
@@ -147,6 +151,7 @@ const MainAppContent: React.FC = () => {
         {currentTab === 'prescriptions' && <OrdonnancesPage />}
         {currentTab === 'laboratory' && <LaboratoryPage />}
         {currentTab === 'accounting' && <AccountingPage />}
+        {currentTab === 'deposits' && <DepositsPage />}
         {currentTab === 'settings' && <SettingsPage />}
       </main>
     </div>
@@ -154,6 +159,8 @@ const MainAppContent: React.FC = () => {
 };
 
 function App() {
+  useEffect(() => initRippleEffect(), []);
+
   return (
     <NotificationProvider>
       <OfflineProvider>
