@@ -7,6 +7,7 @@ export interface User {
   email: string;
   role: 'admin' | 'doctor' | 'secretary' | 'pharmacist' | 'lab_tech' | 'manager';
   passwordSet?: boolean;
+  availabilityStatus?: 'available' | 'busy' | 'away';
 }
 
 export interface Clinic {

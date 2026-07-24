@@ -1,16 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Sun, Moon, Bell, AlertTriangle, ShieldAlert, Menu } from 'lucide-react';
+import { api } from '../utils/api';
+import { useNotifications } from '../contexts/NotificationContext';
+import { Sun, Moon, Bell, AlertTriangle, ShieldAlert, Menu, ChevronDown } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
   onToggleSidebar?: () => void;
 }
 
+const AVAILABILITY_OPTIONS: { value: 'available' | 'busy' | 'away'; label: string; color: string }[] = [
+  { value: 'available', label: 'Disponible', color: 'var(--success, #16a34a)' },
+  { value: 'busy', label: 'Occupé', color: '#f59e0b' },
+  { value: 'away', label: 'Absent', color: '#94a3b8' }
+];
+
 export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
-  const { clinic } = useAuth();
+  const { user, clinic, refreshProfile } = useAuth();
+  const { showToast } = useNotifications();
   const [theme, setTheme] = useState<string>('light');
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
+  const [availabilityMenuOpen, setAvailabilityMenuOpen] = useState<boolean>(false);
+  const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<boolean>(false);
 
   useEffect(() => {
     // Theme setup
@@ -33,6 +44,21 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
     setTheme(nextTheme);
     localStorage.setItem('theme', nextTheme);
     document.documentElement.setAttribute('data-theme', nextTheme);
+  };
+
+  const handleAvailabilityChange = async (status: 'available' | 'busy' | 'away') => {
+    setAvailabilityMenuOpen(false);
+    if (status === user?.availabilityStatus) return;
+    setIsUpdatingAvailability(true);
+    try {
+      await api.put('/settings/availability', { status });
+      await refreshProfile();
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || 'Impossible de mettre à jour votre statut de disponibilité.');
+    } finally {
+      setIsUpdatingAvailability(false);
+    }
   };
 
   const isExpiringSoon = daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 3;
@@ -126,6 +152,86 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
           }}>
             <AlertTriangle size={16} />
             <span style={{ whiteSpace: 'nowrap' }}>{daysRemaining} j. restants</span>
+          </div>
+        )}
+
+        {/* Doctor Availability Status */}
+        {user?.role === 'doctor' && (
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setAvailabilityMenuOpen(o => !o)}
+              disabled={isUpdatingAvailability}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'none',
+                border: '1px solid var(--border)',
+                padding: '6px 10px',
+                borderRadius: '8px',
+                cursor: isUpdatingAvailability ? 'default' : 'pointer',
+                color: 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                fontWeight: 600
+              }}
+            >
+              <span style={{
+                width: '9px',
+                height: '9px',
+                borderRadius: '50%',
+                backgroundColor: AVAILABILITY_OPTIONS.find(o => o.value === (user.availabilityStatus || 'available'))?.color,
+                flexShrink: 0
+              }} />
+              <span className="header-availability-label">
+                {AVAILABILITY_OPTIONS.find(o => o.value === (user.availabilityStatus || 'available'))?.label}
+              </span>
+              <ChevronDown size={14} />
+            </button>
+
+            {availabilityMenuOpen && (
+              <>
+                <div
+                  onClick={() => setAvailabilityMenuOpen(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 95 }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  right: 0,
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  boxShadow: 'var(--shadow-md)',
+                  minWidth: '160px',
+                  zIndex: 96,
+                  overflow: 'hidden'
+                }}>
+                  {AVAILABILITY_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleAvailabilityChange(opt.value)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '9px 12px',
+                        background: opt.value === (user.availabilityStatus || 'available') ? 'var(--bg-tertiary)' : 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.825rem',
+                        fontWeight: 600,
+                        textAlign: 'left'
+                      }}
+                    >
+                      <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }} />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 

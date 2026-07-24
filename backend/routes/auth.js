@@ -104,7 +104,8 @@ router.post('/register', async (req, res) => {
         name: adminName,
         email,
         role: 'admin',
-        passwordSet: true
+        passwordSet: true,
+        availabilityStatus: 'available'
       },
       clinic: {
         id: clinicId,
@@ -174,7 +175,8 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        passwordSet: user.password_set
+        passwordSet: user.password_set,
+        availabilityStatus: user.availability_status
       },
       clinic
     });
@@ -311,7 +313,8 @@ router.post('/google', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        passwordSet: user.password_set
+        passwordSet: user.password_set,
+        availabilityStatus: user.availability_status
       },
       clinic
     });
@@ -326,7 +329,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, name, email, role, active, password_set')
+      .select('id, name, email, role, active, password_set, availability_status')
       .eq('id', req.user.userId)
       .single();
 
@@ -347,7 +350,8 @@ router.get('/me', auth, async (req, res) => {
         email: user.email,
         role: user.role,
         active: user.active,
-        passwordSet: user.password_set
+        passwordSet: user.password_set,
+        availabilityStatus: user.availability_status
       },
       clinic
     });

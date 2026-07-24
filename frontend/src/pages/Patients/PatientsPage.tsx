@@ -37,6 +37,12 @@ interface Patient {
   created_at?: string;
 }
 
+const AVAILABILITY_META: Record<string, { label: string; color: string }> = {
+  available: { label: 'Disponible', color: 'var(--success, #16a34a)' },
+  busy: { label: 'Occupé', color: '#f59e0b' },
+  away: { label: 'Absent', color: '#94a3b8' }
+};
+
 interface PatientsPageProps {
   onSelectPatient: (id: number) => void;
   triggerOpenModal?: boolean;
@@ -68,6 +74,13 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
   const [notes, setNotes] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
+  // Post-creation orientation: quick-assign the freshly registered patient to an available doctor
+  const [orientationPatient, setOrientationPatient] = useState<{ id: number; name: string } | null>(null);
+  const [orientationDoctors, setOrientationDoctors] = useState<any[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
+  const [orientationMotif, setOrientationMotif] = useState<string>('Consultation');
+  const [isOrienting, setIsOrienting] = useState<boolean>(false);
+
   const fetchPatients = async (query = '', filter = 'all') => {
     try {
       setLoading(true);
@@ -91,6 +104,46 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
       setIsCreating(true);
     }
   }, [triggerOpenModal]);
+
+  useEffect(() => {
+    if (!orientationPatient) return;
+    (async () => {
+      try {
+        const data = await api.get('/settings/users');
+        setOrientationDoctors((data || []).filter((u: any) => u.role === 'doctor' && u.active === 1));
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, [orientationPatient]);
+
+  const closeOrientation = () => {
+    setOrientationPatient(null);
+    setOrientationDoctors([]);
+    setSelectedDoctorId(null);
+    setOrientationMotif('Consultation');
+  };
+
+  const handleOrientPatient = async () => {
+    if (!orientationPatient || !selectedDoctorId) return;
+    setIsOrienting(true);
+    try {
+      await api.post('/appointments', {
+        patientId: orientationPatient.id,
+        practitionerId: selectedDoctorId,
+        dateTime: new Date().toISOString(),
+        motif: orientationMotif || 'Consultation'
+      });
+      const doctorName = orientationDoctors.find(d => d.id === selectedDoctorId)?.name || '';
+      showToast('success', 'Patient orienté', `${orientationPatient.name} a été orienté vers ${doctorName}.`);
+      closeOrientation();
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Échec de l\'orientation', err.error || 'Impossible d\'orienter le patient vers ce médecin.');
+    } finally {
+      setIsOrienting(false);
+    }
+  };
 
   const handleCancelCreate = () => {
     setIsCreating(false);
@@ -136,6 +189,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
       showToast('success', 'Patient créé', `Dossier ${newPatient.folder_number} enregistré avec succès.`);
       handleCancelCreate();
       fetchPatients(search, filterStatus);
+      setOrientationPatient({ id: newPatient.id, name: `${firstName} ${lastName}` });
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Échec de création', err.error || 'Erreur lors de la création du dossier patient.');
@@ -936,6 +990,77 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
         </div>
 
       </div>
+
+      {orientationPatient && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>Orienter le patient</h3>
+              <button onClick={closeOrientation} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 1rem' }}>
+                {orientationPatient.name} vient d'être enregistré. Vers quel médecin ?
+              </p>
+
+              {orientationDoctors.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Aucun médecin actif disponible pour le moment.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
+                  {orientationDoctors.map(doc => {
+                    const meta = AVAILABILITY_META[doc.availability_status as string] || AVAILABILITY_META.available;
+                    const isSelected = selectedDoctorId === doc.id;
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => setSelectedDoctorId(doc.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                          backgroundColor: isSelected ? 'var(--bg-tertiary)' : 'transparent',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: meta.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600, flex: 1 }}>{doc.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{meta.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Motif</label>
+                <input
+                  type="text"
+                  value={orientationMotif}
+                  onChange={(e) => setOrientationMotif(e.target.value)}
+                  className="input-control"
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={closeOrientation} className="btn btn-secondary">Passer</button>
+              <button
+                onClick={handleOrientPatient}
+                disabled={!selectedDoctorId || isOrienting}
+                className="btn"
+                style={{ backgroundColor: '#1e4d40', color: '#ffffff' }}
+              >
+                {isOrienting ? 'Orientation...' : 'Orienter maintenant'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

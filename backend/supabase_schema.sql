@@ -37,6 +37,7 @@ CREATE TABLE users (
   password_set BOOLEAN NOT NULL DEFAULT true, -- false for Google-only accounts with no real password yet
   role TEXT NOT NULL, -- admin, doctor, secretary, pharmacist, lab_tech, manager
   active INTEGER DEFAULT 1, -- 1=true, 0=false
+  availability_status TEXT NOT NULL DEFAULT 'available' CHECK (availability_status IN ('available', 'busy', 'away')), -- self-set by doctors; used to orient walk-in patients
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

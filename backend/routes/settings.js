@@ -6,12 +6,14 @@ const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 
 // GET /api/settings/users
-// Get all staff users
-router.get('/users', auth, checkRole(['admin', 'manager']), async (req, res) => {
+// Get all staff users. Secretaries need this to populate doctor pickers
+// (appointment booking, patient orientation) — they cannot manage staff,
+// but they must be able to read the list of active practitioners.
+router.get('/users', auth, checkRole(['admin', 'manager', 'secretary']), async (req, res) => {
   try {
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, name, email, role, active, created_at')
+      .select('id, name, email, role, active, availability_status, created_at')
       .eq('clinic_id', req.user.clinicId)
       .order('role', { ascending: true })
       .order('name', { ascending: true });
@@ -21,6 +23,40 @@ router.get('/users', auth, checkRole(['admin', 'manager']), async (req, res) => 
   } catch (error) {
     console.error("Get settings users error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération des utilisateurs." });
+  }
+});
+
+// PUT /api/settings/availability
+// Self-service: a doctor updates their OWN availability status. Never takes
+// a target user id — eliminates any IDOR surface by construction.
+router.put('/availability', auth, checkRole(['doctor']), async (req, res) => {
+  try {
+    const { status } = req.body;
+    const validStatuses = ['available', 'busy', 'away'];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: "Statut de disponibilité invalide (attendu : available, busy ou away)." });
+    }
+
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ availability_status: status })
+      .eq('id', req.user.userId)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (updateError) throw updateError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'AVAILABILITY_UPDATE',
+      details: `Statut de disponibilité changé à "${status}"`
+    });
+
+    res.json({ success: true, availability_status: status });
+  } catch (error) {
+    console.error("Update availability error:", error);
+    res.status(500).json({ error: "Erreur lors de la mise à jour du statut de disponibilité." });
   }
 });
 
