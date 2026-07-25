@@ -162,11 +162,20 @@ export const OnboardingPage: React.FC = () => {
         }
         /* Specific override for browser autofill background */
         .onboard-input:-webkit-autofill,
-        .onboard-input:-webkit-autofill:hover, 
+        .onboard-input:-webkit-autofill:hover,
         .onboard-input:-webkit-autofill:focus {
           -webkit-text-fill-color: #ffffff !important;
           -webkit-box-shadow: 0 0 0px 1000px #0b0f19 inset !important;
           transition: background-color 5000s ease-in-out 0s !important;
+        }
+        @media (max-width: 560px) {
+          .onboard-steps span {
+            display: none;
+          }
+          .onboard-steps > div {
+            padding: 1rem 0.5rem !important;
+            gap: 0 !important;
+          }
         }
       `}</style>
 
@@ -176,7 +185,7 @@ export const OnboardingPage: React.FC = () => {
         overflow: 'hidden'
       }}>
         {/* Steps header banner */}
-        <div style={{
+        <div className="onboard-steps" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
           borderBottom: '1px solid #1f2937',
@@ -262,14 +271,12 @@ export const OnboardingPage: React.FC = () => {
               </p>
 
               {/* Staff Input Area */}
-              <div style={{
+              <div className="grid-cols-2" style={{
                 backgroundColor: '#1f2937',
                 border: '1px solid #374151',
                 borderRadius: '8px',
                 padding: '1.25rem',
                 marginBottom: '1.5rem',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
                 gap: '12px'
               }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>

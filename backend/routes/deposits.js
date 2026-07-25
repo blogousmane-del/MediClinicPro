@@ -11,7 +11,7 @@ const ONLINE_METHODS = ['wave', 'orange_money', 'mtn_momo'];
 
 // GET /api/deposits
 // List deposits for the clinic, optionally scoped to one patient
-router.get('/', auth, async (req, res) => {
+router.get('/', auth, checkRole(DEPOSIT_ROLES), async (req, res) => {
   try {
     const { patientId } = req.query;
 
@@ -179,7 +179,7 @@ router.put('/:id', auth, checkRole(DEPOSIT_ROLES), async (req, res) => {
 
     const { data: deposit, error: checkError } = await supabase
       .from('deposits')
-      .select('id, status, amount, patient_id')
+      .select('id, status, payment_status, amount, patient_id')
       .eq('id', depositId)
       .eq('clinic_id', req.user.clinicId)
       .maybeSingle();
@@ -190,6 +190,9 @@ router.put('/:id', auth, checkRole(DEPOSIT_ROLES), async (req, res) => {
     }
     if (deposit.status !== 'held') {
       return res.status(400).json({ error: "Ce dépôt a déjà été résolu." });
+    }
+    if (deposit.payment_status !== 'paid') {
+      return res.status(400).json({ error: "Ce dépôt ne peut pas être résolu tant que le paiement n'est pas confirmé." });
     }
 
     const { error: updateError } = await supabase

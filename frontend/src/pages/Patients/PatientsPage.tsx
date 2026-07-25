@@ -338,12 +338,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
 
         {/* Form & Sidebar Grid */}
         <form onSubmit={handleCreatePatient}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1fr)',
-            gap: '1.5rem',
-            alignItems: 'start'
-          }}>
+          <div className="side-panel-grid">
             {/* LEFT FORM */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Identité */}
@@ -353,7 +348,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Identité</h3>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="grid-cols-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>PRÉNOM</label>
                     <input type="text" placeholder="ex. : Kouassi" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} required />
@@ -364,7 +359,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="grid-cols-2" style={{ gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>GENRE</label>
                     <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}>
@@ -387,7 +382,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Contact</h3>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="grid-cols-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>TÉLÉPHONE</label>
                     <PhoneInput value={phone} onChange={setPhone} required />

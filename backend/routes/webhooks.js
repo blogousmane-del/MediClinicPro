@@ -22,7 +22,7 @@ async function isDuplicateEvent(provider, rawBody) {
 // Our own checkout references are always "<type>-<id>", generated at
 // initiation time (sub-12, pay-45, dep-7) and echoed back by the provider.
 function amountMatches(provider, expected, reported) {
-  if (reported === undefined || reported === null) return true; // provider didn't echo amount — trust the signed webhook
+  if (reported === undefined || reported === null) return false; // no amount to verify against — fail closed, needs manual review
   const tolerance = provider === 'paytech' ? expected * 0.05 : 1; // PayTech absorbs ~3% fees; Bictorys settles exact
   return Math.abs(reported - expected) <= tolerance;
 }

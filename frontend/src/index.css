@@ -174,6 +174,50 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
+    padding-bottom: 64px; /* room for the fixed mobile quick-actions bar */
+  }
+}
+
+/* ===== Mobile quick-actions bar (Patient / Rendez-vous / Dépôt) ===== */
+.mobile-quick-actions {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-quick-actions {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+    padding: 6px max(6px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  }
+
+  .mobile-quick-actions-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 48px;
+    background: none;
+    border: none;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .mobile-quick-actions-btn:active {
+    background-color: var(--bg-tertiary);
+    color: var(--primary);
   }
 }
 
@@ -276,6 +320,47 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 640px) {
   .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr; }
+}
+
+/* ===== Reusable "main content + narrow side panel" split (form pages, detail pages) ===== */
+.side-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .side-panel-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Wider variant for dense two-column detail views (timeline + action widgets) */
+.detail-split-grid {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .detail-split-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Small 3-across grid for compact numeric inputs (vitals, etc.) */
+.compact-3-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+@media (max-width: 480px) {
+  .compact-3-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* Premium Buttons */
@@ -551,6 +636,7 @@ h1, h2, h3, h4, h5, h6 {
   z-index: 1000;
   animation: fadeIn 0.2s ease;
   padding: 1rem;
+  overflow-y: auto;
 }
 
 .modal-content {
@@ -559,6 +645,9 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 550px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow-lg);
   animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
@@ -570,6 +659,13 @@ h1, h2, h3, h4, h5, h6 {
   gap: 12px;
 }
 
+.rx-med-line-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr 0.8fr 30px;
+  gap: 8px;
+  align-items: center;
+}
+
 @media (max-width: 640px) {
   .modal-grid {
     grid-template-columns: 1fr;
@@ -578,9 +674,7 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0.5rem;
   }
   .modal-content {
-    max-height: 92vh;
-    display: flex;
-    flex-direction: column;
+    max-height: 95vh;
   }
   .modal-header, .modal-body, .modal-footer {
     padding: 1rem;
@@ -592,6 +686,17 @@ h1, h2, h3, h4, h5, h6 {
   .modal-footer .btn {
     width: 100%;
   }
+  .rx-med-line-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .rx-med-line-grid > div:nth-child(1) {
+    grid-column: 1 / -1;
+  }
+  .rx-med-line-grid > .rx-med-line-remove {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
 }
 
 .modal-header {
@@ -600,12 +705,14 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-body {
   padding: 1.5rem;
-  max-height: 80vh;
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .modal-footer {
@@ -615,6 +722,7 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: flex-end;
   gap: 0.75rem;
   background-color: var(--bg-tertiary);
+  flex-shrink: 0;
 }
 
 /* Keyframes */
@@ -1310,6 +1418,32 @@ h1, h2, h3, h4, h5, h6 {
 }
 .landing-highlight:hover svg {
   transform: scale(1.15);
+}
+
+/* Stats grid: divider lines between items (divide-x on desktop single row,
+   divide-x + divide-y on the 2x2 tablet grid, stacked top-dividers on narrow mobile) */
+.landing-stats-grid > .landing-highlight {
+  padding: 0.25rem 1rem;
+}
+@media (min-width: 901px) {
+  .landing-stats-grid > .landing-highlight:not(:first-child) {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+  }
+}
+@media (max-width: 900px) and (min-width: 501px) {
+  .landing-stats-grid > .landing-highlight:nth-child(even) {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .landing-stats-grid > .landing-highlight:nth-child(n+3) {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 1rem;
+  }
+}
+@media (max-width: 500px) {
+  .landing-stats-grid > .landing-highlight:not(:first-child) {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 1rem;
+  }
 }
 
 /* Payment provider badges: lift on hover */

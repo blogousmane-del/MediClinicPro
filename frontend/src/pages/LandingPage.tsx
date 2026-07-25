@@ -8,8 +8,8 @@ import {
   Receipt,
   BarChart3,
   ChevronRight,
+  ArrowRight,
   Check,
-  Plus,
   Menu,
   X,
   LayoutDashboard,
@@ -24,6 +24,15 @@ const marqueeModules = [
   { icon: FlaskConical, label: 'Laboratoire' },
   { icon: Pill, label: 'Pharmacie' },
   { icon: Receipt, label: 'Comptabilité' }
+];
+
+const featurePills = [
+  { icon: Calendar, label: 'Rendez-vous' },
+  { icon: Users, label: 'Dossiers patients' },
+  { icon: FlaskConical, label: 'Résultats labo' },
+  { icon: Pill, label: 'Pharmacie' },
+  { icon: Receipt, label: 'Facturation' },
+  { icon: BarChart3, label: 'Rapports BI' }
 ];
 
 interface LandingPageProps {
@@ -85,7 +94,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         <nav className="landing-nav-desktop" style={{ fontSize: '0.925rem', fontWeight: 600 }}>
           <a href="#features" className="landing-link" style={{ color: '#475569', textDecoration: 'none' }}>Fonctionnalités</a>
           <a href="#pricing" className="landing-link" style={{ color: '#475569', textDecoration: 'none' }}>Tarifs</a>
-          <a href="#about" className="landing-link" style={{ color: '#475569', textDecoration: 'none' }}>À propos</a>
         </nav>
 
         {/* Desktop Right Action Buttons */}
@@ -281,7 +289,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                   boxShadow: '0 6px 20px rgba(30, 77, 64, 0.25)'
                 }}
               >
-                <span>Découvrir nos offres</span>
+                <span>Commencer l'essai gratuit</span>
               </button>
 
               <a
@@ -527,35 +535,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               gap: '1rem',
               marginBottom: '2rem'
             }}>
-              <div className="landing-pill-hover" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                <Calendar size={18} color="#0d9488" />
-                <span>Rendez-vous</span>
-              </div>
-
-              <div className="landing-pill-hover" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                <Users size={18} color="#0d9488" />
-                <span>Dossiers patients</span>
-              </div>
-
-              <div className="landing-pill-hover" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                <FlaskConical size={18} color="#0d9488" />
-                <span>Résultats labo</span>
-              </div>
-
-              <div className="landing-pill-hover" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                <Pill size={18} color="#0d9488" />
-                <span>Pharmacie</span>
-              </div>
-
-              <div className="landing-pill-hover" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                <Receipt size={18} color="#0d9488" />
-                <span>Facturation</span>
-              </div>
-
-              <div className="landing-pill-hover" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                <BarChart3 size={18} color="#0d9488" />
-                <span>Rapports BI</span>
-              </div>
+              {featurePills.map((f, i) => {
+                const Icon = f.icon;
+                return (
+                  <div key={i} className="landing-pill-hover" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={15} color="#1e4d40" />
+                    </div>
+                    <span>{f.label}</span>
+                  </div>
+                );
+              })}
             </div>
 
             <button
@@ -576,7 +566,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               }}
             >
               <span>Toutes les fonctionnalités</span>
-              <Plus size={16} />
+              <ArrowRight size={16} />
             </button>
           </div>
         </div>
@@ -665,6 +655,67 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         </div>
       </section>
 
+      {/* 6b. Closing CTA Band */}
+      <section className="landing-reveal" style={{
+        backgroundColor: '#162a26',
+        padding: '4rem 1.5rem',
+        display: 'flex',
+        justifyContent: 'center',
+        textAlign: 'center'
+      }}>
+        <div style={{ maxWidth: '640px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#5eead4' }}>
+            COMMENCER
+          </span>
+          <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#ffffff', fontFamily: 'var(--font-secondary)', margin: 0, lineHeight: 1.25 }}>
+            Prêt à transformer votre clinique ?
+          </h2>
+          <p style={{ color: '#94a3b8', fontSize: '1rem', margin: 0 }}>
+            Simplifiez la gestion quotidienne de votre clinique avec une plateforme pensée pour Abidjan et la Côte d'Ivoire.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
+            <button
+              onClick={() => onNavigate('register')}
+              className="landing-btn-lift"
+              style={{
+                backgroundColor: '#1e4d40',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '14px 28px',
+                fontWeight: 700,
+                fontSize: '0.975rem',
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(30, 77, 64, 0.35)'
+              }}
+            >
+              Démarrer gratuitement
+            </button>
+
+            <a
+              href="#pricing"
+              className="landing-btn-lift"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: 'transparent',
+                color: '#ffffff',
+                border: '1px solid #334155',
+                borderRadius: '12px',
+                padding: '14px 24px',
+                fontWeight: 700,
+                fontSize: '0.975rem',
+                textDecoration: 'none'
+              }}
+            >
+              <span>Voir les tarifs</span>
+              <ArrowRight size={16} />
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* 7. Dark Footer */}
       <footer style={{
         backgroundColor: '#0f172a',
@@ -686,15 +737,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             <span style={{ fontWeight: 800, fontSize: '1.15rem', color: '#ffffff' }}>MediClinic</span>
           </div>
 
-          <span style={{ fontSize: '0.85rem' }}>
-            © 2026 MediClinic. Développé pour les cliniques et cabinets en Côte d'Ivoire.
-          </span>
-
           <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.85rem' }}>
             <a href="#features" className="landing-footer-link" style={{ color: '#94a3b8', textDecoration: 'none' }}>Fonctionnalités</a>
             <a href="#pricing" className="landing-footer-link" style={{ color: '#94a3b8', textDecoration: 'none' }}>Tarifs</a>
             <span onClick={() => onNavigate('terms')} className="landing-footer-link" style={{ color: '#94a3b8', cursor: 'pointer' }}>Conditions d'utilisation</span>
           </div>
+
+          <span style={{ fontSize: '0.85rem' }}>
+            © 2026 MediClinic. Développé pour les cliniques et cabinets en Côte d'Ivoire.
+          </span>
         </div>
       </footer>
 

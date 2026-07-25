@@ -90,6 +90,7 @@ export const PharmacyPage: React.FC = () => {
   const [batchNumber, setBatchNumber] = useState<string>('U3KFJT');
   const [supplier, setSupplier] = useState<string>('Pharmaliv');
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [editingCurrentStock, setEditingCurrentStock] = useState<number>(0);
 
   const fetchMedications = async () => {
     try {
@@ -113,7 +114,8 @@ export const PharmacyPage: React.FC = () => {
       setNameSelect(PHARMACY_MED_CATALOG.includes(medItem.name) ? medItem.name : 'Autre (Saisir manuellement)');
       setCustomName(PHARMACY_MED_CATALOG.includes(medItem.name) ? '' : medItem.name);
       setForm(medItem.form || 'Comprimé');
-      setQuantity(medItem.stock_quantity ? medItem.stock_quantity.toString() : '50');
+      setEditingCurrentStock(medItem.stock_quantity || 0);
+      setQuantity('');
       setPricePurchase(medItem.price_purchase ? medItem.price_purchase.toString() : '850');
       setPriceSale(medItem.price_sale ? medItem.price_sale.toString() : '1200');
       setExpiryDate(medItem.expiry || '2026-12-31');
@@ -121,6 +123,7 @@ export const PharmacyPage: React.FC = () => {
       setSupplier(medItem.supplier || 'Pharmaliv');
     } else {
       setEditingMedId(null);
+      setEditingCurrentStock(0);
       setNameSelect('Amoxicilline 500mg');
       setCustomName('');
       setForm('Comprimé');
@@ -137,6 +140,7 @@ export const PharmacyPage: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingMedId(null);
+    setEditingCurrentStock(0);
     setNameSelect('Amoxicilline 500mg');
     setCustomName('');
   };
@@ -769,11 +773,17 @@ export const PharmacyPage: React.FC = () => {
                 {/* QUANTITÉ REÇUE */}
                 <div className="form-group">
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                    Quantité reçue *
+                    {editingMedId ? 'Quantité reçue à ajouter *' : 'Quantité reçue *'}
                   </label>
+                  {editingMedId && (
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                      Stock actuel : {editingCurrentStock}. Entrez uniquement la quantité livrée à ajouter.
+                    </p>
+                  )}
                   <input
                     type="number"
-                    placeholder="Ex: 50"
+                    min="0"
+                    placeholder={editingMedId ? 'Ex: 20' : 'Ex: 50'}
                     value={quantity}
                     onChange={e => setQuantity(e.target.value)}
                     className="input-control"

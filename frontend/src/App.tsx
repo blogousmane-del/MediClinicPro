@@ -4,6 +4,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { OfflineProvider } from './contexts/OfflineContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
+import { MobileQuickActionsBar } from './components/MobileQuickActionsBar';
 import { initRippleEffect } from './utils/ripple';
 
 // Pages
@@ -92,6 +93,8 @@ const MainAppContent: React.FC = () => {
     } else if (action === 'new_appt') {
       setCurrentTab('appointments');
       setOpenApptModal(true);
+    } else if (action === 'new_deposit') {
+      setCurrentTab('deposits');
     }
   };
 
@@ -154,6 +157,9 @@ const MainAppContent: React.FC = () => {
         {currentTab === 'deposits' && <DepositsPage />}
         {currentTab === 'settings' && <SettingsPage />}
       </main>
+
+      {/* Mobile-only quick action bar (hidden on desktop) */}
+      <MobileQuickActionsBar onQuickAction={handleQuickAction} />
     </div>
   );
 };

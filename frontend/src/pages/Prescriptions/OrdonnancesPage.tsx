@@ -1011,7 +1011,7 @@ export const OrdonnancesPage: React.FC = () => {
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 
                 {/* Patient & Prescriber Doctor */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="modal-grid" style={{ gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
                       SÉLECTIONNER LE PATIENT *
@@ -1110,12 +1110,7 @@ export const OrdonnancesPage: React.FC = () => {
                             gap: '8px'
                           }}
                         >
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '2fr 1.2fr 1.2fr 1.2fr 0.8fr 30px',
-                            gap: '8px',
-                            alignItems: 'center'
-                          }}>
+                          <div className="rx-med-line-grid">
                             {/* NOM DÉROULANT OU AUTRE */}
                             <div>
                               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
@@ -1197,6 +1192,7 @@ export const OrdonnancesPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemoveMedicationLine(line.id)}
+                              className="rx-med-line-remove"
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
                               title="Supprimer la ligne"
                             >

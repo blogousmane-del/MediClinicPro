@@ -371,7 +371,7 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
       </div>
 
       {/* Split details layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '7fr 5fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="detail-split-grid">
         
         {/* LEFT COLUMN: Timeline */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -620,7 +620,7 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
                               <Trash2 size={14} />
                             </button>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+                          <div className="compact-3-grid">
                             <input
                               type="text"
                               placeholder="Posol. (ex: 1compr)"
