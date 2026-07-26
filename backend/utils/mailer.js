@@ -126,6 +126,172 @@ const sendConfirmationEmail = async (toEmail, adminName, clinicName) => {
   }
 };
 
+const buildRenewalReminderEmail = (adminName, clinicName, daysLeft, planName, price) => {
+  const isFree = price === 0;
+  const actionText = isFree
+    ? `votre période d'essai gratuite du plan ${planName} se termine dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`
+    : `votre abonnement au plan ${planName} (${price.toLocaleString()} FCFA/mois) expire dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`;
+
+  const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1a202c;">
+      <div style="text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 20px; margin-bottom: 20px;">
+        <h1 style="color: #0d9488; margin: 0; font-size: 24px;">Rappel d'abonnement MediClinic</h1>
+      </div>
+
+      <div style="line-height: 1.6; font-size: 16px;">
+        <p>Bonjour <strong>${adminName}</strong>,</p>
+
+        <p>Pour l'établissement <strong>"${clinicName}"</strong>, ${actionText}.</p>
+
+        <p>Passé ce délai, l'écriture de nouvelles données (patients, rendez-vous, ordonnances...) sera automatiquement bloquée jusqu'au renouvellement.</p>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${APP_URL}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Renouveler mon abonnement</a>
+        </div>
+
+        <p style="margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; font-size: 12px; color: #a0aec0; text-align: center;">
+          Cet email est généré automatiquement, merci de ne pas y répondre directement.
+        </p>
+      </div>
+    </div>
+  `;
+
+  const text = `Bonjour ${adminName},\n\nPour l'établissement "${clinicName}", ${actionText}.\n\nPassé ce délai, l'écriture de nouvelles données sera automatiquement bloquée jusqu'au renouvellement.\n\nRenouvelez depuis : ${APP_URL}\n\nCordialement,\nL'équipe MediClinic Pro`;
+
+  return { html, text };
+};
+
+/**
+ * Sends a renewal reminder to a clinic admin ahead of subscription/trial expiry.
+ * Same three-tier fallback as sendConfirmationEmail (Resend → SMTP → console).
+ *
+ * @param {string} toEmail
+ * @param {string} adminName
+ * @param {string} clinicName
+ * @param {number} daysLeft
+ * @param {string} planName
+ * @param {number} price
+ */
+const sendRenewalReminderEmail = async (toEmail, adminName, clinicName, daysLeft, planName, price) => {
+  const subject = `MediClinic Pro — Votre abonnement expire dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`;
+  const { html, text } = buildRenewalReminderEmail(adminName, clinicName, daysLeft, planName, price);
+
+  const resendApiKey = process.env.RESEND_API_KEY || '';
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'MediClinic Pro <no-reply@mediclinicpro.com>';
+
+  if (resendApiKey) {
+    const resend = new Resend(resendApiKey);
+    const { data, error } = await resend.emails.send({ from: resendFrom, to: toEmail, subject, html, text });
+    if (error) {
+      console.error(`[Email] Erreur Resend (rappel abonnement) à ${toEmail}:`, error);
+      throw error;
+    }
+    console.log(`[Email] Rappel d'abonnement envoyé via Resend à ${toEmail} (ID: ${data?.id})`);
+    return { success: true, messageId: data?.id };
+  }
+
+  const host = process.env.SMTP_HOST || '';
+  const port = process.env.SMTP_PORT || 587;
+  const user = process.env.SMTP_USER || '';
+  const pass = process.env.SMTP_PASS || '';
+  const from = process.env.SMTP_FROM || '"MediClinic Pro" <no-reply@mediclinicpro.com>';
+
+  if (host && user && pass) {
+    const transporter = nodemailer.createTransport({
+      host,
+      port: parseInt(port),
+      secure: parseInt(port) === 465,
+      auth: { user, pass }
+    });
+    const info = await transporter.sendMail({ from, to: toEmail, subject, html, text });
+    console.log(`[Email] Rappel d'abonnement envoyé à ${toEmail} (MessageID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  }
+
+  console.log(`⚠️ Aucune configuration d'envoi d'email trouvée — rappel d'abonnement simulé pour ${toEmail} (${daysLeft}j restants).`);
+  return { simulated: true };
+};
+
+const TICKET_STATUS_LABELS_FR = { open: 'Ouvert', in_progress: 'En cours', resolved: 'Résolu', closed: 'Fermé' };
+
+const buildTicketStatusEmail = (adminName, clinicName, subject, status, resolutionNote) => {
+  const statusLabel = TICKET_STATUS_LABELS_FR[status] || status;
+  const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1a202c;">
+      <div style="text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 20px; margin-bottom: 20px;">
+        <h1 style="color: #0d9488; margin: 0; font-size: 24px;">Mise à jour de votre ticket support</h1>
+      </div>
+      <div style="line-height: 1.6; font-size: 16px;">
+        <p>Bonjour <strong>${adminName}</strong>,</p>
+        <p>Votre ticket <strong>"${subject}"</strong> pour l'établissement <strong>"${clinicName}"</strong> est maintenant : <strong>${statusLabel}</strong>.</p>
+        ${resolutionNote ? `<div style="background-color: #f7fafc; border-left: 4px solid #0d9488; padding: 15px; border-radius: 6px; margin: 20px 0;"><p style="margin:0;">${resolutionNote}</p></div>` : ''}
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${APP_URL}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir mes tickets</a>
+        </div>
+        <p style="margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; font-size: 12px; color: #a0aec0; text-align: center;">
+          Cet email est généré automatiquement, merci de ne pas y répondre directement.
+        </p>
+      </div>
+    </div>
+  `;
+  const text = `Bonjour ${adminName},\n\nVotre ticket "${subject}" pour l'établissement "${clinicName}" est maintenant : ${statusLabel}.\n${resolutionNote ? `\nNote : ${resolutionNote}\n` : ''}\nVoir vos tickets : ${APP_URL}\n\nCordialement,\nL'équipe MediClinic Pro`;
+  return { html, text };
+};
+
+/**
+ * Emails a clinic admin when their support ticket's status changes.
+ * Same three-tier fallback as sendConfirmationEmail/sendRenewalReminderEmail
+ * (Resend → SMTP → console).
+ *
+ * @param {string} toEmail
+ * @param {string} adminName
+ * @param {string} clinicName
+ * @param {string} subject
+ * @param {string} status
+ * @param {string} [resolutionNote]
+ */
+const sendTicketStatusEmail = async (toEmail, adminName, clinicName, subject, status, resolutionNote) => {
+  const emailSubject = `MediClinic Pro — Mise à jour de votre ticket : ${TICKET_STATUS_LABELS_FR[status] || status}`;
+  const { html, text } = buildTicketStatusEmail(adminName, clinicName, subject, status, resolutionNote);
+
+  const resendApiKey = process.env.RESEND_API_KEY || '';
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'MediClinic Pro <no-reply@mediclinicpro.com>';
+
+  if (resendApiKey) {
+    const resend = new Resend(resendApiKey);
+    const { data, error } = await resend.emails.send({ from: resendFrom, to: toEmail, subject: emailSubject, html, text });
+    if (error) {
+      console.error(`[Email] Erreur Resend (ticket) à ${toEmail}:`, error);
+      throw error;
+    }
+    console.log(`[Email] Mise à jour de ticket envoyée via Resend à ${toEmail} (ID: ${data?.id})`);
+    return { success: true, messageId: data?.id };
+  }
+
+  const host = process.env.SMTP_HOST || '';
+  const port = process.env.SMTP_PORT || 587;
+  const user = process.env.SMTP_USER || '';
+  const pass = process.env.SMTP_PASS || '';
+  const from = process.env.SMTP_FROM || '"MediClinic Pro" <no-reply@mediclinicpro.com>';
+
+  if (host && user && pass) {
+    const transporter = nodemailer.createTransport({
+      host,
+      port: parseInt(port),
+      secure: parseInt(port) === 465,
+      auth: { user, pass }
+    });
+    const info = await transporter.sendMail({ from, to: toEmail, subject: emailSubject, html, text });
+    console.log(`[Email] Mise à jour de ticket envoyée à ${toEmail} (MessageID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  }
+
+  console.log(`⚠️ Aucune configuration d'envoi d'email trouvée — mise à jour de ticket simulée pour ${toEmail} (statut: ${status}).`);
+  return { simulated: true };
+};
+
 module.exports = {
-  sendConfirmationEmail
+  sendConfirmationEmail,
+  sendRenewalReminderEmail,
+  sendTicketStatusEmail
 };
