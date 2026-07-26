@@ -18,7 +18,7 @@ router.get('/overview', async (req, res) => {
   try {
     const { data: clinics, error: clinicsError } = await supabase
       .from('clinics')
-      .select('id, name, address, subscription_status, subscription_expires_at, created_at')
+      .select('id, name, address, subscription_status, subscription_expires_at, created_at, plan')
       .order('created_at', { ascending: false });
     if (clinicsError) throw clinicsError;
 
@@ -72,6 +72,7 @@ router.get('/overview', async (req, res) => {
         id: c.id,
         name: c.name,
         address: c.address,
+        plan: c.plan || 'hopital',
         status: isExpired ? 'expired' : 'active',
         subscriptionExpiresAt: c.subscription_expires_at,
         createdAt: c.created_at,

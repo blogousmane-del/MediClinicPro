@@ -23,6 +23,7 @@ interface ClinicOverview {
   id: number;
   name: string;
   address: string | null;
+  plan: 'starter' | 'clinique' | 'hopital';
   status: 'active' | 'expired';
   subscriptionExpiresAt: string | null;
   createdAt: string;
@@ -481,6 +482,9 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
   );
 };
 
+const planLabels: Record<string, string> = { starter: 'Starter', clinique: 'Clinique', hopital: 'Hôpital' };
+const planBadges: Record<string, string> = { starter: 'badge-info', clinique: 'badge-warning', hopital: 'badge-success' };
+
 const ClinicsTable: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
   <div className="table-container">
     <table style={{ width: '100%' }}>
@@ -502,8 +506,7 @@ const ClinicsTable: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
               {c.address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.address}</div>}
             </td>
             <td>
-              {/* Single real plan today — no multi-tier system exists yet */}
-              <span className="badge badge-info">Standard</span>
+              <span className={`badge ${planBadges[c.plan] || 'badge-info'}`}>{planLabels[c.plan] || c.plan}</span>
             </td>
             <td style={{ textAlign: 'center' }}>{c.practitioners}</td>
             <td style={{ textAlign: 'center' }}>{c.patients}</td>
