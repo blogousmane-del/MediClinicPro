@@ -517,27 +517,30 @@ router.put('/tickets/:id', async (req, res) => {
 
     res.json({ success: true, message: "Ticket mis à jour avec succès." });
 
+    // Fire-and-forget — the whole block is wrapped in one try/catch (not just
+    // the email send) so a Supabase lookup failure here can never surface as
+    // an unhandled promise rejection after the response has already gone out.
     (async () => {
-      const { data: admin } = await supabase
-        .from('users')
-        .select('name, email')
-        .eq('clinic_id', ticket.clinic_id)
-        .eq('role', 'admin')
-        .eq('active', 1)
-        .limit(1)
-        .maybeSingle();
-      if (!admin) return;
-
-      const { data: clinic } = await supabase
-        .from('clinics')
-        .select('name')
-        .eq('id', ticket.clinic_id)
-        .maybeSingle();
-
       try {
+        const { data: admin } = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('clinic_id', ticket.clinic_id)
+          .eq('role', 'admin')
+          .eq('active', 1)
+          .limit(1)
+          .maybeSingle();
+        if (!admin) return;
+
+        const { data: clinic } = await supabase
+          .from('clinics')
+          .select('name')
+          .eq('id', ticket.clinic_id)
+          .maybeSingle();
+
         await sendTicketStatusEmail(admin.email, admin.name, clinic?.name || '', ticket.subject, status, resolutionNote);
-      } catch (emailError) {
-        console.error(`[TICKETS] Échec envoi email de mise à jour pour le ticket #${ticket.id}:`, emailError);
+      } catch (backgroundError) {
+        console.error(`[TICKETS] Échec de la notification par email pour le ticket #${ticket.id}:`, backgroundError);
       }
     })();
   } catch (error) {
@@ -641,6 +644,28 @@ Add this function right after `fetchStaffUsers`:
       setLoading(false);
     }
   };
+```
+
+Find the existing `roleLabels` constant (declared inside the component, used by the "Gestion des Utilisateurs" tab):
+
+```tsx
+  const roleLabels: Record<string, string> = {
+    admin: 'Administrateur',
+    doctor: 'Médecin',
+    secretary: 'Secrétaire',
+    pharmacist: 'Pharmacien',
+    lab_tech: 'Laborantin',
+    manager: 'Gestionnaire',
+    nurse: 'Infirmier(ère)'
+  };
+```
+
+Add these three lookup maps right after it — declared once here rather than as inline object literals in the JSX below, matching this file's own `roleLabels` convention:
+
+```tsx
+  const ticketCategoryLabels: Record<string, string> = { facturation: 'Facturation', bug: 'Bug technique', general: 'Question générale', autre: 'Autre' };
+  const ticketStatusLabels: Record<string, string> = { open: 'Ouvert', in_progress: 'En cours', resolved: 'Résolu', closed: 'Fermé' };
+  const ticketStatusBadges: Record<string, string> = { open: 'badge-warning', in_progress: 'badge-info', resolved: 'badge-success', closed: 'badge-danger' };
 ```
 
 Update the tab-switch `useEffect` from:
@@ -805,10 +830,10 @@ Insert a new tab block right before `{/* CREATE STAFF USER MODAL */}`:
                           </div>
                         )}
                       </td>
-                      <td>{{ facturation: 'Facturation', bug: 'Bug technique', general: 'Question générale', autre: 'Autre' }[t.category] || t.category}</td>
+                      <td>{ticketCategoryLabels[t.category] || t.category}</td>
                       <td>
-                        <span className={`badge ${{ open: 'badge-warning', in_progress: 'badge-info', resolved: 'badge-success', closed: 'badge-danger' }[t.status] || 'badge-info'}`}>
-                          {{ open: 'Ouvert', in_progress: 'En cours', resolved: 'Résolu', closed: 'Fermé' }[t.status] || t.status}
+                        <span className={`badge ${ticketStatusBadges[t.status] || 'badge-info'}`}>
+                          {ticketStatusLabels[t.status] || t.status}
                         </span>
                       </td>
                       <td>{new Date(t.created_at).toLocaleDateString('fr-FR')}</td>
@@ -1159,9 +1184,9 @@ Replace it with:
 Add this component at the end of the file, right after the existing `SubscriptionsSection` component (before the file ends):
 
 ```tsx
-const TICKET_STATUS_LABELS: Record<string, string> = { open: 'Ouvert', in_progress: 'En cours', resolved: 'Résolu', closed: 'Fermé' };
-const TICKET_STATUS_BADGES: Record<string, string> = { open: 'badge-warning', in_progress: 'badge-info', resolved: 'badge-success', closed: 'badge-danger' };
-const TICKET_CATEGORY_LABELS: Record<string, string> = { facturation: 'Facturation', bug: 'Bug technique', general: 'Question générale', autre: 'Autre' };
+const ticketStatusLabels: Record<string, string> = { open: 'Ouvert', in_progress: 'En cours', resolved: 'Résolu', closed: 'Fermé' };
+const ticketStatusBadges: Record<string, string> = { open: 'badge-warning', in_progress: 'badge-info', resolved: 'badge-success', closed: 'badge-danger' };
+const ticketCategoryLabels: Record<string, string> = { facturation: 'Facturation', bug: 'Bug technique', general: 'Question générale', autre: 'Autre' };
 
 const TicketsSection: React.FC<{
   tickets: SupportTicket[] | null;
@@ -1219,13 +1244,16 @@ const TicketsSection: React.FC<{
               </tr>
             </thead>
             <tbody>
+              {/* key includes status, not just id: the status <select> below is
+                  an uncontrolled input (defaultValue), so changing status must
+                  force a remount to show the right value after a refetch */}
               {tickets.map(t => (
-                <React.Fragment key={t.id}>
+                <React.Fragment key={`${t.id}-${t.status}`}>
                   <tr>
                     <td><strong>{t.subject}</strong></td>
                     <td>{t.clinicName}</td>
-                    <td>{TICKET_CATEGORY_LABELS[t.category] || t.category}</td>
-                    <td><span className={`badge ${TICKET_STATUS_BADGES[t.status] || 'badge-info'}`}>{TICKET_STATUS_LABELS[t.status] || t.status}</span></td>
+                    <td>{ticketCategoryLabels[t.category] || t.category}</td>
+                    <td><span className={`badge ${ticketStatusBadges[t.status] || 'badge-info'}`}>{ticketStatusLabels[t.status] || t.status}</span></td>
                     <td>{formatDate(t.createdAt)}</td>
                     <td style={{ textAlign: 'right' }}>
                       <button
