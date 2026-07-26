@@ -1,8 +1,8 @@
 -- DDL Schema for MediClinicPro Supabase Migration (PostgreSQL)
 
 -- Drop tables if exist (for clean initialization)
-DROP TABLE IF EXISTS support_tickets CASCADE;
 DROP TABLE IF EXISTS payment_webhook_events CASCADE;
+DROP TABLE IF EXISTS support_tickets CASCADE;
 DROP TABLE IF EXISTS subscription_payments CASCADE;
 DROP TABLE IF EXISTS deposits CASCADE;
 DROP TABLE IF EXISTS activity_logs CASCADE;
