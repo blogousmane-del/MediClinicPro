@@ -5,7 +5,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'doctor' | 'secretary' | 'pharmacist' | 'lab_tech' | 'manager';
+  role: 'admin' | 'doctor' | 'secretary' | 'pharmacist' | 'lab_tech' | 'manager' | 'nurse';
   passwordSet?: boolean;
   availabilityStatus?: 'available' | 'busy' | 'away';
 }
@@ -18,6 +18,7 @@ export interface Clinic {
   logo: string;
   subscription_status: 'active' | 'expired' | 'trial';
   subscription_expires_at: string;
+  plan?: 'starter' | 'clinique' | 'hopital';
   settings?: any;
 }
 
@@ -31,8 +32,9 @@ interface AuthContextType {
   register: (clinicName: string, adminName: string, email: string, password: string, phone: string) => Promise<void>;
   logout: () => void;
   onboardClinic: (address: string, phone: string, staff: any[], modules: string[]) => Promise<void>;
-  renewSubscription: (phone: string | undefined, months: number) => Promise<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string }>;
+  renewSubscription: (phone: string | undefined, months: number, planId?: 'clinique' | 'hopital') => Promise<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string }>;
   pollSubscriptionStatus: (subscriptionPaymentId: number) => Promise<{ status: 'pending' | 'paid' | 'failed'; clinic?: Clinic }>;
+  activateFreePlan: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   setPassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
@@ -142,16 +144,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const renewSubscription = async (phone: string | undefined, months: number) => {
+  const renewSubscription = async (phone: string | undefined, months: number, planId?: 'clinique' | 'hopital') => {
     const data = await api.post('/financials/subscription/checkout', {
       phoneNumber: phone,
-      months
+      months,
+      planId
     });
     return {
       checkoutUrl: data.checkoutUrl,
       subscriptionPaymentId: data.subscriptionPaymentId,
       provider: data.provider
     };
+  };
+
+  const activateFreePlan = async () => {
+    await api.put('/settings/plan', { planId: 'starter' });
+    await refreshProfile();
   };
 
   const pollSubscriptionStatus = async (subscriptionPaymentId: number) => {
@@ -176,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         onboardClinic,
         renewSubscription,
         pollSubscriptionStatus,
+        activateFreePlan,
         refreshProfile,
         setPassword
       }}

@@ -75,6 +75,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
     }
   };
 
+  const googleInitialized = useRef(false);
+
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || isForgotView) return;
 
@@ -82,10 +84,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
     const tryRender = () => {
       attempts += 1;
       if (window.google?.accounts?.id && googleButtonRef.current) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleCredential
-        });
+        if (!googleInitialized.current) {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleGoogleCredential
+          });
+          googleInitialized.current = true;
+        }
         googleButtonRef.current.innerHTML = '';
         window.google.accounts.id.renderButton(googleButtonRef.current, {
           theme: 'outline',

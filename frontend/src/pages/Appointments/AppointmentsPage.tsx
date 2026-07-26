@@ -363,7 +363,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
         {['admin', 'secretary'].includes(user?.role || '') && (
           <button
             onClick={() => setIsModalOpen(true)}
-            className="btn btn-primary"
+            className="btn btn-primary page-cta-btn"
             style={{ gap: '6px', flexShrink: 0 }}
           >
             <Plus size={18} />

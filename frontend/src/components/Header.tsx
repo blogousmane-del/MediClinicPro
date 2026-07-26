@@ -155,8 +155,8 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
           </div>
         )}
 
-        {/* Doctor Availability Status */}
-        {user?.role === 'doctor' && (
+        {/* Doctor/Nurse Availability Status */}
+        {(user?.role === 'doctor' || user?.role === 'nurse') && (
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setAvailabilityMenuOpen(o => !o)}

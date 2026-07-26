@@ -39,7 +39,7 @@ router.get('/medications', auth, async (req, res) => {
 // Record a stock entry (replenish medication)
 router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), async (req, res) => {
   try {
-    const { name, form, dosage, qty, pricePurchase, priceSale, expiryDate, batchNumber, supplier } = req.body;
+    const { name, form, dosage, manufacturer, unit, minStockThreshold, qty, pricePurchase, priceSale, expiryDate, batchNumber, supplier } = req.body;
 
     if (!name || !form || !dosage || !qty || !pricePurchase || !priceSale) {
       return res.status(400).json({ error: "Les informations de réapprovisionnement principales sont obligatoires." });
@@ -67,6 +67,9 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
           stock_quantity: med.stock_quantity + qty,
           price_purchase: pricePurchase,
           price_sale: priceSale,
+          manufacturer: manufacturer || med.manufacturer,
+          unit: unit || med.unit,
+          min_stock_threshold: minStockThreshold != null ? minStockThreshold : med.min_stock_threshold,
           expiry_date: expiryDate || med.expiry_date,
           batch_number: batchNumber || med.batch_number,
           supplier: supplier || med.supplier
@@ -84,8 +87,10 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
           name,
           form,
           dosage,
+          manufacturer: manufacturer || '',
+          unit: unit || '',
           stock_quantity: qty,
-          min_stock_threshold: 10,
+          min_stock_threshold: minStockThreshold != null ? minStockThreshold : 10,
           price_purchase: pricePurchase,
           price_sale: priceSale,
           expiry_date: expiryDate || '',

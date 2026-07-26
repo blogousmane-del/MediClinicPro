@@ -499,15 +499,7 @@ export const OrdonnancesPage: React.FC = () => {
   const countPartielles = itemsToRender.filter(p => p.status === 'partielle').length || 1;
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.5rem',
-      padding: '1.5rem 2rem',
-      backgroundColor: 'var(--bg-primary)',
-      minHeight: 'calc(100vh - var(--header-height))',
-      boxSizing: 'border-box'
-    }}>
+    <div className="app-page">
       
       {/* 1. Header Breadcrumb matching Image 1 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -520,8 +512,8 @@ export const OrdonnancesPage: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ position: 'relative', width: '280px' }}>
+        <div className="page-header-actions">
+          <div className="page-search-box">
             <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
@@ -585,6 +577,7 @@ export const OrdonnancesPage: React.FC = () => {
 
         <button
           onClick={handleOpenNewModal}
+          className="page-cta-btn"
           style={{
             display: 'flex',
             alignItems: 'center',

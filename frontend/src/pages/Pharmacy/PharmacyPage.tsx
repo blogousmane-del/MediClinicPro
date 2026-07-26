@@ -59,6 +59,8 @@ interface Medication {
   name: string;
   form: string;
   dosage: string;
+  manufacturer: string;
+  unit: string;
   stock_quantity: number;
   min_stock_threshold: number;
   price_purchase: number;
@@ -67,6 +69,31 @@ interface Medication {
   batch_number: string;
   supplier: string;
 }
+
+// Catalog entries are "<name> <dosage>" (e.g. "Amoxicilline 500mg"); the DB
+// stores name/dosage separately, so split on the trailing dosage token.
+const parseNameAndDosage = (fullName: string): { name: string; dosage: string } => {
+  const match = fullName.match(/^(.*?)\s+([\d.,/]+\s?(?:mg|g|ml|mcg|µg|UI|%))$/i);
+  if (match) {
+    return { name: match[1].trim(), dosage: match[2].trim() };
+  }
+  return { name: fullName.trim(), dosage: '' };
+};
+
+const FormSectionHeader: React.FC<{ title: string; first?: boolean }> = ({ title, first }) => (
+  <div
+    style={{
+      gridColumn: '1 / -1',
+      marginTop: first ? 0 : '0.5rem',
+      paddingTop: first ? 0 : '0.75rem',
+      borderTop: first ? 'none' : '1px solid var(--border)'
+    }}
+  >
+    <h4 style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+      {title}
+    </h4>
+  </div>
+);
 
 export const PharmacyPage: React.FC = () => {
   const { user } = useAuth();
@@ -82,8 +109,12 @@ export const PharmacyPage: React.FC = () => {
   const [editingMedId, setEditingMedId] = useState<number | null>(null);
   const [nameSelect, setNameSelect] = useState<string>('Amoxicilline 500mg');
   const [customName, setCustomName] = useState<string>('');
+  const [dosage, setDosage] = useState<string>('500mg');
   const [form, setForm] = useState<string>('Comprimé');
+  const [manufacturer, setManufacturer] = useState<string>('');
+  const [unit, setUnit] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('50');
+  const [minStockThreshold, setMinStockThreshold] = useState<string>('10');
   const [pricePurchase, setPricePurchase] = useState<string>('850');
   const [priceSale, setPriceSale] = useState<string>('1200');
   const [expiryDate, setExpiryDate] = useState<string>('2026-12-31');
@@ -91,6 +122,13 @@ export const PharmacyPage: React.FC = () => {
   const [supplier, setSupplier] = useState<string>('Pharmaliv');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [editingCurrentStock, setEditingCurrentStock] = useState<number>(0);
+
+  const marginPct = (() => {
+    const purchase = parseFloat(pricePurchase);
+    const sale = parseFloat(priceSale);
+    if (!sale || Number.isNaN(purchase) || Number.isNaN(sale)) return null;
+    return Math.round(((sale - purchase) / sale) * 100);
+  })();
 
   const fetchMedications = async () => {
     try {
@@ -113,9 +151,13 @@ export const PharmacyPage: React.FC = () => {
       setEditingMedId(medItem.id);
       setNameSelect(PHARMACY_MED_CATALOG.includes(medItem.name) ? medItem.name : 'Autre (Saisir manuellement)');
       setCustomName(PHARMACY_MED_CATALOG.includes(medItem.name) ? '' : medItem.name);
+      setDosage(medItem.dosage || '');
       setForm(medItem.form || 'Comprimé');
+      setManufacturer(medItem.manufacturer || '');
+      setUnit(medItem.unit || '');
       setEditingCurrentStock(medItem.stock_quantity || 0);
       setQuantity('');
+      setMinStockThreshold(medItem.min_stock_threshold != null ? medItem.min_stock_threshold.toString() : '10');
       setPricePurchase(medItem.price_purchase ? medItem.price_purchase.toString() : '850');
       setPriceSale(medItem.price_sale ? medItem.price_sale.toString() : '1200');
       setExpiryDate(medItem.expiry || '2026-12-31');
@@ -126,8 +168,12 @@ export const PharmacyPage: React.FC = () => {
       setEditingCurrentStock(0);
       setNameSelect('Amoxicilline 500mg');
       setCustomName('');
+      setDosage(parseNameAndDosage('Amoxicilline 500mg').dosage);
       setForm('Comprimé');
+      setManufacturer('');
+      setUnit('');
       setQuantity('50');
+      setMinStockThreshold('10');
       setPricePurchase('850');
       setPriceSale('1200');
       setExpiryDate('2026-12-31');
@@ -148,6 +194,7 @@ export const PharmacyPage: React.FC = () => {
   const handleReplenishSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalMedName = nameSelect === 'Autre (Saisir manuellement)' ? (customName || 'Médicament Spécial') : nameSelect;
+    const finalDosage = dosage || parseNameAndDosage(finalMedName).dosage;
 
     if (!finalMedName || !quantity || !pricePurchase || !priceSale) {
       showToast('error', 'Champs obligatoires', 'Veuillez remplir le nom, la quantité et les prix.');
@@ -159,8 +206,11 @@ export const PharmacyPage: React.FC = () => {
       const payload = {
         name: finalMedName,
         form,
-        dosage: '500mg',
+        dosage: finalDosage,
+        manufacturer,
+        unit,
         qty: parseInt(quantity),
+        minStockThreshold: minStockThreshold ? parseInt(minStockThreshold) : 10,
         pricePurchase: parseFloat(pricePurchase),
         priceSale: parseFloat(priceSale),
         expiryDate: expiryDate || '2026-12-31',
@@ -228,15 +278,7 @@ export const PharmacyPage: React.FC = () => {
     : 0;
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.5rem',
-      padding: '1.5rem 2rem',
-      backgroundColor: 'var(--bg-primary)',
-      minHeight: 'calc(100vh - var(--header-height))',
-      boxSizing: 'border-box'
-    }}>
+    <div className="app-page">
       
       {/* 1. Header Breadcrumb matching Image 2 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -249,8 +291,8 @@ export const PharmacyPage: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ position: 'relative', width: '280px' }}>
+        <div className="page-header-actions">
+          <div className="page-search-box">
             <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
@@ -315,6 +357,7 @@ export const PharmacyPage: React.FC = () => {
         {['admin', 'pharmacist', 'manager'].includes(user?.role || '') && (
           <button
             onClick={() => handleOpenAddModal()}
+            className="page-cta-btn"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -720,6 +763,8 @@ export const PharmacyPage: React.FC = () => {
             <form onSubmit={handleReplenishSubmit}>
               <div className="modal-body modal-grid">
                 
+                <FormSectionHeader title="Informations générales" first />
+
                 {/* NOM DU MÉDICAMENT DÉROULANT OU AUTRE */}
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
@@ -727,7 +772,10 @@ export const PharmacyPage: React.FC = () => {
                   </label>
                   <select
                     value={nameSelect}
-                    onChange={e => setNameSelect(e.target.value)}
+                    onChange={e => {
+                      setNameSelect(e.target.value);
+                      setDosage(parseNameAndDosage(e.target.value).dosage);
+                    }}
                     className="input-control"
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', marginTop: '4px' }}
                     required
@@ -753,6 +801,23 @@ export const PharmacyPage: React.FC = () => {
                   )}
                 </div>
 
+                {/* FABRICANT */}
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    Fabricant
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Pharmaliv"
+                    value={manufacturer}
+                    onChange={e => setManufacturer(e.target.value)}
+                    className="input-control"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', marginTop: '4px' }}
+                  />
+                </div>
+
+                <FormSectionHeader title="Dosage et forme" />
+
                 {/* FORME GALÉNIQUE DÉROULANTE */}
                 <div className="form-group">
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
@@ -769,6 +834,23 @@ export const PharmacyPage: React.FC = () => {
                     ))}
                   </select>
                 </div>
+
+                {/* DOSAGE */}
+                <div className="form-group">
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    Dosage
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 500mg"
+                    value={dosage}
+                    onChange={e => setDosage(e.target.value)}
+                    className="input-control"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', marginTop: '4px' }}
+                  />
+                </div>
+
+                <FormSectionHeader title="Stock initial" />
 
                 {/* QUANTITÉ REÇUE */}
                 <div className="form-group">
@@ -791,6 +873,23 @@ export const PharmacyPage: React.FC = () => {
                     required
                   />
                 </div>
+
+                {/* UNITÉ */}
+                <div className="form-group">
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    Unité
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Boîte de 10"
+                    value={unit}
+                    onChange={e => setUnit(e.target.value)}
+                    className="input-control"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', marginTop: '4px' }}
+                  />
+                </div>
+
+                <FormSectionHeader title="Tarification" />
 
                 {/* PRIX ACHAT */}
                 <div className="form-group">
@@ -824,16 +923,44 @@ export const PharmacyPage: React.FC = () => {
                   />
                 </div>
 
-                {/* N° LOT */}
+                {/* MARGE (CALCULÉE, LECTURE SEULE) */}
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    Marge
+                  </label>
+                  <div
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      marginTop: '4px',
+                      backgroundColor: 'var(--bg-secondary, #f0f4f2)',
+                      border: '1px solid var(--border)',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)'
+                    }}
+                  >
+                    {marginPct !== null ? `${marginPct}%` : '—'}
+                    <span style={{ fontWeight: 400, fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                      (Prix vente - Prix achat) / Prix vente × 100
+                    </span>
+                  </div>
+                </div>
+
+                <FormSectionHeader title="Seuils d'alerte" />
+
+                {/* STOCK MINIMUM D'ALERTE */}
                 <div className="form-group">
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                    Numéro de lot / Réf.
+                    Stock minimum d'alerte
                   </label>
                   <input
-                    type="text"
-                    placeholder="Ex: U3KFJT"
-                    value={batchNumber}
-                    onChange={e => setBatchNumber(e.target.value)}
+                    type="number"
+                    min="0"
+                    placeholder="Ex: 20"
+                    value={minStockThreshold}
+                    onChange={e => setMinStockThreshold(e.target.value)}
                     className="input-control"
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', marginTop: '4px' }}
                   />
@@ -853,8 +980,25 @@ export const PharmacyPage: React.FC = () => {
                   />
                 </div>
 
+                <FormSectionHeader title="Autres informations" />
+
+                {/* N° LOT */}
+                <div className="form-group">
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    Numéro de lot / Réf.
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: U3KFJT"
+                    value={batchNumber}
+                    onChange={e => setBatchNumber(e.target.value)}
+                    className="input-control"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', marginTop: '4px' }}
+                  />
+                </div>
+
                 {/* FOURNISSEUR */}
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <div className="form-group">
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
                     Fournisseur
                   </label>

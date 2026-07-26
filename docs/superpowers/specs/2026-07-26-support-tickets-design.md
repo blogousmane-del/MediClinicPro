@@ -59,7 +59,7 @@ This is a **new table**, so — same schema-drift constraint as every other chan
 
 ## Error handling
 
-- `POST /settings/tickets`: 400 if subject/category/message missing, or category not in the allowed set.
+- `POST /settings/tickets`: 400 if subject/message missing. An unrecognized `category` does **not** 400 — it silently falls back to `'general'` (deviation from this doc's original plan, kept intentionally: a stray/legacy category value shouldn't block someone from filing a ticket).
 - `PUT /platform/tickets/:id`: 400 if status not in the allowed set; 404 if ticket doesn't exist. Email failure does not fail the request (logged, same as other non-blocking email sends in this app).
 - No new payment/webhook surface, no new schema-drift risk beyond the one new table (which is a lower risk than an `ALTER TABLE` on an existing populated table, since it starts empty).
 

@@ -4,11 +4,11 @@ const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { initiateCheckoutWithFailover } = require('../services/payments');
+const { getPlan, isPaymentMethodAllowed } = require('../utils/plans');
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 const API_PUBLIC_URL = process.env.API_PUBLIC_URL || 'http://localhost:5000';
 const ONLINE_METHODS = ['wave', 'orange_money', 'mtn_momo'];
-const SUBSCRIPTION_MONTHLY_PRICE = 15000; // FCFA — single plan, matches CLAUDE.md
 
 // GET /api/financials/payments
 // List payments / receipts
@@ -80,6 +80,20 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
     }
 
     const isOnline = ONLINE_METHODS.includes(paymentMethod);
+
+    if (isOnline) {
+      const { data: clinicPlan, error: clinicPlanError } = await supabase
+        .from('clinics')
+        .select('plan')
+        .eq('id', req.user.clinicId)
+        .single();
+      if (clinicPlanError) throw clinicPlanError;
+
+      if (!isPaymentMethodAllowed(clinicPlan.plan, paymentMethod)) {
+        const plan = getPlan(clinicPlan.plan);
+        return res.status(403).json({ error: `Le plan ${plan.name} ne permet pas les encaissements Mobile Money. Passez au plan Hôpital dans Abonnez-vous, ou encaissez en espèces.` });
+      }
+    }
 
     const { data: paymentResult, error: insertError } = await supabase
       .from('payments')
@@ -290,11 +304,46 @@ router.get('/stats', auth, async (req, res) => {
 // subscription is only extended once the provider's webhook confirms payment.
 router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { months, phoneNumber } = req.body;
+    const { months, phoneNumber, planId } = req.body;
     const qtyMonths = parseInt(months, 10);
 
     if (![1, 3, 6, 12].includes(qtyMonths)) {
       return res.status(400).json({ error: "Durée d'abonnement invalide (1, 3, 6 ou 12 mois)." });
+    }
+
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('name, plan')
+      .eq('id', req.user.clinicId)
+      .single();
+    if (clinicError) throw clinicError;
+
+    // Defaults to a renewal of the clinic's current plan; starter (free) never
+    // goes through paid checkout — use PUT /settings/plan instead.
+    const targetPlanId = planId || clinic.plan;
+    if (targetPlanId === 'starter') {
+      return res.status(400).json({ error: "Le plan Starter est gratuit — activez-le depuis Abonnez-vous, sans paiement." });
+    }
+    if (!['clinique', 'hopital'].includes(targetPlanId)) {
+      return res.status(400).json({ error: "Plan d'abonnement invalide." });
+    }
+
+    // Switching tier (not just renewing the same one) — make sure the clinic's
+    // current staff actually fits the target plan before taking payment.
+    if (targetPlanId !== clinic.plan) {
+      const targetPlan = getPlan(targetPlanId);
+      if (targetPlan.staffLimit !== null) {
+        const { count: activeStaffCount, error: countError } = await supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('clinic_id', req.user.clinicId)
+          .eq('active', 1);
+        if (countError) throw countError;
+
+        if ((activeStaffCount || 0) > targetPlan.staffLimit) {
+          return res.status(400).json({ error: `Le plan ${targetPlan.name} est limité à ${targetPlan.staffLimit} collaborateurs actifs. Désactivez des comptes dans "Gestion des Utilisateurs" avant de changer de plan.` });
+        }
+      }
     }
 
     let normalizedPhone;
@@ -306,26 +355,20 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       normalizedPhone = phoneCheck.e164;
     }
 
-    const { data: clinic, error: clinicError } = await supabase
-      .from('clinics')
-      .select('name')
-      .eq('id', req.user.clinicId)
-      .single();
-    if (clinicError) throw clinicError;
-
     const { data: adminUser } = await supabase
       .from('users')
       .select('name, email')
       .eq('id', req.user.userId)
       .maybeSingle();
 
-    const amount = qtyMonths * SUBSCRIPTION_MONTHLY_PRICE;
+    const amount = qtyMonths * getPlan(targetPlanId).price;
 
     const { data: subPayment, error: insertError } = await supabase
       .from('subscription_payments')
       .insert({
         clinic_id: req.user.clinicId,
         user_id: req.user.userId,
+        plan: targetPlanId,
         months: qtyMonths,
         amount,
         provider: 'pending',
@@ -339,7 +382,7 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       {
         amount,
         currency: 'XOF',
-        description: `Abonnement MediClinic — ${clinic.name} (${qtyMonths} mois)`,
+        description: `Abonnement MediClinic ${getPlan(targetPlanId).name} — ${clinic.name} (${qtyMonths} mois)`,
         reference: `sub-${subPayment.id}`,
         returnUrl: `${APP_URL}/`,
         cancelUrl: `${APP_URL}/`,

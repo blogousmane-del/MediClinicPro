@@ -110,7 +110,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
     (async () => {
       try {
         const data = await api.get('/settings/users');
-        setOrientationDoctors((data || []).filter((u: any) => u.role === 'doctor' && u.active === 1));
+        setOrientationDoctors((data || []).filter((u: any) => ['doctor', 'nurse'].includes(u.role) && u.active === 1));
       } catch (err) {
         console.error(err);
       }
@@ -237,15 +237,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
   // IF CREATING PATIENT: RENDER THE "Nouveau patient" VIEW
   if (isCreating) {
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.5rem',
-        padding: '1.5rem 2rem',
-        backgroundColor: 'var(--bg-primary)',
-        minHeight: 'calc(100vh - var(--header-height))',
-        boxSizing: 'border-box'
-      }}>
+      <div className="app-page">
         {/* Top Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -257,8 +249,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ position: 'relative', width: '280px' }}>
+          <div className="page-header-actions">
+            <div className="page-search-box">
               <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
@@ -512,16 +504,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
 
   // REGISTRE DES PATIENTS TABLE VIEW MATCHING IMAGE 1
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.5rem',
-      padding: '1.5rem 2rem',
-      backgroundColor: 'var(--bg-primary)',
-      minHeight: 'calc(100vh - var(--header-height))',
-      boxSizing: 'border-box'
-    }}>
-      
+    <div className="app-page">
+
       {/* 1. Header / Breadcrumb matching Image 1 */}
       <div style={{
         display: 'flex',
@@ -545,8 +529,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ position: 'relative', width: '280px' }}>
+        <div className="page-header-actions">
+          <div className="page-search-box">
             <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
@@ -621,6 +605,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
         {['admin', 'secretary', 'manager'].includes(user?.role || '') && (
           <button
             onClick={() => setIsCreating(true)}
+            className="page-cta-btn"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -995,12 +980,12 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
             </div>
             <div className="modal-body">
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 1rem' }}>
-                {orientationPatient.name} vient d'être enregistré. Vers quel médecin ?
+                {orientationPatient.name} vient d'être enregistré. Vers quel médecin ou infirmier(ère) ?
               </p>
 
               {orientationDoctors.length === 0 ? (
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Aucun médecin actif disponible pour le moment.
+                  Aucun médecin ou infirmier(ère) actif disponible pour le moment.
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
@@ -1023,7 +1008,10 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                         }}
                       >
                         <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: meta.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600, flex: 1 }}>{doc.name}</span>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600, flex: 1 }}>
+                          {doc.name}
+                          <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}> · {doc.role === 'nurse' ? 'Infirmier(ère)' : 'Médecin'}</span>
+                        </span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{meta.label}</span>
                       </div>
                     );

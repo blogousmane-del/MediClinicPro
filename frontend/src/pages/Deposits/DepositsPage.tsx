@@ -243,6 +243,12 @@ export const DepositsPage: React.FC = () => {
           min-height: calc(100vh - var(--header-height));
           box-sizing: border-box;
         }
+        @media (max-width: 640px) {
+          .dep-page {
+            padding: 1rem 0.875rem;
+            gap: 1rem;
+          }
+        }
         .dep-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .dep-tab {
           padding: 8px 16px;

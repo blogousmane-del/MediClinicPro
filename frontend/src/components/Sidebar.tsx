@@ -12,8 +12,14 @@ import {
   ShieldCheck,
   Settings as SettingsIcon,
   LogOut,
-  X
+  X,
+  Building2
 } from 'lucide-react';
+
+// Client-side hint only — the real access boundary is the backend's
+// SUPER_ADMIN_EMAILS allowlist (superAdminOnly middleware). Hiding this entry
+// for everyone else is UX, not security.
+const PLATFORM_ADMIN_EMAILS = ['blog.ousmane@gmail.com'];
 
 interface SidebarProps {
   currentTab: string;
@@ -30,9 +36,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
   if (!user) return null;
 
   const menuItems = [
-    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager'] },
-    { id: 'patients', label: 'Patients', icon: Users, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager'] },
-    { id: 'appointments', label: 'Rendez-vous', icon: Calendar, roles: ['admin', 'doctor', 'secretary', 'manager'] },
+    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager', 'nurse'] },
+    { id: 'patients', label: 'Patients', icon: Users, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager', 'nurse'] },
+    { id: 'appointments', label: 'Rendez-vous', icon: Calendar, roles: ['admin', 'doctor', 'secretary', 'manager', 'nurse'] },
     { id: 'prescriptions', label: 'Ordonnances', icon: FileText, roles: ['admin', 'doctor', 'pharmacist', 'manager'] },
     { id: 'laboratory', label: 'Laboratoire', icon: FlaskConical, roles: ['admin', 'lab_tech', 'manager'] },
     { id: 'pharmacy', label: 'Pharmacie', icon: Pill, roles: ['admin', 'pharmacist', 'manager'] },
@@ -42,6 +48,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
   ];
 
   const filteredItems = menuItems.filter(item => item.roles.includes(user.role));
+  if (PLATFORM_ADMIN_EMAILS.includes(user.email)) {
+    filteredItems.push({ id: 'platform-admin', label: 'Administration plateforme', icon: Building2, roles: [] });
+  }
 
   const roleLabels: Record<string, string> = {
     admin: 'Administrateur',
@@ -49,7 +58,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
     secretary: 'Secrétaire',
     pharmacist: 'Pharmacien',
     lab_tech: 'Laborantin',
-    manager: 'Gestionnaire'
+    manager: 'Gestionnaire',
+    nurse: 'Infirmier(ère)'
   };
 
   const formattedClinicName = (clinic?.name || 'Ma Clinique').toUpperCase();
@@ -80,8 +90,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
         style={{
           width: 'var(--sidebar-width, 240px)',
           height: '100vh',
-          backgroundColor: '#0c131f',
-          color: '#8fa0b5',
+          backgroundColor: '#162a26',
+          color: '#9bb0a9',
           position: 'fixed',
           left: 0,
           top: 0,
@@ -102,7 +112,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             alignItems: 'center',
             justifyContent: 'space-between'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={onClose}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClose(); } }}
+              title="Fermer le menu"
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+            >
               <img src="/logo-icon.svg" alt="MediClinic" width={34} height={34} style={{ display: 'block', flexShrink: 0 }} />
               <span style={{
                 fontWeight: 700,
@@ -138,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#8fa0b5',
+                  color: '#9bb0a9',
                   display: 'none',
                   padding: '4px'
                 }}
@@ -165,7 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             <div style={{
               fontSize: '0.725rem',
               fontWeight: 500,
-              color: '#64748b',
+              color: '#6b8078',
               marginTop: '2px',
               letterSpacing: '0.03em',
               textTransform: 'uppercase'
@@ -200,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                     borderRadius: '10px',
                     border: 'none',
                     backgroundColor: isActive ? '#1c4436' : 'transparent',
-                    color: isActive ? '#ffffff' : '#8fa0b5',
+                    color: isActive ? '#ffffff' : '#9bb0a9',
                     textAlign: 'left',
                     width: '100%',
                     cursor: 'pointer',
@@ -216,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.color = '#8fa0b5';
+                      e.currentTarget.style.color = '#9bb0a9';
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
@@ -245,7 +262,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               width: '36px',
               height: '36px',
               borderRadius: '50%',
-              backgroundColor: '#172233',
+              backgroundColor: '#1f3a33',
               border: '1.5px solid rgba(255, 255, 255, 0.15)',
               display: 'flex',
               alignItems: 'center',
@@ -273,7 +290,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               </div>
               <div style={{
                 fontSize: '0.725rem',
-                color: '#64748b',
+                color: '#6b8078',
                 marginTop: '1px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -291,7 +308,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             style={{
               background: 'none',
               border: 'none',
-              color: '#64748b',
+              color: '#6b8078',
               cursor: 'pointer',
               padding: '6px',
               display: 'flex',
@@ -301,7 +318,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               flexShrink: 0
             }}
             onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#6b8078'}
           >
             <LogOut size={16} />
           </button>
@@ -326,8 +343,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               <button onClick={() => setShowLogoutConfirm(false)} className="btn btn-secondary">Annuler</button>
               <button
                 onClick={() => { setShowLogoutConfirm(false); logout(); }}
-                className="btn"
-                style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
+                className="btn btn-primary"
               >
                 Se déconnecter
               </button>

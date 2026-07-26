@@ -46,6 +46,7 @@ async function auth(req, res, next) {
       // real route; this previously meant expired clinics had NO way to renew.)
       const isBillingRoute =
         req.originalUrl.includes('/financials/subscription') ||
+        req.originalUrl.includes('/settings/plan') ||
         req.originalUrl.includes('/auth/logout');
 
       const now = new Date();

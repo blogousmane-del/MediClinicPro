@@ -1,0 +1,74 @@
+// Scheduled jobs, triggered by Vercel Cron (see vercel.json's `crons` entry)
+// or manually via curl in dev. Not behind the `auth` middleware — gated by a
+// shared secret instead, same pattern Vercel's own docs recommend for cron
+// endpoints. Degrades gracefully (503) when CRON_SECRET isn't configured,
+// consistent with every other optional feature in this app.
+const express = require('express');
+const router = express.Router();
+const { supabase } = require('../database');
+const { getPlan } = require('../utils/plans');
+const { sendRenewalReminderEmail } = require('../utils/mailer');
+
+const CRON_SECRET = process.env.CRON_SECRET || '';
+const REMINDER_THRESHOLDS_DAYS = [3, 1]; // two touchpoints before auto-block; exact-day match means a once-daily cron never double-sends
+
+function requireCronSecret(req, res, next) {
+  if (!CRON_SECRET) {
+    return res.status(503).json({ error: "Tâches planifiées non configurées (CRON_SECRET manquant)." });
+  }
+  if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+    return res.status(401).json({ error: "Non autorisé." });
+  }
+  next();
+}
+
+// GET /api/cron/renewal-reminders
+// Emails clinic admins whose subscription (or free trial) expires in exactly
+// 3 or 1 day(s) — covers both the Starter free-tier countdown and paid-tier
+// monthly renewals, since both live on the same clinics.subscription_expires_at.
+router.get('/renewal-reminders', requireCronSecret, async (req, res) => {
+  try {
+    const now = new Date();
+    const horizon = new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000); // widest threshold + 1 day margin
+
+    const { data: clinics, error: clinicsError } = await supabase
+      .from('clinics')
+      .select('id, name, plan, subscription_status, subscription_expires_at')
+      .not('subscription_expires_at', 'is', null)
+      .gte('subscription_expires_at', now.toISOString())
+      .lte('subscription_expires_at', horizon.toISOString());
+    if (clinicsError) throw clinicsError;
+
+    let sent = 0;
+    for (const clinic of clinics || []) {
+      const expiresAt = new Date(clinic.subscription_expires_at);
+      const daysLeft = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000));
+      if (!REMINDER_THRESHOLDS_DAYS.includes(daysLeft)) continue;
+
+      const { data: admin, error: adminError } = await supabase
+        .from('users')
+        .select('name, email')
+        .eq('clinic_id', clinic.id)
+        .eq('role', 'admin')
+        .eq('active', 1)
+        .limit(1)
+        .maybeSingle();
+      if (adminError || !admin) continue;
+
+      const plan = getPlan(clinic.plan);
+      try {
+        await sendRenewalReminderEmail(admin.email, admin.name, clinic.name, daysLeft, plan.name, plan.price);
+        sent += 1;
+      } catch (emailError) {
+        console.error(`[CRON] Échec envoi rappel abonnement pour la clinique #${clinic.id}:`, emailError);
+      }
+    }
+
+    res.json({ checked: (clinics || []).length, sent });
+  } catch (error) {
+    console.error("Renewal reminders cron error:", error);
+    res.status(500).json({ error: "Erreur lors de l'exécution des rappels d'abonnement." });
+  }
+});
+
+module.exports = router;

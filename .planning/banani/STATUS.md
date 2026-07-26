@@ -23,7 +23,6 @@ Full import requested by user 2026-07-22 — all 25 pages + 16 shared components
 
 ## Pending / deferred
 - `LabResults`, `PendingLabs`, `NotificationSent` (Laboratory sub-flows) — `LaboratoryPage` reviewed at a lint-warning level only (no unused-import issues found); not compared screen-by-screen against these three Banani mocks yet.
-- `Gestion des abonnements` (+ Mobile) — Settings already has a working billing/subscription tab; not compared in detail against Banani's dedicated subscription screens.
 - Shared components not yet individually reviewed: FinancialSummaryCard, InvoiceItemRow, MedicineInputRow, MiniCalendar, PharmacyItem, PrescriptionCard, SettingToggle, AlertItem, TransactionRow, AppointmentCard, AppointmentRow, FilterChips — folded into their parent pages' light-polish pass rather than built as standalone primitives, since none of the parent pages were rebuilt from scratch.
 - "New Screen" (empty Banani placeholder) — ignored, no content.
 
@@ -91,6 +90,34 @@ Dispatched 3 background read-only agents in parallel to independently audit the 
 - Schema drift check: `backend/supabase_schema.sql` now correctly defines `appointments.room`/`appointments.notes` (previously flagged as an unapplied manual migration) — file-level check only, live Supabase DB state not re-verified this pass.
 
 All fixes verified with `node -c` on both changed files (clean). No live DB/API calls made this pass (static code audit only).
+
+## 2026-07-26 Banani new screen — Administration plateforme (Super Admin)
+Genuinely new capability, not a polish pass — fetched `new_screen9.jsx` (plan: `platform-admin.md`). First-ever cross-clinic view in MediClinic; every other route in the app deliberately scopes by `clinic_id`. Confirmed scope with the user before coding: access gated by a `SUPER_ADMIN_EMAILS` allowlist (not a new role), Banani's fake "Tickets support"/"Santé du système" sections dropped entirely (no backing infrastructure — would repeat prior fabrication mistakes), fake "Plan" tiers dropped (only one real plan exists). New: `backend/middleware/superAdmin.js`, `backend/routes/platform.js` (`GET /api/platform/overview`), `frontend/src/pages/PlatformAdmin/PlatformAdminPage.tsx`, new Sidebar entry (client-side hint only). Verified end-to-end against the running backend (allowlisted account gets real data, non-allowlisted gets 403) and `npm run build`/`npm run lint` clean. Not visually verified — no browser tool this session.
+
+**Correction same day**: user flagged via screenshot comparison that reusing the real clinic `Sidebar`/`Header` was wrong for this specific screen (unlike every other Banani import) — a cross-clinic operator console shouldn't show Patients/Rendez-vous/Ordonnances tabs. Rebuilt `PlatformAdminPage.tsx` as a fully separate shell with its own dark sidebar (`Vue d'ensemble`/`Cliniques`/`Utilisateurs`/`Abonnements`); `App.tsx` now early-returns it entirely instead of nesting it in `<main>`. Added two more real sections while at it: `GET /api/platform/users` (every user across every clinic) and `GET /api/platform/subscriptions` (subscription status + payment history across all clinics). Re-verified: direct Supabase query checks (14 users, 5 clinics, 3 payments, no errors) and the auth/gating pipeline re-confirmed with a known seeded account (403 for non-allowlisted); `npm run build`/`npm run lint` clean.
+
+## 2026-07-25 Banani re-fetch — Pharmacie / Ajouter un médicament (diff pass, not a rebuild)
+Re-fetched `AddMedicine.jsx` (plan: `pharmacy-add-medicine.md`) at user request, even though already marked Done. The diff surfaced a real bug, not just styling: the live modal hardcoded `dosage: '500mg'` on every submit — confirmed against live DB rows that `name`/`dosage` are meant to be separate fields, corrupting records added through the modal. Fixed by adding a real "Dosage" field (auto-derived from the catalog string, user-editable). Also: made `min_stock_threshold` editable end-to-end (column existed, was hardcoded to 10 and never updatable via `POST /pharmacy/replenish`); added a live computed "Marge" readout; added new `manufacturer`/`unit` columns (user chose to add these — migration, not yet applied to live DB) and wired them into the form; reorganized the modal into Banani's labeled sections. Skipped Banani's extra "Sauvegarder" button (no distinct real action, same precedent as elsewhere) and its full-page Sidebar/TopBar chrome (real components already more functional). Verified via `npm run build`/`npm run lint` (clean); **not visually verified** — no browser-driving tool in this session.
+
+Requires manual migration before `POST /pharmacy/replenish` works again:
+```sql
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS manufacturer TEXT;
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS unit TEXT;
+```
+
+## 2026-07-26 Banani fetch — Abonnement / Choisir un plan (pixel-parity pass)
+Fetched `new_screen10.jsx` ("Abonnement — Choisir un plan", plan: `abonnement-choisir-plan.md`). The underlying multi-tier plan feature (schema, backend enforcement, checkout, webhook plan-switch, cron renewal reminders) had already shipped this session from a screenshot + confirmed requirements, not an MCP fetch — this pass is a structural diff against the real Banani source, not a new feature build.
+
+Rebuilt the 3-card picker in `SettingsPage.tsx`'s "Abonnez-vous" tab to match Banani's real layout: centered "Nos formules" eyebrow + H1 + subtitle header, badge chip per card (Gratuit/Populaire/Tout inclus) with a zap icon + permanent highlight on the top tier, stacked price block ("FCFA"/period next to the number), divider, 6 fixed comparison rows with check/x icons (excluded rows shown struck-through and muted, not omitted — new pattern vs. the previous pass which only listed included features), CTA + one-line note per card, and a softened "tous les plans incluent" divider bar below the grid.
+
+Deliberate deviations from the raw Banani source (confirmed against prior decisions + established project precedent, not re-asked):
+1. Kept tier names Starter/Clinique/Hôpital (not Banani's "Essai gratuit/Standard/Premium") — the user named these tiers explicitly earlier this session.
+2. Comparison rows derived from real plan data (`staffLimit`/`allowedRoles`/`paymentMethods`) client-side, not copy-pasted from Banani's hardcoded feature strings — so the Mobile Money row can't drift from what's actually enforced.
+3. Dropped Banani's WhatsApp/email contact card entirely — grepped the codebase, no real support channel exists; a fake WhatsApp number was already found and removed from `AuthPage.tsx` earlier this session (2026-07-24 audit entry above), so adding another one here would repeat the same mistake.
+4. Softened the "all plans include" pill: dropped "support email" (unbacked), kept only verifiable claims.
+5. Reworded the Hôpital card's CTA note away from Banani's "Support prioritaire inclus" (no priority-support infrastructure exists) to a true framing about unlimited staff.
+
+Verified: `npm run build` and `npm run lint` clean, no new warnings. **Not visually verified in a live browser** — no browser-driving tool this session; recommend a manual check at 375/768/1280px before treating as fully pixel-verified (the existing `.plan-cards-grid` 3→1 column collapse below 850px is unchanged from the previous pass).
 
 ## 2026-07-25 Banani re-fetch — Landing Page structural rebuild
 User flagged the live `LandingPage.tsx` as "very different" from Banani's landing page after selecting 2 screens (`new_screen4.jsx` desktop + `LandingPageMobile.jsx`). Re-fetched (plan: `landing-page.md`, 2026-07-25 addendum) and confirmed the page had drifted from the 07-21 plan (light theme + real photography instead of the originally-planned fixed-dark/icon-only hero — an earlier, undocumented in-session decision that superseded the old plan and was kept, since it's real and not fabricated).

@@ -653,6 +653,20 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
+/* Many modals wrap .modal-body + .modal-footer in a <form> that's a direct
+   child of .modal-content. .modal-content is a flex column, but <form>
+   defaults to display:block, which breaks the flex chain — .modal-body's
+   flex/overflow-y rules below only apply when it's an actual flex item, so
+   without this the body never scrolls and .modal-content's overflow:hidden
+   just silently clips content instead (footer can end up squeezed/hidden).
+   This keeps the flex column going through the <form>. */
+.modal-content > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .modal-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -780,6 +794,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 768px) {
   .sidebar {
+    width: min(78vw, 240px) !important;
     transform: translateX(-100%);
   }
   .sidebar.open {
@@ -1338,12 +1353,16 @@ h1, h2, h3, h4, h5, h6 {
   transform: none;
 }
 
-/* Buttons: lift on hover */
+/* Buttons: slight relief + cyan halo on hover */
 .landing-btn-lift {
   transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 .landing-btn-lift:hover {
   transform: translateY(-2px);
+  box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.22), 0 10px 22px rgba(13, 148, 136, 0.22) !important;
+}
+.landing-btn-lift:active {
+  transform: translateY(0);
 }
 
 /* Cards: lift + shadow grow on hover (pricing) */
@@ -1355,14 +1374,15 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 20px 40px rgba(30, 77, 64, 0.16);
 }
 
-/* Feature pills: lift + tint on hover */
+/* Feature pills: lift + tint + soft shadow on hover */
 .landing-pill-hover {
-  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .landing-pill-hover:hover {
   transform: translateY(-2px);
   background-color: #e6f4ea;
   border-color: #bbf7d0;
+  box-shadow: 0 8px 18px rgba(13, 148, 136, 0.12);
 }
 
 /* Marquee cards: subtle lift on hover (in addition to the wrapper's pause-on-hover) */
@@ -1396,12 +1416,26 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 
-/* Footer links: brighten on hover */
+/* Footer links: brighten + sliding cyan underline on hover */
 .landing-footer-link {
+  position: relative;
   transition: color 0.2s ease;
+}
+.landing-footer-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0;
+  height: 2px;
+  background-color: #5eead4;
+  transition: width 0.25s ease;
 }
 .landing-footer-link:hover {
   color: #ffffff !important;
+}
+.landing-footer-link:hover::after {
+  width: 100%;
 }
 
 /* Logo mark: subtle pop on hover */
@@ -1475,6 +1509,56 @@ h1, h2, h3, h4, h5, h6 {
   .landing-highlight:hover svg,
   .landing-img-zoom:hover img {
     transform: none;
+  }
+}
+
+/* ===== Shared root page wrapper (Patients, Pharmacy, Laboratory, Prescriptions) ===== */
+.app-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 2rem;
+  background-color: var(--bg-primary);
+  min-height: calc(100vh - var(--header-height));
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .app-page {
+    padding: 1rem 0.875rem;
+    gap: 1.15rem;
+  }
+}
+
+/* ===== Shared page-header primary CTA button (Ajouter/Nouveau buttons) ===== */
+@media (max-width: 640px) {
+  .page-cta-btn {
+    padding: 8px 14px !important;
+    font-size: 0.8rem !important;
+  }
+}
+
+/* ===== Shared page-header search/actions toolbar (Patients, Pharmacy, Laboratory, Prescriptions) ===== */
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.page-search-box {
+  position: relative;
+  width: 280px;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .page-header-actions {
+    width: 100%;
+  }
+  .page-search-box {
+    flex: 1 1 auto;
+    width: auto;
   }
 }
 

@@ -22,6 +22,7 @@ import { LaboratoryPage } from './pages/Laboratory/LaboratoryPage';
 import { AccountingPage } from './pages/Accounting/AccountingPage';
 import { DepositsPage } from './pages/Deposits/DepositsPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
+import { PlatformAdminPage } from './pages/PlatformAdmin/PlatformAdminPage';
 
 const MainAppContent: React.FC = () => {
   const { user, clinic, loading } = useAuth();
@@ -37,6 +38,36 @@ const MainAppContent: React.FC = () => {
   const [openPatientModal, setOpenPatientModal] = useState<boolean>(false);
   const [openApptModal, setOpenApptModal] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+
+  const tabTitles: Record<string, string> = {
+    dashboard: 'Tableau de bord',
+    appointments: 'Gestion des Rendez-vous',
+    patients: selectedPatientId ? 'Dossier Patient' : 'Registre des Patients',
+    pharmacy: 'Gestion de Pharmacie',
+    prescriptions: 'Gestion des Ordonnances',
+    laboratory: 'File du Laboratoire',
+    accounting: 'Grand Livre & Recettes',
+    deposits: 'Dépôts de garantie',
+    settings: 'Paramètres du cabinet',
+    'platform-admin': 'Administration plateforme'
+  };
+
+  // Keep the browser tab title in sync with the current view (no real routing,
+  // so this doesn't create separately indexable URLs — just a UX/share-context nicety).
+  useEffect(() => {
+    if (!user) {
+      const loggedOutTitles: Record<string, string> = {
+        landing: "MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire",
+        login: 'Connexion — MediClinic',
+        register: 'Créer un compte — MediClinic',
+        terms: "Conditions générales d'utilisation — MediClinic"
+      };
+      document.title = loggedOutTitles[loggedOutTab] || 'MediClinic';
+      return;
+    }
+    document.title = tabTitles[currentTab] ? `${tabTitles[currentTab]} — MediClinic` : 'MediClinic';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loggedOutTab, currentTab, selectedPatientId]);
 
   if (loading) {
     return (
@@ -72,19 +103,13 @@ const MainAppContent: React.FC = () => {
     return <OnboardingPage />;
   }
 
-  // 3. Main Authenticated Interface
-  const tabTitles: Record<string, string> = {
-    dashboard: 'Tableau de bord',
-    appointments: 'Gestion des Rendez-vous',
-    patients: selectedPatientId ? 'Dossier Patient' : 'Registre des Patients',
-    pharmacy: 'Gestion de Pharmacie',
-    prescriptions: 'Gestion des Ordonnances',
-    laboratory: 'File du Laboratoire',
-    accounting: 'Grand Livre & Recettes',
-    deposits: 'Dépôts de garantie',
-    settings: 'Paramètres du cabinet'
-  };
+  // 3. Cross-clinic platform admin — a wholly separate console, not a tab
+  // inside the normal clinic app (no Patients/Rendez-vous/Ordonnances here).
+  if (currentTab === 'platform-admin') {
+    return <PlatformAdminPage onExit={() => setCurrentTab('dashboard')} />;
+  }
 
+  // 4. Main Authenticated Interface
   const handleQuickAction = (action: string) => {
     if (action === 'new_patient') {
       setSelectedPatientId(null);

@@ -3,6 +3,7 @@ const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { initiateCheckoutWithFailover } = require('../services/payments');
+const { getPlan, isPaymentMethodAllowed } = require('../utils/plans');
 
 const DEPOSIT_ROLES = ['admin', 'secretary', 'manager'];
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
@@ -72,6 +73,20 @@ router.post('/', auth, checkRole(DEPOSIT_ROLES), async (req, res) => {
     const safeItems = Array.isArray(items) ? items : [];
     const estimatedTotal = safeItems.reduce((sum, item) => sum + (Number(item.cost) || 0), 0);
     const isOnline = ONLINE_METHODS.includes(paymentMethod);
+
+    if (isOnline) {
+      const { data: clinicPlan, error: clinicPlanError } = await supabase
+        .from('clinics')
+        .select('plan')
+        .eq('id', req.user.clinicId)
+        .single();
+      if (clinicPlanError) throw clinicPlanError;
+
+      if (!isPaymentMethodAllowed(clinicPlan.plan, paymentMethod)) {
+        const plan = getPlan(clinicPlan.plan);
+        return res.status(403).json({ error: `Le plan ${plan.name} ne permet pas les encaissements Mobile Money. Passez au plan Hôpital dans Abonnez-vous, ou encaissez en espèces.` });
+      }
+    }
 
     const { data: depositResult, error: insertError } = await supabase
       .from('deposits')

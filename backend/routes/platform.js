@@ -263,7 +263,10 @@ router.put('/tickets/:id', async (req, res) => {
       .from('support_tickets')
       .update({
         status,
-        resolution_note: resolutionNote || undefined,
+        // `undefined` (not falsy-`''`) is what Supabase's client omits from the
+        // update payload — using `|| undefined` here would make submitting an
+        // empty note a no-op instead of clearing a previously-set one.
+        resolution_note: resolutionNote === undefined ? undefined : resolutionNote,
         updated_at: new Date().toISOString()
       })
       .eq('id', req.params.id);

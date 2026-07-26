@@ -335,7 +335,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             }}>
               <img
                 src="/doctor_hero.png"
-                alt="Beau docteur africain MediClinic Côte d'Ivoire"
+                alt="Médecin utilisant MediClinic pour gérer sa clinique en Côte d'Ivoire"
                 style={{
                   width: '100%',
                   height: '100%',

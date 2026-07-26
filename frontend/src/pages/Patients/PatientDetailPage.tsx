@@ -2,24 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  ArrowLeft, 
-  User, 
-  Activity, 
-  FileText, 
-  FlaskConical, 
-  CreditCard, 
-  Plus, 
+import {
+  ArrowLeft,
+  User,
+  Activity,
+  FileText,
+  FlaskConical,
+  CreditCard,
+  Plus,
   Trash2,
   Calendar,
   AlertTriangle,
-  Printer
+  Printer,
+  ArrowRightLeft
 } from 'lucide-react';
 
 interface PatientDetailPageProps {
   patientId: number;
   onBack: () => void;
 }
+
+const REFERRAL_AVAILABILITY_META: Record<string, { label: string; color: string }> = {
+  available: { label: 'Disponible', color: 'var(--success, #16a34a)' },
+  busy: { label: 'Occupé', color: '#f59e0b' },
+  away: { label: 'Absent', color: '#94a3b8' }
+};
 
 export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId, onBack }) => {
   const { user } = useAuth();
@@ -61,6 +68,13 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
   const [pendingPrescriptions, setPendingPrescriptions] = useState<any[]>([]);
   const [pendingExams, setPendingExams] = useState<any[]>([]);
 
+  // Referral / orientation widget (doctor / nurse only): redirect this patient
+  // to a colleague at any point, not just right after creation.
+  const [colleagues, setColleagues] = useState<any[]>([]);
+  const [selectedColleagueId, setSelectedColleagueId] = useState<number | null>(null);
+  const [referMotif, setReferMotif] = useState<string>('Consultation');
+  const [isReferring, setIsReferring] = useState<boolean>(false);
+
   const fetchPatientDetails = async () => {
     try {
       setLoading(true);
@@ -87,6 +101,40 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
   useEffect(() => {
     fetchPatientDetails();
   }, [patientId]);
+
+  useEffect(() => {
+    if (!['doctor', 'nurse'].includes(user?.role || '')) return;
+    (async () => {
+      try {
+        const data = await api.get('/settings/users');
+        setColleagues((data || []).filter((u: any) => ['doctor', 'nurse'].includes(u.role) && u.active === 1 && u.id !== user?.id));
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, [user?.role, user?.id]);
+
+  const handleReferPatient = async () => {
+    if (!selectedColleagueId) return;
+    setIsReferring(true);
+    try {
+      await api.post('/appointments', {
+        patientId,
+        practitionerId: selectedColleagueId,
+        dateTime: new Date().toISOString(),
+        motif: referMotif || 'Consultation'
+      });
+      const colleagueName = colleagues.find(c => c.id === selectedColleagueId)?.name || '';
+      showToast('success', 'Patient orienté', `${patient.first_name} ${patient.last_name} a été orienté vers ${colleagueName}.`);
+      setSelectedColleagueId(null);
+      setReferMotif('Consultation');
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Échec de l\'orientation', err.error || 'Impossible d\'orienter ce patient.');
+    } finally {
+      setIsReferring(false);
+    }
+  };
 
   // Handle Add line in prescription builder
   const handleAddPrescLine = () => {
@@ -793,7 +841,77 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
             </div>
           )}
 
-          {/* 3. LAB TECH: Saisie résultats direct shortcuts */}
+          {/* 3. DOCTOR/NURSE: Orienter / Référer le patient vers un collègue */}
+          {['doctor', 'nurse'].includes(user?.role || '') && (
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ArrowRightLeft size={18} />
+                Orienter / Référer le patient
+              </h3>
+
+              {colleagues.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                  Aucun autre médecin ou infirmier(ère) actif disponible pour le moment.
+                </p>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                    {colleagues.map(col => {
+                      const meta = REFERRAL_AVAILABILITY_META[col.availability_status as string] || REFERRAL_AVAILABILITY_META.available;
+                      const isSelected = selectedColleagueId === col.id;
+                      return (
+                        <div
+                          key={col.id}
+                          onClick={() => setSelectedColleagueId(col.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedColleagueId(col.id); } }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                            backgroundColor: isSelected ? 'var(--bg-tertiary)' : 'transparent',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: meta.color, flexShrink: 0 }} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>
+                            {col.name}
+                            <span style={{ fontWeight: 500, color: 'var(--text-muted)' }}> · {col.role === 'nurse' ? 'Infirmier(ère)' : 'Médecin'}</span>
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{meta.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontSize: '0.75rem' }}>Motif</label>
+                    <input
+                      type="text"
+                      value={referMotif}
+                      onChange={e => setReferMotif(e.target.value)}
+                      className="input-control"
+                      style={{ padding: '6px' }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleReferPatient}
+                    className="btn btn-primary w-full"
+                    disabled={!selectedColleagueId || isReferring}
+                  >
+                    {isReferring ? 'Orientation...' : 'Orienter maintenant'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 4. LAB TECH: Saisie résultats direct shortcuts */}
           {user?.role === 'lab_tech' && pendingExams.length > 0 && (
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Saisir des résultats labo</h3>

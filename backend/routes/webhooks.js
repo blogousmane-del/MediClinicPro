@@ -65,14 +65,14 @@ async function fulfillSubscriptionEvent(provider, id, event) {
 
   await supabase
     .from('clinics')
-    .update({ subscription_status: 'active', subscription_expires_at: baseDate.toISOString() })
+    .update({ subscription_status: 'active', subscription_expires_at: baseDate.toISOString(), plan: row.plan || undefined })
     .eq('id', row.clinic_id);
 
   await supabase.from('activity_logs').insert({
     clinic_id: row.clinic_id,
     user_id: row.user_id,
     action: 'SUBSCRIPTION_RENEW',
-    details: `Abonnement renouvelé pour ${row.months} mois (${row.amount} FCFA) via ${provider.toUpperCase()}`
+    details: `Abonnement ${row.plan || ''} renouvelé pour ${row.months} mois (${row.amount} FCFA) via ${provider.toUpperCase()}`
   });
 }
 

@@ -7,6 +7,8 @@ const { OAuth2Client } = require('google-auth-library');
 const { supabase } = require('../database');
 const { JWT_SECRET, auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
+const { computeEffectiveAvailability } = require('../utils/schedule');
+const { getPlan, isRoleAllowedForPlan, isStaffLimitReached } = require('../utils/plans');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
@@ -15,7 +17,8 @@ const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : nul
 // Clinic registration + Admin user creation
 router.post('/register', async (req, res) => {
   try {
-    const { clinicName, adminName, email, password, phone } = req.body;
+    const { clinicName, adminName, email: rawEmail, password, phone } = req.body;
+    const email = (rawEmail || '').trim().toLowerCase();
 
     if (!clinicName || !adminName || !email || !password || !phone) {
       return res.status(400).json({ error: "Tous les champs sont requis." });
@@ -123,7 +126,8 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
+    const email = (rawEmail || '').trim().toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({ error: "Email et mot de passe requis." });
@@ -176,7 +180,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.role,
         passwordSet: user.password_set,
-        availabilityStatus: user.availability_status
+        availabilityStatus: computeEffectiveAvailability(user)
       },
       clinic
     });
@@ -212,7 +216,7 @@ router.post('/google', async (req, res) => {
       return res.status(401).json({ error: "Adresse email Google non vérifiée." });
     }
 
-    const email = payload.email;
+    const email = (payload.email || '').trim().toLowerCase();
     const displayName = payload.name || email.split('@')[0];
 
     // Look up an existing user by email (global unique constraint on users.email)
@@ -314,7 +318,7 @@ router.post('/google', async (req, res) => {
         email: user.email,
         role: user.role,
         passwordSet: user.password_set,
-        availabilityStatus: user.availability_status
+        availabilityStatus: computeEffectiveAvailability(user)
       },
       clinic
     });
@@ -329,7 +333,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, name, email, role, active, password_set, availability_status')
+      .select('id, name, email, role, active, password_set, availability_status, work_schedule')
       .eq('id', req.user.userId)
       .single();
 
@@ -351,7 +355,7 @@ router.get('/me', auth, async (req, res) => {
         role: user.role,
         active: user.active,
         passwordSet: user.password_set,
-        availabilityStatus: user.availability_status
+        availabilityStatus: computeEffectiveAvailability(user)
       },
       clinic
     });
@@ -444,11 +448,37 @@ router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
 
     if (clinicUpdateError) throw clinicUpdateError;
 
-    // 2. Add staff users (if any)
+    // 2. Add staff users (if any) — gated by the clinic's plan (staff limit + allowed roles)
     if (staff && Array.isArray(staff)) {
+      const { data: clinicForPlan, error: clinicPlanError } = await supabase
+        .from('clinics')
+        .select('plan')
+        .eq('id', req.user.clinicId)
+        .single();
+      if (clinicPlanError) throw clinicPlanError;
+
+      const { count: existingActiveStaff, error: staffCountError } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinic_id', req.user.clinicId)
+        .eq('active', 1);
+      if (staffCountError) throw staffCountError;
+
+      let activeStaffCount = existingActiveStaff || 0;
+
       for (const member of staff) {
-        const { name, email, password, role } = member;
+        const { name, email: rawEmail, password, role } = member;
+        const email = (rawEmail || '').trim().toLowerCase();
         if (name && email && password && role) {
+          if (!isRoleAllowedForPlan(clinicForPlan.plan, role)) {
+            const plan = getPlan(clinicForPlan.plan);
+            return res.status(403).json({ error: `Le plan ${plan.name} n'autorise pas le rôle "${role}". Passez à un plan supérieur dans Abonnez-vous pour débloquer ce rôle.` });
+          }
+          if (isStaffLimitReached(clinicForPlan.plan, activeStaffCount)) {
+            const plan = getPlan(clinicForPlan.plan);
+            return res.status(403).json({ error: `Le plan ${plan.name} est limité à ${plan.staffLimit} collaborateurs actifs. Passez à un plan supérieur dans Abonnez-vous pour ajouter plus de collaborateurs.` });
+          }
+
           const { data: emailCheck, error: checkError } = await supabase
             .from('users')
             .select('id')
@@ -470,6 +500,7 @@ router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
                 active: 1
               });
             if (insertUserError) throw insertUserError;
+            activeStaffCount += 1;
           }
         }
       }
