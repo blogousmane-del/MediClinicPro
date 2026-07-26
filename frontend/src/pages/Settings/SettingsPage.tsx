@@ -6,12 +6,22 @@ import {
   Search,
   Bell,
   Check,
+  X,
   Plus,
   Loader2,
-  ShieldCheck
+  ShieldCheck,
+  Star,
+  Zap
 } from 'lucide-react';
 import { PhoneInput } from '../../components/PhoneInput';
 import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
+
+interface DaySchedule {
+  day: number; // 0=Dimanche..6=Samedi (JS Date.getDay())
+  off: boolean;
+  start: string; // HH:MM, meaningless when off
+  end: string;   // HH:MM, meaningless when off
+}
 
 interface StaffUser {
   id: number;
@@ -19,13 +29,43 @@ interface StaffUser {
   email: string;
   role: string;
   active: number;
+  work_schedule?: DaySchedule[] | null;
+}
+
+interface SupportTicket {
+  id: number;
+  subject: string;
+  category: string;
+  message: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  resolution_note: string | null;
+  created_at: string;
+}
+
+const WEEKDAY_SHORT: Record<number, string> = { 0: 'Dim', 1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam' };
+const ORDERED_WEEK = [1, 2, 3, 4, 5, 6, 0];
+const DEFAULT_SCHEDULE: DaySchedule[] = ORDERED_WEEK.map(day => ({
+  day,
+  off: day === 0 || day === 6,
+  start: '08:00',
+  end: '17:00'
+}));
+
+function formatSchedule(st: StaffUser): string | null {
+  if (!st.work_schedule || st.work_schedule.length === 0) return null;
+  const byDay = new Map(st.work_schedule.map(e => [e.day, e]));
+  const parts = ORDERED_WEEK
+    .map(d => byDay.get(d))
+    .filter((e): e is DaySchedule => !!e && !e.off)
+    .map(e => `${WEEKDAY_SHORT[e.day]} ${e.start.slice(0, 5)}-${e.end.slice(0, 5)}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 export const SettingsPage: React.FC = () => {
-  const { user: currentUser, clinic, renewSubscription, pollSubscriptionStatus, refreshProfile, setPassword } = useAuth();
+  const { user: currentUser, clinic, renewSubscription, pollSubscriptionStatus, activateFreePlan, refreshProfile, setPassword } = useAuth();
   const { showToast } = useNotifications();
 
-  const [activeSubTab, setActiveSubTab] = useState<'billing' | 'clinic' | 'users' | 'security'>('billing');
+  const [activeSubTab, setActiveSubTab] = useState<'billing' | 'clinic' | 'users' | 'security' | 'support'>('billing');
   const [loading, setLoading] = useState<boolean>(true);
 
   // Password / security form states
@@ -48,6 +88,7 @@ export const SettingsPage: React.FC = () => {
   const [newUserEmail, setNewUserEmail] = useState<string>('');
   const [newUserPass, setNewUserPass] = useState<string>('');
   const [newUserRole, setNewUserRole] = useState<string>('doctor');
+  const [newUserSchedule, setNewUserSchedule] = useState<DaySchedule[]>(DEFAULT_SCHEDULE);
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
 
   // Billing & Subscription states
@@ -55,6 +96,28 @@ export const SettingsPage: React.FC = () => {
   const [renewMonths, setRenewMonths] = useState<number>(1);
   const [isRenewing, setIsRenewing] = useState<boolean>(false);
   const [activeCheckout, setActiveCheckout] = useState<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string } | null>(null);
+  const [plansCatalog, setPlansCatalog] = useState<Record<string, any> | null>(null);
+  // null (not a guessed default like 'hopital') until the real value loads —
+  // a fake default here previously let the renewal form render with a
+  // 0 FCFA price before/without a successful fetch (see fetchPlansData).
+  const [currentPlanId, setCurrentPlanId] = useState<'starter' | 'clinique' | 'hopital' | null>(null);
+  const [activeStaffCount, setActiveStaffCount] = useState<number>(0);
+  const [selectedPaidPlan, setSelectedPaidPlan] = useState<'clinique' | 'hopital' | null>(null);
+  const [isActivatingFree, setIsActivatingFree] = useState<boolean>(false);
+
+  // Support ticket states
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketSubject, setTicketSubject] = useState<string>('');
+  const [ticketCategory, setTicketCategory] = useState<string>('general');
+  const [ticketMessage, setTicketMessage] = useState<string>('');
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState<boolean>(false);
+
+  const renewalTargetPlanId: 'clinique' | 'hopital' | null =
+    selectedPaidPlan || (currentPlanId === 'clinique' || currentPlanId === 'hopital' ? currentPlanId : null);
+  const pricePerMonth = (renewalTargetPlanId && plansCatalog?.[renewalTargetPlanId]?.price) || 0;
+  const trialDaysLeft = clinic?.subscription_expires_at
+    ? Math.max(0, Math.ceil((new Date(clinic.subscription_expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : null;
 
   const fetchClinicDetails = async () => {
     try {
@@ -83,11 +146,42 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const fetchPlansData = async () => {
+    try {
+      setLoading(true);
+      const data = await api.get('/settings/plans');
+      setPlansCatalog(data.plans);
+      setCurrentPlanId(data.currentPlan);
+      setActiveStaffCount(data.activeStaffCount || 0);
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur de chargement', err.error || "Impossible de charger les plans d'abonnement.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTickets = async () => {
+    try {
+      setLoading(true);
+      const data = await api.get('/settings/tickets');
+      setTickets(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeSubTab === 'clinic') {
       fetchClinicDetails();
     } else if (activeSubTab === 'users') {
       fetchStaffUsers();
+    } else if (activeSubTab === 'billing') {
+      fetchPlansData();
+    } else if (activeSubTab === 'support') {
+      fetchTickets();
     } else {
       setLoading(false);
     }
@@ -125,13 +219,24 @@ export const SettingsPage: React.FC = () => {
       return;
     }
 
+    const isSchedulable = newUserRole === 'doctor' || newUserRole === 'nurse';
+    if (isSchedulable && newUserSchedule.every(d => d.off)) {
+      showToast('error', 'Horaire requis', 'Sélectionnez au moins un jour de travail pour ce collaborateur.');
+      return;
+    }
+
     setIsSavingUser(true);
     try {
       const payload = {
         name: newUserName,
         email: newUserEmail,
         password: newUserPass,
-        role: newUserRole
+        role: newUserRole,
+        ...(isSchedulable ? {
+          workSchedule: newUserSchedule.map(d => d.off
+            ? { day: d.day, off: true }
+            : { day: d.day, off: false, start: d.start, end: d.end })
+        } : {})
       };
 
       await api.post('/settings/users', payload);
@@ -140,6 +245,7 @@ export const SettingsPage: React.FC = () => {
       setNewUserName('');
       setNewUserEmail('');
       setNewUserPass('');
+      setNewUserSchedule(DEFAULT_SCHEDULE);
       fetchStaffUsers();
     } catch (err: any) {
       console.error(err);
@@ -200,10 +306,11 @@ export const SettingsPage: React.FC = () => {
 
   const handleRenewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!renewalTargetPlanId) return;
 
     setIsRenewing(true);
     try {
-      const result = await renewSubscription(paymentPhone || undefined, renewMonths);
+      const result = await renewSubscription(paymentPhone || undefined, renewMonths, renewalTargetPlanId);
       setActiveCheckout(result);
     } catch (err: any) {
       console.error(err);
@@ -213,13 +320,82 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleActivateFree = async () => {
+    setIsActivatingFree(true);
+    try {
+      await activateFreePlan();
+      showToast('success', 'Plan Starter activé', 'Vous bénéficiez de 7 jours d\'utilisation gratuite.');
+      fetchPlansData();
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || 'Impossible d\'activer ce plan.');
+    } finally {
+      setIsActivatingFree(false);
+    }
+  };
+
+  const handleCreateTicketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketSubject || !ticketMessage) {
+      showToast('error', 'Champs requis', 'Veuillez renseigner le sujet et le message.');
+      return;
+    }
+
+    setIsSubmittingTicket(true);
+    try {
+      await api.post('/settings/tickets', { subject: ticketSubject, category: ticketCategory, message: ticketMessage });
+      showToast('success', 'Ticket envoyé', 'Votre demande a été transmise au support.');
+      setTicketSubject('');
+      setTicketMessage('');
+      setTicketCategory('general');
+      fetchTickets();
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || "Impossible d'envoyer le ticket.");
+    } finally {
+      setIsSubmittingTicket(false);
+    }
+  };
+
+  const PLAN_CARD_META: Record<'starter' | 'clinique' | 'hopital', { badge: string; note: string; ctaLabel: string }> = {
+    starter: { badge: 'Gratuit', note: 'Aucune carte bancaire requise', ctaLabel: "Démarrer l'essai gratuit" },
+    clinique: { badge: 'Populaire', note: 'Renouvellement mensuel automatique', ctaLabel: 'Choisir Clinique' },
+    hopital: { badge: 'Tout inclus', note: 'Idéal pour les cliniques multi-praticiens', ctaLabel: 'Choisir Hôpital' }
+  };
+
+  // Comparison rows are derived from the real plan config (staffLimit/allowedRoles/
+  // paymentMethods), never hardcoded, so the excluded/included markers can't drift
+  // from what the backend actually enforces.
+  const buildFeatureRows = (planData: any): { label: string; ok: boolean }[] => {
+    const staffLabel = planData.staffLimit === null || planData.staffLimit === undefined
+      ? "Utilisateurs & rôles illimités"
+      : `${planData.staffLimit} utilisateurs${planData.allowedRoles ? ' & rôles restreints' : ' & rôles illimités'}`;
+    return [
+      { label: staffLabel, ok: true },
+      { label: 'Patients & Dossiers illimités', ok: true },
+      { label: 'Rendez-vous, Ordonnances & Pharmacie', ok: true },
+      { label: 'Laboratoire & Comptabilité', ok: true },
+      { label: 'Paiement Espèces', ok: true },
+      { label: 'Encaissements Mobile Money', ok: !!planData.paymentMethods?.includes('wave') }
+    ];
+  };
+
   const roleLabels: Record<string, string> = {
     admin: 'Administrateur',
     doctor: 'Médecin',
     secretary: 'Secrétaire',
     pharmacist: 'Pharmacien',
     lab_tech: 'Laborantin',
-    manager: 'Gestionnaire'
+    manager: 'Gestionnaire',
+    nurse: 'Infirmier(ère)'
+  };
+
+  const ticketCategoryLabels: Record<string, string> = { facturation: 'Facturation', bug: 'Bug technique', general: 'Question générale', autre: 'Autre' };
+  const ticketStatusLabels: Record<string, string> = { open: 'Ouvert', in_progress: 'En cours', resolved: 'Résolu', closed: 'Fermé' };
+  const ticketStatusBadges: Record<string, string> = { open: 'badge-warning', in_progress: 'badge-info', resolved: 'badge-success', closed: 'badge-danger' };
+
+  const updateScheduleDay = (day: number, patch: Partial<DaySchedule>) => {
+    setNewUserSchedule(newUserSchedule.map(d => d.day === day ? { ...d, ...patch } : d));
   };
 
   return (
@@ -298,6 +474,18 @@ export const SettingsPage: React.FC = () => {
           grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
           gap: 1.25rem;
           align-items: start;
+        }
+
+        .plan-cards-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+
+        @media (min-width: 850px) {
+          .plan-cards-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
         }
 
         .settings-form-row {
@@ -399,7 +587,7 @@ export const SettingsPage: React.FC = () => {
             onClick={() => setActiveSubTab('billing')}
             className={`settings-tab-btn ${activeSubTab === 'billing' ? 'active' : 'inactive'}`}
           >
-            Gestion de l'abonnement
+            Abonnez-vous
           </button>
 
           <button
@@ -424,75 +612,224 @@ export const SettingsPage: React.FC = () => {
           >
             Sécurité
           </button>
+
+          <button
+            onClick={() => setActiveSubTab('support')}
+            className={`settings-tab-btn ${activeSubTab === 'support' ? 'active' : 'inactive'}`}
+          >
+            Support
+          </button>
         </div>
 
-        {/* TAB 1: GESTION DE L'ABONNEMENT */}
+        {/* TAB 1: ABONNEZ-VOUS — Choisir un plan */}
         {activeSubTab === 'billing' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-            {/* Main Title Section */}
-            <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
-                Abonnement
+            {/* Header — centered eyebrow + title, matches Banani's "Abonnement — Choisir un plan" screen */}
+            <div style={{ textAlign: 'center', maxWidth: '560px', margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '10px' }}>
+                <Star size={14} color="#1e4d40" fill="#1e4d40" />
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#1e4d40', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Nos formules
+                </span>
+              </div>
+              <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px 0', fontFamily: 'var(--font-secondary)' }}>
+                Choisissez votre plan
               </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-                {clinic?.subscription_status === 'expired' ? (
-                  <span style={{ color: 'var(--danger)', fontWeight: 600 }}>Abonnement expiré — renouvelez ci-dessous pour réactiver l'écriture des données.</span>
-                ) : clinic?.subscription_expires_at ? (
-                  `Statut : ${clinic.subscription_status === 'trial' ? 'Période d\'essai' : 'Actif'} · Renouvellement le ${new Date(clinic.subscription_expires_at).toLocaleDateString('fr-FR')}`
-                ) : (
-                  'Statut : Actif · Renouvellement le 02/08/2026'
-                )}
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: 0 }}>
+                {clinic?.subscription_status === 'expired'
+                  ? "Abonnement expiré — choisissez un plan ci-dessous pour réactiver l'écriture des données."
+                  : 'Commencez gratuitement, évoluez selon vos besoins. Sans engagement.'}
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>
+                Plan {(currentPlanId && plansCatalog?.[currentPlanId]?.name) || ''}
+                {clinic?.subscription_expires_at && ` · ${clinic.subscription_status === 'trial' ? "Essai jusqu'au" : 'Renouvellement le'} ${new Date(clinic.subscription_expires_at).toLocaleDateString('fr-FR')}`}
+                {' · '}{activeStaffCount} collaborateur{activeStaffCount > 1 ? 's' : ''} actif{activeStaffCount > 1 ? 's' : ''}
               </p>
             </div>
 
-            <div className="settings-billing-grid">
-
-              {/* Plan Card */}
+            {/* Upgrade nudge for Starter (free-trial) users — points at Hôpital,
+                the tier with no staff/role limits and Mobile Money enabled. */}
+            {!loading && plansCatalog && currentPlanId === 'starter' && (
               <div style={{
-                backgroundColor: '#e6f4ea',
-                border: '1px solid #bbf7d0',
-                borderRadius: '16px',
-                padding: '1.5rem 1.25rem',
-                boxShadow: '0 4px 14px rgba(30, 77, 64, 0.08)'
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
+                backgroundColor: '#fff7e6', border: '1px solid #f0c987', borderRadius: '14px', padding: '1rem 1.25rem',
+                maxWidth: '900px', margin: '0 auto', width: '100%', boxSizing: 'border-box'
               }}>
-                <span style={{ fontSize: '0.725rem', fontWeight: 800, color: '#1e4d40', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  PLAN CLINIQUE
-                </span>
-                
-                <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px', margin: '0.4rem 0 0.8rem 0' }}>
-                  <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e4d40', whiteSpace: 'nowrap' }}>
-                    15 000 FCFA
-                  </span>
-                  <span style={{ fontSize: '0.85rem', color: '#1e4d40', opacity: 0.85, fontWeight: 600 }}>
-                    / mois
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Zap size={18} color="#b8860b" style={{ flexShrink: 0 }} />
+                  <p style={{ fontWeight: 700, color: '#7a5b12', margin: 0, fontSize: '0.85rem' }}>
+                    {trialDaysLeft !== null && `Il vous reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai. `}
+                    Passez au plan Hôpital pour débloquer les utilisateurs illimités et les encaissements Mobile Money.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPaidPlan('hopital')}
+                  style={{ backgroundColor: '#1e4d40', color: '#ffffff', border: 'none', borderRadius: '10px', padding: '9px 16px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  Passer au plan Hôpital
+                </button>
+              </div>
+            )}
+
+            {!loading && plansCatalog && (
+              <div className="plan-cards-grid">
+                {(['starter', 'clinique', 'hopital'] as const).map(planId => {
+                  const planData = plansCatalog[planId];
+                  if (!planData) return null;
+                  const isCurrent = planId === currentPlanId;
+                  const isSelectedForRenewal = planId !== 'starter' && renewalTargetPlanId === planId;
+                  const isHighlighted = planId === 'hopital'; // permanent marketing highlight on the top tier, matches Banani, independent of what's actually subscribed
+                  const meta = PLAN_CARD_META[planId];
+                  const featureRows = buildFeatureRows(planData);
+
+                  return (
+                    <div
+                      key={planId}
+                      style={{
+                        position: 'relative',
+                        backgroundColor: isHighlighted ? '#e6f4ea' : 'var(--bg-secondary)',
+                        border: isHighlighted ? '1px solid #1e4d40' : '1px solid var(--border)',
+                        borderRadius: '16px',
+                        padding: '1.5rem 1.25rem',
+                        boxShadow: isHighlighted ? '0 4px 14px rgba(30, 77, 64, 0.1)' : '0 2px 8px rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1.1rem'
+                      }}
+                    >
+                      {isCurrent && (
+                        <span style={{
+                          position: 'absolute', top: '1.1rem', right: '1.1rem',
+                          fontSize: '0.65rem', fontWeight: 800, color: '#1e4d40',
+                          backgroundColor: '#bbf7d0', padding: '3px 9px', borderRadius: '999px',
+                          textTransform: 'uppercase', letterSpacing: '0.03em'
+                        }}>
+                          Plan actuel
+                        </span>
+                      )}
+
+                      {/* Badge row */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: isCurrent ? '5.5rem' : 0 }}>
+                        <span style={{
+                          fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
+                          backgroundColor: isHighlighted ? '#1e4d40' : (planId === 'clinique' ? '#d4e0dc' : 'var(--bg-primary)'),
+                          color: isHighlighted ? '#ffffff' : '#1e4d40'
+                        }}>
+                          {meta.badge}
+                        </span>
+                        {isHighlighted && <Zap size={14} color="#1e4d40" />}
+                      </div>
+
+                      {/* Price block */}
+                      <div>
+                        <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)', margin: '0 0 4px 0' }}>
+                          {planData.name}
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+                          <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+                            {planData.price === 0 ? '0' : planData.price.toLocaleString()}
+                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '2px' }}>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>FCFA</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {planData.price === 0 ? `${planData.trialDays} jours` : '/ mois'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid var(--border)' }} />
+
+                      {/* Feature comparison rows — included and excluded both shown, matching Banani */}
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: 1 }}>
+                        {featureRows.map((row, i) => (
+                          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '9px' }}>
+                            <span style={{
+                              width: '16px', height: '16px', borderRadius: '999px', flexShrink: 0, marginTop: '1px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              backgroundColor: row.ok ? 'rgba(30, 77, 64, 0.12)' : 'var(--bg-primary)'
+                            }}>
+                              {row.ok ? <Check size={10} color="#1e4d40" /> : <X size={10} color="var(--text-muted)" />}
+                            </span>
+                            <span style={{
+                              fontSize: '0.82rem', lineHeight: 1.25,
+                              color: row.ok ? 'var(--text-primary)' : 'var(--text-muted)',
+                              textDecoration: row.ok ? 'none' : 'line-through'
+                            }}>
+                              {row.label}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* CTA + note */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {isCurrent ? (
+                          <div style={{ width: '100%', padding: '9px 14px', borderRadius: '10px', textAlign: 'center', fontWeight: 700, fontSize: '0.85rem', backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                            Plan actuel
+                          </div>
+                        ) : planId === 'starter' ? (
+                          <button
+                            type="button"
+                            onClick={handleActivateFree}
+                            disabled={isActivatingFree}
+                            className="btn"
+                            style={{ width: '100%', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 14px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                          >
+                            {isActivatingFree ? 'Activation...' : meta.ctaLabel}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPaidPlan(planId as 'clinique' | 'hopital')}
+                            className="btn"
+                            style={{
+                              width: '100%',
+                              backgroundColor: isSelectedForRenewal ? '#1e4d40' : (isHighlighted ? '#1e4d40' : 'var(--bg-primary)'),
+                              color: isSelectedForRenewal || isHighlighted ? '#ffffff' : 'var(--text-primary)',
+                              border: isSelectedForRenewal || isHighlighted ? 'none' : '1px solid var(--border)',
+                              borderRadius: '10px',
+                              padding: '9px 14px',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {isSelectedForRenewal ? 'Sélectionné ✓' : meta.ctaLabel}
+                          </button>
+                        )}
+                        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>
+                          {meta.note}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Comparison note bar — softened vs. Banani's copy: dropped the "support email"
+                claim (no support channel exists in this app, same reasoning that removed a
+                fake WhatsApp link elsewhere), kept only verifiable claims. */}
+            {!loading && plansCatalog && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
+                <div style={{ flex: 1, borderTop: '1px solid var(--border)' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '10px', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Tous les plans incluent : accès web & mobile, mises à jour incluses, changement de plan à tout moment
                   </span>
                 </div>
-
-                <p style={{ fontSize: '0.8rem', color: '#1e4d40', opacity: 0.85, margin: '0 0 1rem 0' }}>
-                  La solution complète pour votre clinique
-                </p>
-
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.825rem' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 600 }}>
-                    <Check size={15} color="#1e4d40" style={{ flexShrink: 0 }} /> <span>Jusqu'à 15 collaborateurs</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 600 }}>
-                    <Check size={15} color="#1e4d40" style={{ flexShrink: 0 }} /> <span>Dossiers patients illimités</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 600 }}>
-                    <Check size={15} color="#1e4d40" style={{ flexShrink: 0 }} /> <span>Pharmacie & Laboratoire inclus</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 600 }}>
-                    <Check size={15} color="#1e4d40" style={{ flexShrink: 0 }} /> <span>Encaissements & Facturation FCFA</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e4d40', fontWeight: 600 }}>
-                    <Check size={15} color="#1e4d40" style={{ flexShrink: 0 }} /> <span>Mode déconnecté basique</span>
-                  </li>
-                </ul>
+                <div style={{ flex: 1, borderTop: '1px solid var(--border)' }} />
               </div>
+            )}
 
-              {/* Renewal Form */}
+            {/* Payment form — only shown once a paid plan (Clinique/Hôpital) is targeted,
+                either because it's already the active plan (renewal) or just picked above.
+                Also requires plansCatalog to be loaded — renewalTargetPlanId alone isn't
+                enough to guarantee a real price is available to display. */}
+            {plansCatalog && renewalTargetPlanId && (
               <form onSubmit={handleRenewSubmit} style={{
                 backgroundColor: 'var(--bg-secondary)',
                 border: '1px solid var(--border)',
@@ -501,10 +838,12 @@ export const SettingsPage: React.FC = () => {
                 boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1rem',
+                maxWidth: '420px',
+                width: '100%'
               }}>
                 <span style={{ fontSize: '0.725rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  RENOUVELER PAR MOBILE MONEY
+                  {renewalTargetPlanId === currentPlanId ? 'RENOUVELER' : 'PASSER AU PLAN'} {plansCatalog?.[renewalTargetPlanId]?.name?.toUpperCase()}
                 </span>
 
                 <div>
@@ -517,13 +856,16 @@ export const SettingsPage: React.FC = () => {
                     className="input-control"
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '0.85rem' }}
                   >
-                    <option value={1}>1 mois — 15 000 FCFA</option>
-                    <option value={3}>3 mois — 45 000 FCFA</option>
-                    <option value={6}>6 mois — 90 000 FCFA</option>
-                    <option value={12}>12 mois — 180 000 FCFA</option>
+                    {[1, 3, 6, 12].map(n => (
+                      <option key={n} value={n}>{n} mois — {(n * pricePerMonth).toLocaleString()} FCFA</option>
+                    ))}
                   </select>
                 </div>
 
+                {/* Paying MediClinic's own subscription fee always goes through the
+                    Bictorys/PayTech Mobile Money checkout, regardless of which tier is
+                    being purchased — the target plan's `paymentMethods` describes what
+                    the clinic can charge its OWN patients, not how the clinic pays us. */}
                 <div>
                   <label style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>
                     Numéro Mobile Money (optionnel)
@@ -560,12 +902,11 @@ export const SettingsPage: React.FC = () => {
                       <span>Initialisation...</span>
                     </>
                   ) : (
-                    <span>Continuer vers le paiement ({(renewMonths * 15000).toLocaleString()} FCFA)</span>
+                    <span>Continuer vers le paiement ({(renewMonths * pricePerMonth).toLocaleString()} FCFA)</span>
                   )}
                 </button>
               </form>
-
-            </div>
+            )}
 
           </div>
         )}
@@ -574,11 +915,13 @@ export const SettingsPage: React.FC = () => {
           <PaymentCheckoutModal
             checkoutUrl={activeCheckout.checkoutUrl}
             provider={activeCheckout.provider}
-            amountLabel={`${(renewMonths * 15000).toLocaleString()} FCFA`}
+            amountLabel={`${(renewMonths * pricePerMonth).toLocaleString()} FCFA`}
             pollStatus={() => pollSubscriptionStatus(activeCheckout.subscriptionPaymentId)}
             onSuccess={() => {
-              showToast('success', 'Abonnement renouvelé', `Votre abonnement a été prolongé de ${renewMonths} mois.`);
+              showToast('success', 'Abonnement activé', `Votre plan a été activé/renouvelé pour ${renewMonths} mois.`);
               setActiveCheckout(null);
+              setSelectedPaidPlan(null);
+              fetchPlansData();
             }}
             onClose={() => setActiveCheckout(null)}
           />
@@ -638,7 +981,7 @@ export const SettingsPage: React.FC = () => {
         {activeSubTab === 'users' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-              <button onClick={() => setIsUserModalOpen(true)} className="btn btn-primary" style={{ gap: '6px', backgroundColor: '#1e4d40', borderRadius: '10px' }}>
+              <button onClick={() => setIsUserModalOpen(true)} className="btn btn-primary page-cta-btn" style={{ gap: '6px', backgroundColor: '#1e4d40', borderRadius: '10px' }}>
                 <Plus size={16} />
                 <span>Ajouter un collaborateur</span>
               </button>
@@ -660,7 +1003,14 @@ export const SettingsPage: React.FC = () => {
                     <tr key={st.id} style={{ opacity: st.active === 0 ? 0.6 : 1 }}>
                       <td style={{ fontWeight: 600 }}>{st.name}</td>
                       <td>{st.email}</td>
-                      <td><span className="badge badge-info">{roleLabels[st.role]}</span></td>
+                      <td>
+                        <span className="badge badge-info">{roleLabels[st.role]}</span>
+                        {formatSchedule(st) && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                            {formatSchedule(st)}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         {st.active === 1 ? (
                           <span className="badge badge-success">Actif</span>
@@ -760,6 +1110,78 @@ export const SettingsPage: React.FC = () => {
           </form>
         )}
 
+        {/* TAB 5: SUPPORT */}
+        {activeSubTab === 'support' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <form onSubmit={handleCreateTicketSubmit} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '520px', width: '100%', boxSizing: 'border-box' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border)', paddingBottom: '8px', margin: 0 }}>
+                Contacter le support
+              </h3>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Sujet *</label>
+                <input type="text" value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} className="input-control" required />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Catégorie *</label>
+                <select value={ticketCategory} onChange={e => setTicketCategory(e.target.value)} className="input-control" required>
+                  <option value="general">Question générale</option>
+                  <option value="facturation">Facturation</option>
+                  <option value="bug">Bug technique</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Message *</label>
+                <textarea value={ticketMessage} onChange={e => setTicketMessage(e.target.value)} className="input-control" rows={4} required />
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', backgroundColor: '#1e4d40', borderRadius: '10px' }} disabled={isSubmittingTicket}>
+                {isSubmittingTicket ? 'Envoi...' : 'Envoyer le ticket'}
+              </button>
+            </form>
+
+            <div className="table-container">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Sujet</th>
+                    <th>Catégorie</th>
+                    <th>Statut</th>
+                    <th>Créé le</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tickets.map(t => (
+                    <tr key={t.id}>
+                      <td style={{ fontWeight: 600 }}>
+                        {t.subject}
+                        {t.resolution_note && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                            {t.resolution_note}
+                          </div>
+                        )}
+                      </td>
+                      <td>{ticketCategoryLabels[t.category] || t.category}</td>
+                      <td>
+                        <span className={`badge ${ticketStatusBadges[t.status] || 'badge-info'}`}>
+                          {ticketStatusLabels[t.status] || t.status}
+                        </span>
+                      </td>
+                      <td>{new Date(t.created_at).toLocaleDateString('fr-FR')}</td>
+                    </tr>
+                  ))}
+                  {tickets.length === 0 && (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem' }}>Aucun ticket envoyé.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* CREATE STAFF USER MODAL */}
         {isUserModalOpen && (
           <div className="modal-backdrop" onClick={() => setIsUserModalOpen(false)}>
@@ -790,12 +1212,84 @@ export const SettingsPage: React.FC = () => {
                     <label>Rôle / Profil d'accès *</label>
                     <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} className="input-control" required>
                       <option value="doctor">Médecin / Praticien</option>
+                      <option value="nurse">Infirmier(ère)</option>
                       <option value="secretary">Secrétaire / Accueil</option>
                       <option value="pharmacist">Pharmacien interne</option>
                       <option value="lab_tech">Technicien Laboratoire</option>
                       <option value="manager">Gestionnaire Financier</option>
                     </select>
                   </div>
+
+                  {(newUserRole === 'doctor' || newUserRole === 'nurse') && (
+                    <div className="form-group">
+                      <label>Horaire de travail *</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {ORDERED_WEEK.map(day => {
+                          const entry = newUserSchedule.find(d => d.day === day)!;
+                          return (
+                            <div
+                              key={day}
+                              style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '6px 0',
+                                borderBottom: '1px solid var(--border)'
+                              }}
+                            >
+                              <span style={{ width: '38px', fontWeight: 700, fontSize: '0.8rem', flexShrink: 0 }}>
+                                {WEEKDAY_SHORT[day]}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => updateScheduleDay(day, { off: !entry.off })}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '8px',
+                                  border: `1px solid ${entry.off ? 'var(--border)' : 'var(--primary)'}`,
+                                  backgroundColor: entry.off ? 'transparent' : 'var(--primary-light, #e6f4ea)',
+                                  color: entry.off ? 'var(--text-muted)' : 'var(--primary)',
+                                  fontWeight: 600,
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  flexShrink: 0
+                                }}
+                              >
+                                {entry.off ? 'Absent' : 'Travaille'}
+                              </button>
+
+                              {!entry.off && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 190px', minWidth: '190px' }}>
+                                  <input
+                                    type="time"
+                                    value={entry.start}
+                                    onChange={e => updateScheduleDay(day, { start: e.target.value })}
+                                    className="input-control"
+                                    style={{ padding: '6px', flex: '1 1 85px', minWidth: '85px' }}
+                                    required
+                                  />
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', flexShrink: 0 }}>à</span>
+                                  <input
+                                    type="time"
+                                    value={entry.end}
+                                    onChange={e => updateScheduleDay(day, { end: e.target.value })}
+                                    className="input-control"
+                                    style={{ padding: '6px', flex: '1 1 85px', minWidth: '85px' }}
+                                    required
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '8px 0 0' }}>
+                        En dehors de ces jours/heures (ou un jour marqué "Absent"), ce collaborateur apparaîtra automatiquement "Absent" pour l'orientation des patients.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="modal-footer">
