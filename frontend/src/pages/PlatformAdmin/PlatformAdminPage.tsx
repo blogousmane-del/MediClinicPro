@@ -25,6 +25,8 @@ interface ClinicOverview {
   address: string | null;
   plan: 'starter' | 'clinique' | 'hopital';
   status: 'active' | 'expired';
+  unlimitedStaff: boolean;
+  suspended: boolean;
   subscriptionExpiresAt: string | null;
   createdAt: string;
   practitioners: number;
@@ -182,6 +184,33 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Erreur', err.error || "Impossible de mettre à jour le ticket.");
+    }
+  };
+
+  const handleToggleClinicOverride = async (clinicId: number, unlimited: boolean) => {
+    try {
+      await api.put(`/platform/clinics/${clinicId}/staff-override`, { unlimited });
+      showToast('success', 'Mis à jour', unlimited ? 'Limite de personnel levée.' : 'Limite de personnel rétablie.');
+      const result = await api.get('/platform/overview');
+      setOverview(result);
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || "Impossible de mettre à jour l'exception de personnel.");
+    }
+  };
+
+  const handleToggleClinicSuspend = async (clinicId: number, suspended: boolean) => {
+    if (suspended && !window.confirm("Suspendre cette clinique ? Tous ses utilisateurs perdront l'accès en écriture jusqu'à réactivation.")) {
+      return;
+    }
+    try {
+      await api.put(`/platform/clinics/${clinicId}/suspend`, { suspended });
+      showToast('success', 'Mis à jour', suspended ? 'Clinique suspendue.' : 'Clinique réactivée.');
+      const result = await api.get('/platform/overview');
+      setOverview(result);
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || "Impossible de mettre à jour le statut de la clinique.");
     }
   };
 
@@ -349,7 +378,13 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
           ) : (
             <>
               {section === 'overview' && <OverviewSection overview={overview} onViewTickets={() => setSection('tickets')} />}
-              {section === 'clinics' && <ClinicsSection clinics={overview.clinics} />}
+              {section === 'clinics' && (
+                <ClinicsSection
+                  clinics={overview.clinics}
+                  onToggleOverride={handleToggleClinicOverride}
+                  onToggleSuspend={handleToggleClinicSuspend}
+                />
+              )}
               {section === 'users' && <UsersSection users={platformUsers} />}
               {section === 'subscriptions' && <SubscriptionsSection data={subscriptions} />}
               {section === 'tickets' && (
@@ -485,6 +520,13 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
 const planLabels: Record<string, string> = { starter: 'Starter', clinique: 'Clinique', hopital: 'Hôpital' };
 const planBadges: Record<string, string> = { starter: 'badge-info', clinique: 'badge-warning', hopital: 'badge-success' };
 
+const clinicStatusBadge = (c: { status: 'active' | 'expired'; suspended?: boolean }): { label: string; className: string } => {
+  if (c.suspended) return { label: 'Suspendu', className: 'badge-danger' };
+  return c.status === 'active'
+    ? { label: 'Actif', className: 'badge-success' }
+    : { label: 'Expiré', className: 'badge-danger' };
+};
+
 const ClinicsTable: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
   <div className="table-container">
     <table style={{ width: '100%' }}>
@@ -511,9 +553,7 @@ const ClinicsTable: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
             <td style={{ textAlign: 'center' }}>{c.practitioners}</td>
             <td style={{ textAlign: 'center' }}>{c.patients}</td>
             <td>
-              <span className={`badge ${c.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                {c.status === 'active' ? 'Actif' : 'Expiré'}
-              </span>
+              <span className={`badge ${clinicStatusBadge(c).className}`}>{clinicStatusBadge(c).label}</span>
             </td>
             <td>{formatDate(c.createdAt)}</td>
           </tr>
@@ -526,11 +566,144 @@ const ClinicsTable: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
   </div>
 );
 
-const ClinicsSection: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
-  <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-    <ClinicsTable clinics={clinics} />
-  </div>
-);
+const ClinicsSection: React.FC<{
+  clinics: ClinicOverview[];
+  onToggleOverride: (clinicId: number, unlimited: boolean) => void;
+  onToggleSuspend: (clinicId: number, suspended: boolean) => void;
+}> = ({ clinics, onToggleOverride, onToggleSuspend }) => {
+  const [search, setSearch] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const filterPills: { value: string; label: string }[] = [
+    { value: '', label: 'Tous' },
+    { value: 'active', label: 'Actif' },
+    { value: 'expired', label: 'Expiré' },
+    { value: 'suspended', label: 'Suspendu' }
+  ];
+
+  const filtered = clinics.filter(c => {
+    const matchesSearch = !search || c.name.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus =
+      !statusFilter ||
+      (statusFilter === 'suspended' ? c.suspended : (!c.suspended && c.status === statusFilter));
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher une clinique..."
+          className="input-control"
+          style={{ maxWidth: '260px' }}
+        />
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {filterPills.map(p => (
+            <button
+              key={p.value}
+              onClick={() => setStatusFilter(p.value)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '999px',
+                border: '1px solid var(--border)',
+                backgroundColor: statusFilter === p.value ? '#1e4d40' : 'var(--bg-secondary)',
+                color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-container">
+          <table style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Clinique</th>
+                <th>Plan</th>
+                <th style={{ textAlign: 'center' }}>Prat.</th>
+                <th style={{ textAlign: 'center' }}>Patients</th>
+                <th>Statut</th>
+                <th>Illimité</th>
+                <th>Inscrite le</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(c => {
+                const badge = clinicStatusBadge(c);
+                return (
+                  <React.Fragment key={`${c.id}-${c.suspended}-${c.unlimitedStaff}`}>
+                    <tr>
+                      <td>
+                        <strong>{c.name}</strong>
+                        {c.address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.address}</div>}
+                      </td>
+                      <td><span className={`badge ${planBadges[c.plan] || 'badge-info'}`}>{planLabels[c.plan] || c.plan}</span></td>
+                      <td style={{ textAlign: 'center' }}>{c.practitioners}</td>
+                      <td style={{ textAlign: 'center' }}>{c.patients}</td>
+                      <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
+                      <td>{c.unlimitedStaff && <span className="badge badge-success">Illimité</span>}</td>
+                      <td>{formatDate(c.createdAt)}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
+                          className="btn btn-outline"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                        >
+                          {expandedId === c.id ? 'Fermer' : 'Gérer'}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedId === c.id && (
+                      <tr>
+                        <td colSpan={8} style={{ backgroundColor: 'var(--bg-secondary)', padding: '1rem 1.25rem' }}>
+                          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => onToggleOverride(c.id, !c.unlimitedStaff)}
+                              className="btn btn-outline"
+                              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                            >
+                              {c.unlimitedStaff ? "Retirer l'illimité" : 'Rendre illimité'}
+                            </button>
+                            <button
+                              onClick={() => onToggleSuspend(c.id, !c.suspended)}
+                              className="btn btn-outline"
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '0.8rem',
+                                borderColor: c.suspended ? 'var(--success)' : 'var(--danger)',
+                                color: c.suspended ? 'var(--success)' : 'var(--danger)'
+                              }}
+                            >
+                              {c.suspended ? 'Réactiver' : 'Suspendre'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem' }}>Aucune clinique ne correspond aux filtres.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const UsersSection: React.FC<{ users: PlatformUser[] | null }> = ({ users }) => {
   if (!users) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
