@@ -622,25 +622,33 @@ Change:
 
 to:
 
+**Post-implementation security fix (found in code review, applied before merge):** the snippet below matches `req.originalUrl` including its query string. Since query values are attacker-controlled, matching the raw `req.originalUrl` lets any authenticated caller bypass both this check and the expiry check below by appending a bogus query string, e.g. `POST /api/patients?x=/platform` — `req.originalUrl.includes('/platform')` would then be `true` and the write goes through unblocked, completely defeating the suspension kill switch. The actually-shipped code strips the query string first (`const requestPath = req.originalUrl.split('?')[0];`) and matches against `requestPath` instead — reflected below.
+
 ```js
       // If subscription is expired and user is trying to perform a write operation
       // Allow only settings/billing update or GET requests.
       const isReadRequest = req.method === 'GET';
+      // Route checks below must match against the PATH only, never the raw
+      // originalUrl (which includes the query string). req.originalUrl.includes()
+      // on the full URL let any caller bypass every gate below by appending an
+      // arbitrary query string, e.g. POST /api/patients?x=/platform — a real,
+      // exploitable bug caught in code review before this shipped.
+      const requestPath = req.originalUrl.split('?')[0];
       // A clinic that's actually expired must still be able to reach the renewal
       // endpoint itself — otherwise paying to unlock is blocked by the very
       // gate it's supposed to lift. (/settings/subscription never existed as a
       // real route; this previously meant expired clinics had NO way to renew.)
       const isBillingRoute =
-        req.originalUrl.includes('/financials/subscription') ||
-        req.originalUrl.includes('/settings/plan') ||
-        req.originalUrl.includes('/auth/logout');
+        requestPath.includes('/financials/subscription') ||
+        requestPath.includes('/settings/plan') ||
+        requestPath.includes('/auth/logout');
       // A Super Admin's OWN clinic being expired or suspended must never lock
       // them out of the Platform Admin console — that's the one place able to
       // lift a suspension in the first place. Safe to exempt broadly: every
       // /api/platform route is already gated by superAdminOnly (email
       // allowlist), so this doesn't open anything to a caller who couldn't
       // already reach it.
-      const isPlatformRoute = req.originalUrl.includes('/platform');
+      const isPlatformRoute = requestPath.includes('/platform');
 
       const now = new Date();
       const expiresAt = clinic.subscription_expires_at ? new Date(clinic.subscription_expires_at) : null;
