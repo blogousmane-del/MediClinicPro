@@ -214,6 +214,18 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     }
   };
 
+  const handleToggleUserActive = async (userId: number, active: boolean) => {
+    try {
+      await api.put(`/platform/users/${userId}`, { active });
+      showToast('success', 'Mis à jour', 'Le statut du compte a été modifié.');
+      const updated = await api.get('/platform/users');
+      setPlatformUsers(updated);
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || "Impossible de mettre à jour le statut.");
+    }
+  };
+
   const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
     { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
     { id: 'clinics', label: 'Cliniques', icon: Building2 },
@@ -385,7 +397,9 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
                   onToggleSuspend={handleToggleClinicSuspend}
                 />
               )}
-              {section === 'users' && <UsersSection users={platformUsers} />}
+              {section === 'users' && (
+                <UsersSection users={platformUsers} currentUserId={user?.id} onToggleActive={handleToggleUserActive} />
+              )}
               {section === 'subscriptions' && <SubscriptionsSection data={subscriptions} />}
               {section === 'tickets' && (
                 <TicketsSection
@@ -705,40 +719,113 @@ const ClinicsSection: React.FC<{
   );
 };
 
-const UsersSection: React.FC<{ users: PlatformUser[] | null }> = ({ users }) => {
+const UsersSection: React.FC<{
+  users: PlatformUser[] | null;
+  currentUserId?: number;
+  onToggleActive: (userId: number, active: boolean) => void;
+}> = ({ users, currentUserId, onToggleActive }) => {
+  const [search, setSearch] = useState<string>('');
+  const [roleFilter, setRoleFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+
   if (!users) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
+
+  const roleOptions = Array.from(new Set(users.map(u => u.role)));
+
+  const filtered = users.filter(u => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    const matchesRole = !roleFilter || u.role === roleFilter;
+    const matchesStatus = !statusFilter || (statusFilter === 'active' ? u.active : !u.active);
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="table-container">
-        <table style={{ width: '100%' }}>
-          <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Email</th>
-              <th>Rôle</th>
-              <th>Clinique</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.id}>
-                <td><strong>{u.name}</strong></td>
-                <td>{u.email}</td>
-                <td>{roleLabels[u.role] || u.role}</td>
-                <td>{u.clinicName}</td>
-                <td>
-                  <span className={`badge ${u.active ? 'badge-success' : 'badge-danger'}`}>
-                    {u.active ? 'Actif' : 'Inactif'}
-                  </span>
-                </td>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Rechercher nom ou email..."
+          className="input-control"
+          style={{ maxWidth: '240px' }}
+        />
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input-control" style={{ maxWidth: '200px' }}>
+          <option value="">Tous les rôles</option>
+          {roleOptions.map(r => <option key={r} value={r}>{roleLabels[r] || r}</option>)}
+        </select>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {[{ value: '', label: 'Tous' }, { value: 'active', label: 'Actif' }, { value: 'inactive', label: 'Inactif' }].map(p => (
+            <button
+              key={p.value}
+              onClick={() => setStatusFilter(p.value)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '999px',
+                border: '1px solid var(--border)',
+                backgroundColor: statusFilter === p.value ? '#1e4d40' : 'var(--bg-secondary)',
+                color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="table-container">
+          <table style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th>Email</th>
+                <th>Rôle</th>
+                <th>Clinique</th>
+                <th>Statut</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
-            ))}
-            {users.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem' }}>Aucun utilisateur.</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map(u => (
+                <tr key={u.id}>
+                  <td><strong>{u.name}</strong></td>
+                  <td>{u.email}</td>
+                  <td>{roleLabels[u.role] || u.role}</td>
+                  <td>{u.clinicName}</td>
+                  <td>
+                    <span className={`badge ${u.active ? 'badge-success' : 'badge-danger'}`}>
+                      {u.active ? 'Actif' : 'Inactif'}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {u.id !== currentUserId && (
+                      <button
+                        onClick={() => onToggleActive(u.id, !u.active)}
+                        className="btn btn-outline"
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          borderColor: u.active ? 'var(--danger)' : 'var(--success)',
+                          color: u.active ? 'var(--danger)' : 'var(--success)'
+                        }}
+                      >
+                        {u.active ? 'Désactiver' : 'Activer'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem' }}>Aucun utilisateur ne correspond aux filtres.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
