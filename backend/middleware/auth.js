@@ -25,7 +25,7 @@ async function auth(req, res, next) {
     // Check clinic subscription status
     const { data: clinic, error: clinicError } = await supabase
       .from('clinics')
-      .select('subscription_status, subscription_expires_at')
+      .select('subscription_status, subscription_expires_at, suspended_by_platform')
       .eq('id', decoded.clinicId)
       .maybeSingle();
 
@@ -48,12 +48,32 @@ async function auth(req, res, next) {
         req.originalUrl.includes('/financials/subscription') ||
         req.originalUrl.includes('/settings/plan') ||
         req.originalUrl.includes('/auth/logout');
+      // A Super Admin's OWN clinic being expired or suspended must never lock
+      // them out of the Platform Admin console — that's the one place able to
+      // lift a suspension in the first place. Safe to exempt broadly: every
+      // /api/platform route is already gated by superAdminOnly (email
+      // allowlist), so this doesn't open anything to a caller who couldn't
+      // already reach it.
+      const isPlatformRoute = req.originalUrl.includes('/platform');
 
       const now = new Date();
       const expiresAt = clinic.subscription_expires_at ? new Date(clinic.subscription_expires_at) : null;
       const isExpired = clinic.subscription_status === 'expired' || (expiresAt && expiresAt < now);
+      const isSuspended = clinic.suspended_by_platform === true;
 
-      if (isExpired && !isReadRequest && !isBillingRoute) {
+      // Suspension is a platform decision, not a billing state — unlike
+      // SUBSCRIPTION_EXPIRED there is deliberately no billing-route bypass:
+      // paying does not lift a suspension, only a Super Admin reversing the
+      // toggle does. Checked first so its message wins if both are true.
+      if (isSuspended && !isReadRequest && !isPlatformRoute) {
+        return res.status(403).json({
+          error: "Compte suspendu",
+          code: "ACCOUNT_SUSPENDED",
+          message: "Ce compte a été suspendu par l'administrateur de la plateforme. Contactez le support pour plus d'informations."
+        });
+      }
+
+      if (isExpired && !isReadRequest && !isBillingRoute && !isPlatformRoute) {
         return res.status(403).json({
           error: "Abonnement MediClinic expiré",
           code: "SUBSCRIPTION_EXPIRED",
