@@ -170,14 +170,25 @@ router.get('/subscriptions', async (req, res) => {
     if (clinicsError) throw clinicsError;
 
     const clinicNameById = new Map(clinics.map(c => [c.id, c.name]));
+    const now = new Date();
 
     res.json({
-      clinics: clinics.map(c => ({
-        id: c.id,
-        name: c.name,
-        subscriptionStatus: c.subscription_status,
-        subscriptionExpiresAt: c.subscription_expires_at
-      })),
+      clinics: clinics.map(c => {
+        const expiresAt = c.subscription_expires_at ? new Date(c.subscription_expires_at) : null;
+        // subscription_status is only ever written as 'active' by the payment
+        // webhook (backend/routes/webhooks.js) — nothing in this codebase ever
+        // flips it to 'expired' on its own, so it can't be trusted alone.
+        // Compute the same way GET /overview's enrichedClinics does, so this
+        // tab's Actif/Expiré filter reflects reality instead of a column that
+        // silently stays 'active' forever.
+        const isExpired = c.subscription_status === 'expired' || (expiresAt && expiresAt < now);
+        return {
+          id: c.id,
+          name: c.name,
+          subscriptionStatus: isExpired ? 'expired' : 'active',
+          subscriptionExpiresAt: c.subscription_expires_at
+        };
+      }),
       payments: (payments || []).map(p => ({
         id: p.id,
         clinicName: clinicNameById.get(p.clinic_id) || 'Clinique supprimée',
