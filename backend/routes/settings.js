@@ -140,7 +140,7 @@ router.post('/users', auth, checkRole(['admin']), async (req, res) => {
 
     const { data: clinic, error: clinicError } = await supabase
       .from('clinics')
-      .select('plan')
+      .select('plan, unlimited_staff')
       .eq('id', req.user.clinicId)
       .single();
     if (clinicError) throw clinicError;
@@ -157,7 +157,7 @@ router.post('/users', auth, checkRole(['admin']), async (req, res) => {
       .eq('active', 1);
     if (countError) throw countError;
 
-    if (isStaffLimitReached(clinic.plan, activeStaffCount || 0)) {
+    if (isStaffLimitReached(clinic.plan, activeStaffCount || 0, clinic.unlimited_staff)) {
       const plan = getPlan(clinic.plan);
       return res.status(403).json({ error: `Le plan ${plan.name} est limité à ${plan.staffLimit} collaborateurs actifs. Passez à un plan supérieur dans Abonnez-vous pour ajouter ce collaborateur.` });
     }
@@ -244,7 +244,7 @@ router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
     if (role || isReactivating) {
       const { data: clinic, error: clinicError } = await supabase
         .from('clinics')
-        .select('plan')
+        .select('plan, unlimited_staff')
         .eq('id', req.user.clinicId)
         .single();
       if (clinicError) throw clinicError;
@@ -262,7 +262,7 @@ router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
           .eq('active', 1);
         if (countError) throw countError;
 
-        if (isStaffLimitReached(clinic.plan, activeStaffCount || 0)) {
+        if (isStaffLimitReached(clinic.plan, activeStaffCount || 0, clinic.unlimited_staff)) {
           const plan = getPlan(clinic.plan);
           return res.status(403).json({ error: `Le plan ${plan.name} est limité à ${plan.staffLimit} collaborateurs actifs. Passez à un plan supérieur dans Abonnez-vous pour réactiver ce compte.` });
         }

@@ -69,7 +69,8 @@ function isRoleAllowedForPlan(planId, role) {
   return plan.allowedRoles.includes(role);
 }
 
-function isStaffLimitReached(planId, currentActiveStaffCount) {
+function isStaffLimitReached(planId, currentActiveStaffCount, unlimitedOverride = false) {
+  if (unlimitedOverride) return false;
   const plan = getPlan(planId);
   if (plan.staffLimit === null || plan.staffLimit === undefined) return false;
   return currentActiveStaffCount >= plan.staffLimit;

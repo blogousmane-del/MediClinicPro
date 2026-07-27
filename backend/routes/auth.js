@@ -452,7 +452,7 @@ router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
     if (staff && Array.isArray(staff)) {
       const { data: clinicForPlan, error: clinicPlanError } = await supabase
         .from('clinics')
-        .select('plan')
+        .select('plan, unlimited_staff')
         .eq('id', req.user.clinicId)
         .single();
       if (clinicPlanError) throw clinicPlanError;
@@ -474,7 +474,7 @@ router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
             const plan = getPlan(clinicForPlan.plan);
             return res.status(403).json({ error: `Le plan ${plan.name} n'autorise pas le rôle "${role}". Passez à un plan supérieur dans Abonnez-vous pour débloquer ce rôle.` });
           }
-          if (isStaffLimitReached(clinicForPlan.plan, activeStaffCount)) {
+          if (isStaffLimitReached(clinicForPlan.plan, activeStaffCount, clinicForPlan.unlimited_staff)) {
             const plan = getPlan(clinicForPlan.plan);
             return res.status(403).json({ error: `Le plan ${plan.name} est limité à ${plan.staffLimit} collaborateurs actifs. Passez à un plan supérieur dans Abonnez-vous pour ajouter plus de collaborateurs.` });
           }
