@@ -32,7 +32,7 @@ Same schema-drift constraint as every other change this session (see CLAUDE.md's
 
 ### Backend enforcement
 
-**`backend/utils/plans.js`** — `isStaffLimitReached(planId, currentActiveStaffCount, unlimitedOverride)` gains a third parameter (default `false` for existing callers that don't pass it, though all call sites below are updated to pass it). Returns `false` immediately when `unlimitedOverride` is true, before consulting the plan's `staffLimit`.
+**`backend/utils/plans.js`** — `isStaffLimitReached(planId, currentActiveStaffCount, unlimitedOverride)` gains a third parameter (default `false` for existing callers that don't pass it, though all call sites below are updated to pass it). Returns `false` immediately when `unlimitedOverride` is true, before consulting the plan's `staffLimit`. **Scope note:** this override lifts only the staff *count* limit — `isRoleAllowedForPlan` is untouched, so a Starter clinic with the override still cannot add a `pharmacist`/`lab_tech`/`manager`/`nurse` (roles outside `['admin', 'doctor', 'secretary']`). The user asked for unlimited *accounts*, not a backdoor around role gating; don't conflate the two checks.
 
 Call sites that must now fetch `unlimited_staff` alongside `plan` and pass it through:
 - `backend/routes/settings.js` — `POST /users` (staff add), `PUT /users/:id` (reactivation)
@@ -48,9 +48,11 @@ If `isSuspended && !isReadRequest`, block with `403` and a **new** error code `A
 
 Message: `"Ce compte a été suspendu par l'administrateur de la plateforme. Contactez le support pour plus d'informations."`
 
+**Self-lockout guard (caught in senior review — not in the original decisions, but required for correctness):** `/api/platform/*` routes must be exempted from *both* the expiry check and this new suspension check, added to the existing `isBillingRoute`-style allowlist as a separate `isPlatformRoute = req.originalUrl.includes('/api/platform')` condition, e.g. `if ((isExpired && !isBillingRoute && !isPlatformRoute) || (isSuspended && !isPlatformRoute)) && !isReadRequest`. Reasoning: `platform.js`'s own mutation endpoints (`PUT /platform/clinics/:id/suspend`, etc.) go through this same `auth` middleware. Without this exemption, a Super Admin whose *own* clinic is suspended (or merely has an expired subscription — already a latent gap today, not previously noticed) would be locked out of the one endpoint that could lift it. This is safe to exempt broadly: `superAdminOnly` already gates every `/api/platform` route by email allowlist, so exempting the route from the clinic-status check doesn't open it to anyone who couldn't already reach it.
+
 ### New backend endpoints (`backend/routes/platform.js`)
 
-All gated by the existing `router.use(auth, superAdminOnly)`. Each is the first mutation-writing-an-activity-log in this file (today it writes none) — the affected clinic's own activity feed should show what a platform operator did to it, for transparency to that clinic's staff.
+All gated by the existing `router.use(auth, superAdminOnly)`. Each is the first mutation-writing-an-activity-log in this file (today it writes none) — the affected clinic's own activity feed should show what a platform operator did to it, for transparency to that clinic's staff. Every write includes `user_id: req.user.userId` (the acting Super Admin) — safe even though that user belongs to a *different* clinic than the one being logged against: `activity_logs.user_id` is a plain nullable FK to `users(id)` with no clinic-match constraint (confirmed in `supabase_schema.sql`), so this is the one place in the app where `activity_logs.user_id`'s clinic and the row's own `clinic_id` deliberately diverge — worth a one-line comment in the code so it doesn't look like a scoping bug on a later read.
 
 - **`PUT /platform/clinics/:id/staff-override`** — body `{ unlimited: boolean }`. Updates `clinics.unlimited_staff`. Writes `activity_logs` (`clinic_id: <target>`, `action: 'PLATFORM_STAFF_OVERRIDE'`, `details` describing on/off).
 - **`PUT /platform/clinics/:id/suspend`** — body `{ suspended: boolean }`. Updates `clinics.suspended_by_platform`. Writes `activity_logs` (`action: 'PLATFORM_CLINIC_SUSPENDED'` or `'PLATFORM_CLINIC_REACTIVATED'`).
