@@ -28,6 +28,8 @@ CREATE TABLE clinics (
   subscription_status TEXT DEFAULT 'active', -- active, expired, trial
   subscription_expires_at TIMESTAMPTZ,
   plan TEXT NOT NULL DEFAULT 'hopital' CHECK (plan IN ('starter', 'clinique', 'hopital')), -- see backend/utils/plans.js for pricing/limits per tier; existing clinics default to the most permissive tier so nobody is locked out by this migration
+  unlimited_staff BOOLEAN NOT NULL DEFAULT FALSE, -- Super Admin manual override of the plan's staff COUNT limit only — does not touch role restrictions, see backend/utils/plans.js
+  suspended_by_platform BOOLEAN NOT NULL DEFAULT FALSE, -- Super Admin kill switch, blocks all non-GET requests for this clinic; see middleware/auth.js
   settings JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
