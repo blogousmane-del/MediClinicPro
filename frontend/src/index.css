@@ -1480,6 +1480,20 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Pricing section 3-card grid (Landing Page) — 1 col mobile, 3 cols 850px+.
+   Separate from Settings' local .plan-cards-grid (same pattern, different
+   file) to avoid touching that already-shipped page for this change. */
+.pricing-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 850px) {
+  .pricing-cards-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* Payment provider badges: lift on hover */
 .landing-payment-badge {
   transition: transform 0.2s ease, box-shadow 0.2s ease;

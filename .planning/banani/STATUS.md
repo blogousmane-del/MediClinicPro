@@ -1,6 +1,6 @@
 # Banani implementation status
 
-Last updated: 2026-07-22
+Last updated: 2026-07-27
 
 Full import requested by user 2026-07-22 — all 25 pages + 16 shared components. After comparing Banani's mocks against the existing app, most existing pages turned out to already be more capable than Banani's static designs (theme-aware, role-gated, live-data-wired). User decision: light visual/icon polish on existing pages, keep all logic; full builds only for genuinely new/missing content.
 
@@ -125,3 +125,11 @@ User flagged the live `LandingPage.tsx` as "very different" from Banani's landin
 User re-confirmed via batched questions: stats bar stays but real-facts-only (kept the 4 existing items), testimonials section omitted entirely (Banani's 3 testimonials cite fictional named doctors), full structural rebuild approved.
 
 **Changes**: removed a pre-existing dead `#about` nav link; added the missing closing CTA band (dark `#162a26`, between Pricing and Footer) with honest copy (dropped Banani's "Rejoignez les cliniques d'Abidjan qui ont choisi MediClinic" implied-existing-customers claim); added icon-box wrappers to the 6 feature pills to match Banani's chip style; added responsive divider borders to the stats bar (divide-x desktop row / divide-x+divide-y tablet 2×2 / stacked dividers on narrow mobile); reordered footer to logo→links→copyright (Banani's order); swapped the "Toutes les fonctionnalités" button icon from `Plus` to `ArrowRight` to match Banani; changed hero primary CTA copy to "Commencer l'essai gratuit" (was "Découvrir nos offres") — more accurate than Banani's "Réserver une démo" since no demo-booking flow exists. Kept, not fabricated: module marquee, pricing section (real 15 000 FCFA plan — Banani's fetch had no pricing screen), hero's real subscription-fact badge and 14-day-trial trust line (already replacing Banani's fake "82% précision" stat and unverified "approuvé par des hôpitaux" claim from the original 07-21 pass). Verified with `tsc -b`, `oxlint`, and `npm run build` (all clean).
+
+## 2026-07-27 Banani re-fetch — Abonnement/pricing screen applied to Landing Page
+
+Same screen re-selected (`new_screen10.jsx`, "Abonnement — Choisir un plan") — already implemented once for `SettingsPage.tsx`'s billing tab (see 2026-07-26 entry above); this time applied to the **public, logged-out** Landing Page's stale single-card "Tarifs" section (`frontend/src/pages/LandingPage.tsx`, `#pricing`), which still showed a leftover 15 000 FCFA/mois "everything included" card from before the 3-tier model shipped (plan: `abonnement-choisir-plan.md`, 2026-07-27 addendum).
+
+Replaced with the real 3-card Starter/Clinique/Hôpital grid, matching Banani's header copy exactly ("Nos formules" eyebrow / "Choisissez votre plan" / subtitle). Reused every decision already confirmed for this same screen's Settings-page pass (tier names, real-data-derived 6-row comparison, dropped "support email" claim, dropped the WhatsApp/email FAQ card — fabricated `wa.me/...` contact links have now been caught and removed 3 times this session). New for this location: since the landing page is logged-out (no `GET /settings/plans`, auth-gated), plan data is a hardcoded snapshot of `backend/utils/plans.js`'s real `PLANS` values rather than fetched — flagged in the plan file to keep in sync manually if pricing changes; all 3 CTAs route to `onNavigate('register')` (no unauthenticated checkout path exists anywhere in this app); added a new shared `.pricing-cards-grid` class to `index.css` rather than reusing `SettingsPage.tsx`'s page-local `.plan-cards-grid`, to avoid touching that already-shipped page. Kept the existing real Mobile Money payment-badge row unchanged below the grid.
+
+Verified: `npm run build` / `npm run lint` clean, no new warnings. **Not visually verified in a live browser** — no browser-driving tool available this session; recommend a manual check at 375/850/1280px before treating as fully pixel-verified.

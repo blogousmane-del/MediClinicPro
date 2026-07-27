@@ -13,7 +13,9 @@ import {
   Menu,
   X,
   LayoutDashboard,
-  FileText
+  FileText,
+  Star,
+  Zap
 } from 'lucide-react';
 
 const marqueeModules = [
@@ -34,6 +36,58 @@ const featurePills = [
   { icon: Receipt, label: 'Facturation' },
   { icon: BarChart3, label: 'Rapports BI' }
 ];
+
+// Mirrors backend/utils/plans.js's PLANS — this page is logged-out (no
+// GET /settings/plans, which requires auth), so the real values are
+// snapshotted here rather than fetched. Keep in sync with plans.js if
+// pricing/limits change.
+const pricingPlans: {
+  id: 'starter' | 'clinique' | 'hopital';
+  name: string;
+  price: number;
+  period: string;
+  staffLimit: number | null;
+  allowedRoles: string[] | null;
+  paymentMethods: string[];
+  badge: string;
+  highlight: boolean;
+  ctaLabel: string;
+  note: string;
+}[] = [
+  {
+    id: 'starter', name: 'Starter', price: 0, period: '7 jours', staffLimit: 3,
+    allowedRoles: ['admin', 'doctor', 'secretary'], paymentMethods: ['cash'],
+    badge: 'Gratuit', highlight: false, ctaLabel: "Démarrer l'essai gratuit", note: 'Aucune carte bancaire requise'
+  },
+  {
+    id: 'clinique', name: 'Clinique', price: 9000, period: '/ mois', staffLimit: 5,
+    allowedRoles: null, paymentMethods: ['cash'],
+    badge: 'Populaire', highlight: false, ctaLabel: 'Choisir Clinique', note: 'Renouvellement mensuel automatique'
+  },
+  {
+    id: 'hopital', name: 'Hôpital', price: 14500, period: '/ mois', staffLimit: null,
+    allowedRoles: null, paymentMethods: ['cash', 'wave', 'orange_money', 'mtn_momo'],
+    badge: 'Tout inclus', highlight: true, ctaLabel: 'Choisir Hôpital', note: 'Idéal pour les cliniques multi-praticiens'
+  }
+];
+
+// Same 6-row comparison shape as SettingsPage.tsx's billing tab — derived
+// from real plan data (staffLimit/allowedRoles/paymentMethods), not
+// copy-pasted marketing strings, so the Mobile Money row can't drift from
+// what's actually enforced.
+const buildPricingFeatureRows = (plan: (typeof pricingPlans)[number]): { label: string; ok: boolean }[] => {
+  const staffLabel = plan.staffLimit === null
+    ? 'Utilisateurs & rôles illimités'
+    : `${plan.staffLimit} utilisateurs${plan.allowedRoles ? ' & rôles restreints' : ' & rôles illimités'}`;
+  return [
+    { label: staffLabel, ok: true },
+    { label: 'Patients & Dossiers illimités', ok: true },
+    { label: 'Rendez-vous, Ordonnances & Pharmacie', ok: true },
+    { label: 'Laboratoire & Comptabilité', ok: true },
+    { label: 'Paiement Espèces', ok: true },
+    { label: 'Encaissements Mobile Money', ok: plan.paymentMethods.includes('wave') }
+  ];
+};
 
 interface LandingPageProps {
   onNavigate: (tab: 'login' | 'register' | 'terms') => void;
@@ -580,67 +634,123 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         justifyContent: 'center'
       }}>
         <div style={{ maxWidth: '1200px', width: '100%', textAlign: 'center' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#0d9488' }}>
-            TARIFS TRANSPARENTS
-          </span>
-          <h2 style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-secondary)', margin: '8px 0 1rem' }}>
-            Un seul abonnement, tous les modules inclus
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '10px' }}>
+            <Star size={14} color="#1e4d40" fill="#1e4d40" />
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#1e4d40' }}>
+              Nos formules
+            </span>
+          </div>
+          <h2 style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-secondary)', margin: '0 0 1rem' }}>
+            Choisissez votre plan
           </h2>
           <p style={{ color: '#64748b', maxWidth: '600px', margin: '0 auto 3rem', fontSize: '1rem' }}>
-            Pas de paliers cachés ni de fonctionnalités verrouillées. Essai gratuit de 14 jours, sans engagement.
+            Commencez gratuitement, évoluez selon vos besoins. Sans engagement.
           </p>
 
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div className="landing-reveal landing-card-lift" style={{
-              backgroundColor: '#ffffff',
-              border: '2px solid #1e4d40',
-              borderRadius: '24px',
-              padding: '2.5rem 2.25rem',
-              textAlign: 'left',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 12px 32px rgba(30, 77, 64, 0.12)',
-              maxWidth: '420px',
-              width: '100%'
-            }}>
-              <div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>MediClinic</div>
-                <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>Pour les cabinets, cliniques et centres de santé</div>
+          <div className="pricing-cards-grid" style={{ maxWidth: '960px', margin: '0 auto' }}>
+            {pricingPlans.map(plan => {
+              const featureRows = buildPricingFeatureRows(plan);
+              return (
+                <div
+                  key={plan.id}
+                  className="landing-reveal landing-card-lift"
+                  style={{
+                    position: 'relative',
+                    backgroundColor: plan.highlight ? '#e6f4ea' : '#ffffff',
+                    border: plan.highlight ? '2px solid #1e4d40' : '1px solid #e2e8f0',
+                    borderRadius: '20px',
+                    padding: '2rem 1.75rem',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.1rem',
+                    boxShadow: plan.highlight ? '0 12px 32px rgba(30, 77, 64, 0.12)' : '0 2px 8px rgba(0,0,0,0.03)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
+                      backgroundColor: plan.highlight ? '#1e4d40' : '#f1f5f9',
+                      color: plan.highlight ? '#ffffff' : '#1e4d40'
+                    }}>
+                      {plan.badge}
+                    </span>
+                    {plan.highlight && <Zap size={14} color="#1e4d40" />}
+                  </div>
 
-                <div style={{ margin: '1.5rem 0', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                  <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e4d40' }}>15 000</span>
-                  <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>FCFA / mois</span>
+                  <div>
+                    <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b', margin: '0 0 4px 0' }}>{plan.name}</p>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+                      <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
+                        {plan.price === 0 ? '0' : plan.price.toLocaleString()}
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '2px' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>FCFA</span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{plan.period}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #e2e8f0' }} />
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: 1 }}>
+                    {featureRows.map((row, i) => (
+                      <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '9px' }}>
+                        <span style={{
+                          width: '16px', height: '16px', borderRadius: '999px', flexShrink: 0, marginTop: '1px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: row.ok ? 'rgba(30, 77, 64, 0.12)' : '#f1f5f9'
+                        }}>
+                          {row.ok ? <Check size={10} color="#1e4d40" /> : <X size={10} color="#94a3b8" />}
+                        </span>
+                        <span style={{
+                          fontSize: '0.82rem', lineHeight: 1.25,
+                          color: row.ok ? '#334155' : '#94a3b8',
+                          textDecoration: row.ok ? 'none' : 'line-through'
+                        }}>
+                          {row.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button
+                      onClick={() => onNavigate('register')}
+                      className="landing-btn-lift"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        backgroundColor: plan.highlight ? '#1e4d40' : '#ffffff',
+                        color: plan.highlight ? '#ffffff' : '#0f172a',
+                        border: plan.highlight ? 'none' : '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        boxShadow: plan.highlight ? '0 4px 12px rgba(30, 77, 64, 0.25)' : 'none'
+                      }}
+                    >
+                      {plan.ctaLabel}
+                    </button>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', textAlign: 'center', margin: 0 }}>{plan.note}</p>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <ul style={{ listStyle: 'none', padding: 0, margin: '1.5rem 0', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.875rem', color: '#334155' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={16} color="#1e4d40" /> Utilisateurs & rôles illimités</li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={16} color="#1e4d40" /> Patients & Dossiers illimités</li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={16} color="#1e4d40" /> Rendez-vous, Ordonnances & Pharmacie</li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={16} color="#1e4d40" /> Laboratoire & Comptabilité</li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={16} color="#1e4d40" /> Encaissements Mobile Money</li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => onNavigate('register')}
-                className="landing-btn-lift"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#1e4d40',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontWeight: 700,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(30, 77, 64, 0.25)'
-                }}
-              >
-                Commencer l'essai gratuit
-              </button>
+          {/* Comparison note bar — softened vs. Banani's copy: dropped the "support
+              email" claim (no support channel exists), same reasoning applied to
+              this same screen's SettingsPage.tsx implementation. */}
+          <div className="landing-reveal" style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '960px', margin: '2.5rem auto 0' }}>
+            <div style={{ flex: 1, borderTop: '1px solid #e2e8f0' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                Tous les plans incluent : accès web & mobile, mises à jour incluses, changement de plan à tout moment
+              </span>
             </div>
+            <div style={{ flex: 1, borderTop: '1px solid #e2e8f0' }} />
           </div>
 
           {/* Payment Providers Row */}

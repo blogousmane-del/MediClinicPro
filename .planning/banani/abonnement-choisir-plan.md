@@ -45,3 +45,30 @@ This screen was already partially built in an earlier pass this session (screens
 ## Verification
 - `npm run build` / `npm run lint` — clean, no new warnings.
 - Not visually verified in a live browser at 375/768/1280px — no browser-driving tool available this session. Recommend a manual check before treating as fully pixel-verified, especially the 3-column grid's collapse to 1 column below 850px (existing `.plan-cards-grid` media query, unchanged).
+
+---
+
+## 2026-07-27 re-application — Landing Page "Tarifs" section
+
+Same Banani screen (`new_screen10.jsx`), re-selected by the user and re-fetched, this time to replace the **public, logged-out** Landing Page's stale single-card pricing section (`frontend/src/pages/LandingPage.tsx`, `<section id="pricing">`) — still showing a "15 000 FCFA/mois, tout inclus" card left over from before the 3-tier model shipped.
+
+### Key difference from the Settings implementation
+No `req.user.clinicId`, no "current plan" state, no `GET /settings/plans` call (auth-gated, unreachable from a public page). This is pure marketing content funneling into registration.
+
+### Reused decisions (not re-litigated — same screen, same prior confirmations)
+1. Tier names Starter/Clinique/Hôpital (not Banani's Essai gratuit/Standard/Premium).
+2. Feature rows/prices hardcoded to match `backend/utils/plans.js`'s real `PLANS` values (same reasoning: this page can't hit an authenticated endpoint, and the existing single-card version already hardcodes its own numbers today).
+3. Dropped the "support email" claim from the "tous les plans incluent" bar.
+4. Dropped the WhatsApp/email FAQ contact card entirely (fabricated `wa.me/...` pattern already removed twice this session).
+5. Hôpital card keeps its permanent visual highlight (no "Plan actuel" tag here — nothing is actually subscribed on a public page).
+6. CTA note on Hôpital avoids the unbacked "support prioritaire" claim, same as the Settings version.
+
+### New for this location
+- All 3 CTA buttons route to `onNavigate('register')` — there's no unauthenticated checkout path in this app; every tier (including paid ones) is chosen *after* registering. Matches what the current single-card CTA already does.
+- New shared class `.pricing-cards-grid` added to `index.css` (1 col → 3 cols at 850px+) rather than reusing `SettingsPage.tsx`'s local `.plan-cards-grid` (which lives in that page's own embedded `<style>` block, not a shared file) — avoids touching an already-shipped, unrelated page for this task.
+- Updated the section header copy to match Banani's actual text for pixel parity: eyebrow "Nos formules" (was "TARIFS TRANSPARENTS"), title "Choisissez votre plan" (was "Un seul abonnement, tous les modules inclus"), subtitle "Commencez gratuitement, évoluez selon vos besoins. Sans engagement."
+- Kept the existing real "Accepté en Côte d'Ivoire via Mobile Money" payment-badge row (Wave/Orange Money/MTN MoMo) below the grid — real, already-shipped, not part of Banani's fetch but not being removed.
+
+### Verification
+- `npm run build` / `npm run lint` — clean, no new warnings.
+- Not visually verified in a live browser — no browser-driving tool available this session.
