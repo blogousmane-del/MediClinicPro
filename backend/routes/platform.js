@@ -18,7 +18,7 @@ router.get('/overview', async (req, res) => {
   try {
     const { data: clinics, error: clinicsError } = await supabase
       .from('clinics')
-      .select('id, name, address, subscription_status, subscription_expires_at, created_at, plan')
+      .select('id, name, address, subscription_status, subscription_expires_at, created_at, plan, unlimited_staff, suspended_by_platform')
       .order('created_at', { ascending: false });
     if (clinicsError) throw clinicsError;
 
@@ -74,6 +74,8 @@ router.get('/overview', async (req, res) => {
         address: c.address,
         plan: c.plan || 'hopital',
         status: isExpired ? 'expired' : 'active',
+        unlimitedStaff: !!c.unlimited_staff,
+        suspended: !!c.suspended_by_platform,
         subscriptionExpiresAt: c.subscription_expires_at,
         createdAt: c.created_at,
         practitioners: usersByClinic.get(c.id) || 0,
@@ -303,6 +305,143 @@ router.put('/tickets/:id', async (req, res) => {
   } catch (error) {
     console.error("Update ticket error:", error);
     res.status(500).json({ error: "Erreur lors de la mise à jour du ticket." });
+  }
+});
+
+// PUT /api/platform/clinics/:id/staff-override
+// Grant or revoke a manual exception to this clinic's plan-based staff COUNT
+// limit — independent of clinic.plan itself. Does NOT touch role
+// restrictions (isRoleAllowedForPlan is untouched, see utils/plans.js) —
+// this is unlimited accounts, not a backdoor around role gating.
+router.put('/clinics/:id/staff-override', async (req, res) => {
+  try {
+    const { unlimited } = req.body;
+    if (typeof unlimited !== 'boolean') {
+      return res.status(400).json({ error: "Le champ 'unlimited' doit être un booléen." });
+    }
+
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('id, name')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (clinicError) throw clinicError;
+    if (!clinic) {
+      return res.status(404).json({ error: "Clinique introuvable." });
+    }
+
+    const { error: updateError } = await supabase
+      .from('clinics')
+      .update({ unlimited_staff: unlimited })
+      .eq('id', req.params.id);
+    if (updateError) throw updateError;
+
+    // user_id here is the acting Super Admin, who belongs to a DIFFERENT
+    // clinic than clinic_id below — the one deliberate place in this app
+    // where activity_logs.user_id's own clinic and the row's clinic_id
+    // diverge (safe: activity_logs.user_id is a plain nullable FK to
+    // users(id) with no clinic-match constraint).
+    await supabase.from('activity_logs').insert({
+      clinic_id: clinic.id,
+      user_id: req.user.userId,
+      action: 'PLATFORM_STAFF_OVERRIDE',
+      details: unlimited
+        ? "Limite de personnel levée par l'administrateur de la plateforme."
+        : "Limite de personnel du plan rétablie par l'administrateur de la plateforme."
+    });
+
+    res.json({ success: true, message: "Exception de limite de personnel mise à jour." });
+  } catch (error) {
+    console.error("Platform staff-override error:", error);
+    res.status(500).json({ error: "Erreur lors de la mise à jour de l'exception de personnel." });
+  }
+});
+
+// PUT /api/platform/clinics/:id/suspend
+// Kill switch: suspends or reactivates write access for every user of this
+// clinic (enforced in middleware/auth.js). Unlike an expired subscription,
+// there is no self-service unlock — only this endpoint can lift it.
+router.put('/clinics/:id/suspend', async (req, res) => {
+  try {
+    const { suspended } = req.body;
+    if (typeof suspended !== 'boolean') {
+      return res.status(400).json({ error: "Le champ 'suspended' doit être un booléen." });
+    }
+
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('id, name')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (clinicError) throw clinicError;
+    if (!clinic) {
+      return res.status(404).json({ error: "Clinique introuvable." });
+    }
+
+    const { error: updateError } = await supabase
+      .from('clinics')
+      .update({ suspended_by_platform: suspended })
+      .eq('id', req.params.id);
+    if (updateError) throw updateError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: clinic.id,
+      user_id: req.user.userId,
+      action: suspended ? 'PLATFORM_CLINIC_SUSPENDED' : 'PLATFORM_CLINIC_REACTIVATED',
+      details: suspended
+        ? "Compte suspendu par l'administrateur de la plateforme."
+        : "Compte réactivé par l'administrateur de la plateforme."
+    });
+
+    res.json({ success: true, message: suspended ? "Clinique suspendue." : "Clinique réactivée." });
+  } catch (error) {
+    console.error("Platform suspend error:", error);
+    res.status(500).json({ error: "Erreur lors de la mise à jour du statut de suspension." });
+  }
+});
+
+// PUT /api/platform/users/:id
+// Cross-clinic activate/deactivate — emergency use (e.g. a compromised
+// account) without going through that clinic's own admin. Self-lockout
+// guard mirrors the one already in backend/routes/settings.js's own
+// PUT /users/:id (a user cannot deactivate their own account there either).
+router.put('/users/:id', async (req, res) => {
+  try {
+    const { active } = req.body;
+    if (typeof active !== 'boolean') {
+      return res.status(400).json({ error: "Le champ 'active' doit être un booléen." });
+    }
+    if (parseInt(req.params.id) === req.user.userId) {
+      return res.status(400).json({ error: "Vous ne pouvez pas modifier votre propre compte via cette console." });
+    }
+
+    const { data: targetUser, error: userError } = await supabase
+      .from('users')
+      .select('id, clinic_id, name')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (userError) throw userError;
+    if (!targetUser) {
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    }
+
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ active: active ? 1 : 0 })
+      .eq('id', req.params.id);
+    if (updateError) throw updateError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: targetUser.clinic_id,
+      user_id: req.user.userId,
+      action: active ? 'PLATFORM_USER_ACTIVATED' : 'PLATFORM_USER_DEACTIVATED',
+      details: `Compte de ${targetUser.name} ${active ? 'réactivé' : 'désactivé'} par l'administrateur de la plateforme.`
+    });
+
+    res.json({ success: true, message: "Statut de l'utilisateur mis à jour." });
+  } catch (error) {
+    console.error("Platform user status error:", error);
+    res.status(500).json({ error: "Erreur lors de la mise à jour du statut de l'utilisateur." });
   }
 });
 
