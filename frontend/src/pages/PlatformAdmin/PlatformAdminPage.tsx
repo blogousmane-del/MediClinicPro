@@ -832,16 +832,47 @@ const UsersSection: React.FC<{
 };
 
 const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ data }) => {
+  const [statusFilter, setStatusFilter] = useState<string>('');
+
   if (!data) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
 
   const statusLabels: Record<string, string> = { pending: 'En attente', paid: 'Payé', failed: 'Échoué' };
   const statusBadges: Record<string, string> = { pending: 'badge-warning', paid: 'badge-success', failed: 'badge-danger' };
 
+  const filterPills: { value: string; label: string }[] = [
+    { value: '', label: 'Tous' },
+    { value: 'active', label: 'Actif' },
+    { value: 'expired', label: 'Expiré' }
+  ];
+  const filteredClinics = data.clinics.filter(c =>
+    !statusFilter || (statusFilter === 'expired' ? c.subscriptionStatus === 'expired' : c.subscriptionStatus !== 'expired')
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Statut d'abonnement par clinique</h2>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {filterPills.map(p => (
+              <button
+                key={p.value}
+                onClick={() => setStatusFilter(p.value)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '999px',
+                  border: '1px solid var(--border)',
+                  backgroundColor: statusFilter === p.value ? '#1e4d40' : 'var(--bg-secondary)',
+                  color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="table-container">
           <table style={{ width: '100%' }}>
@@ -853,7 +884,7 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
               </tr>
             </thead>
             <tbody>
-              {data.clinics.map(c => (
+              {filteredClinics.map(c => (
                 <tr key={c.id}>
                   <td><strong>{c.name}</strong></td>
                   <td>
@@ -864,6 +895,9 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
                   <td>{formatDate(c.subscriptionExpiresAt)}</td>
                 </tr>
               ))}
+              {filteredClinics.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '1.5rem' }}>Aucune clinique ne correspond au filtre.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
