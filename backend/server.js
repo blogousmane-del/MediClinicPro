@@ -66,7 +66,7 @@ app.use(cors({
 // each route crash on `supabase.from(...)` being called on null. /health is
 // exempt on purpose — it's a pure liveness check, not a DB check.
 app.use((req, res, next) => {
-  if (!supabase && req.path !== '/health') {
+  if (!supabase && req.path !== '/health' && req.path !== '/api/health') {
     return res.status(503).json({
       error: "Configuration serveur incomplète (SUPABASE_URL/SUPABASE_KEY manquant ou invalide). Contactez l'administrateur.",
       code: "SERVER_MISCONFIGURED"
@@ -106,8 +106,11 @@ app.use('/api/platform', platformRoutes);
 app.use('/api/cron', cronRoutes);
 // (webhooksRoutes is mounted earlier, before auth-adjacent middleware)
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint — registered at both paths since this file is hit
+// directly at /health in local dev (server.js listens on its own port) but
+// through Vercel's /api/(.*) rewrite in production, where Express sees the
+// full original path (/api/health), not the stripped one.
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
