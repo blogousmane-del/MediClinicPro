@@ -97,14 +97,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
           top: 0,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
           borderRight: '1px solid rgba(255, 255, 255, 0.05)',
           zIndex: 100,
           boxSizing: 'border-box',
-          boxShadow: '4px 0 24px rgba(0,0,0,0.3)'
+          boxShadow: '4px 0 24px rgba(0,0,0,0.3)',
+          overflow: 'hidden'
         }}
       >
-        <div>
+        <div style={{ flexShrink: 0 }}>
           {/* Top Brand Header */}
           <div style={{
             padding: '1.25rem 1.25rem 0.75rem 1.25rem',
@@ -190,14 +190,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               {formattedClinicAddress}
             </div>
           </div>
+        </div>
 
-          {/* Navigation Items */}
-          <nav style={{
-            padding: '1.25rem 0.75rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
-          }}>
+        {/* Navigation Items — its own scroll area, independent of the
+            fixed header above and the footer below, so a taller menu
+            (e.g. the extra "Administration plateforme" entry) never pushes
+            the profile/logout footer off-screen with no way to reach it */}
+        <nav style={{
+          padding: '1.25rem 0.75rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          flex: '1 1 auto',
+          minHeight: 0,
+          overflowY: 'auto'
+        }}>
             {filteredItems.map(item => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -245,10 +252,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               );
             })}
           </nav>
-        </div>
 
-        {/* User Profile Footer */}
+        {/* User Profile Footer — always pinned below the scrollable nav, never pushed off-screen */}
         <div style={{
+          flexShrink: 0,
           padding: '1rem 1.25rem',
           borderTop: '1px solid rgba(255, 255, 255, 0.07)',
           display: 'flex',
@@ -256,7 +263,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
           justifyContent: 'space-between',
           gap: '10px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => { setCurrentTab('profile'); onClose(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCurrentTab('profile'); onClose(); } }}
+            title="Mon profil"
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, cursor: 'pointer' }}
+          >
             {/* Avatar Circle */}
             <div style={{
               width: '36px',

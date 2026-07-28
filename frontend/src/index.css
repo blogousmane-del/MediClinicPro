@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
   /* Color Palette - Clinical Premium Theme (Mint / Teal accents) */
@@ -1165,14 +1165,62 @@ h1, h2, h3, h4, h5, h6 {
   .auth-form-panel { padding: 2.5rem 2rem; }
 }
 
-/* ===== Terms of Service (reuses .landing-page shell) ===== */
+/* ===== Terms of Service — Banani pixel-parity light theme =====
+   Deliberate one-page exception to the fixed-dark Landing/Auth shell (user
+   decision, 2026-07-27 re-fetch): tokens copied verbatim from the Banani
+   flow's shared style.css, same source as the Platform Admin token pass. */
+.terms-page {
+  --tp-bg: #F4F3F0;
+  --tp-fg: #1E2A2A;
+  --tp-border: #D6D2CB;
+  --tp-input: #ECEAE5;
+  --tp-secondary: #D4E0DC;
+  --tp-primary: #3D6B5E;
+  --tp-muted: #7A8585;
+  background-color: var(--tp-bg);
+  color: var(--tp-fg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.terms-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--tp-border);
+  background-color: var(--tp-bg);
+}
+
+@media (min-width: 768px) {
+  .terms-nav { padding: 1rem 4rem; }
+}
+
+.terms-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.terms-nav-actions a {
+  font-size: 0.85rem;
+  color: var(--tp-muted);
+  cursor: pointer;
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .terms-nav-actions a { display: inline; }
+}
+
 .terms-header {
-  background: #111827;
+  background: var(--tp-fg);
   padding: 2rem 1.25rem;
 }
 
 @media (min-width: 768px) {
-  .terms-header { padding: 3rem 2rem; }
+  .terms-header { padding: 3rem 4rem; }
 }
 
 .terms-layout {
@@ -1183,10 +1231,12 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   gap: 2.5rem;
+  flex: 1;
+  box-sizing: border-box;
 }
 
 @media (min-width: 768px) {
-  .terms-layout { padding: 3rem 2rem; flex-direction: row; gap: 3rem; }
+  .terms-layout { padding: 3rem 4rem; flex-direction: row; gap: 3rem; }
 }
 
 .terms-toc {
@@ -1205,15 +1255,15 @@ h1, h2, h3, h4, h5, h6 {
 .terms-toc a {
   display: block;
   font-size: 0.8125rem;
-  color: #94a3b8;
+  color: var(--tp-muted);
   padding: 0.4rem 0.5rem;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
 .terms-toc a:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.04);
+  color: var(--tp-fg);
+  background: var(--tp-input);
 }
 
 .terms-content {
@@ -1230,11 +1280,24 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   gap: 0.75rem;
   padding-bottom: 2rem;
-  border-bottom: 1px solid #1f2937;
+  border-bottom: 1px solid var(--tp-border);
 }
 
 .terms-section:last-of-type {
   border-bottom: none;
+}
+
+.terms-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 1.5rem 1.25rem;
+  border-top: 1px solid var(--tp-border);
+}
+
+@media (min-width: 768px) {
+  .terms-footer { justify-content: space-between; padding: 1.5rem 4rem; }
 }
 
 /* ===== Landing Page Responsive Styles ===== */
@@ -1686,6 +1749,10 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 0.8rem !important;
     justify-content: center !important;
   }
+  .dashboard-trial-badge {
+    grid-column: 1 / -1 !important;
+    margin-left: 0 !important;
+  }
   .dashboard-stats-grid {
     grid-template-columns: 1fr !important;
   }
@@ -1701,6 +1768,165 @@ h1, h2, h3, h4, h5, h6 {
     padding: 10px 12px !important;
     flex-wrap: wrap !important;
     gap: 10px !important;
+  }
+}
+
+/* ===== Platform Admin — Banani pixel-parity tokens =====
+   Fixed light palette independent of the app-wide dark/light toggle: this is
+   a separate operator console (own dark sidebar already, see
+   PlatformAdminPage.tsx), not a clinic-facing themed page, so it doesn't
+   need to track the visitor's theme preference the way the rest of the app
+   does. Values copied verbatim from the Banani flow's shared style.css. */
+.platform-admin-shell {
+  --bg-primary: #F4F3F0;
+  --bg-secondary: #FFFFFF;
+  --text-primary: #1E2A2A;
+  --text-secondary: #1E2A2A;
+  --text-muted: #7A8585;
+  --border: #D6D2CB;
+  --border-focus: rgba(61, 107, 94, 0.35);
+  --success: #3D8A6A;
+  --success-light: rgba(61, 138, 106, 0.15);
+  --warning: #D4813A;
+  --warning-light: rgba(212, 129, 58, 0.15);
+  --danger: #C0392B;
+  --danger-light: rgba(192, 57, 43, 0.15);
+  --info: #3D6B5E;
+  --info-light: rgba(61, 107, 94, 0.12);
+  --font-secondary: 'DM Sans', sans-serif;
+}
+
+.platform-admin-shell input,
+.platform-admin-shell select,
+.platform-admin-shell button {
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Banani badges/pills are rounded-md (6px), not the app-wide full-pill shape */
+.platform-admin-shell .badge {
+  border-radius: 6px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.platform-admin-shell .filter-pill {
+  border-radius: 6px !important;
+}
+
+/* Real <th>/<td> styling — these tables are bare <table> elements (no
+   .custom-table class), so without this they fall back to UA defaults */
+.platform-admin-shell table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.platform-admin-shell thead tr {
+  background-color: #ECEAE5; /* Banani --color-input */
+}
+.platform-admin-shell th {
+  padding: 0.75rem 1.1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.platform-admin-shell td {
+  padding: 0.75rem 1.1rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+.platform-admin-shell tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Stat-card icon box — Banani wraps each stat icon in a small tinted square */
+.platform-admin-shell .stat-icon-box {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  background-color: #D4E0DC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .platform-admin-shell th,
+  .platform-admin-shell td {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.78rem;
+  }
+}
+
+/* Mobile-first responsive shell — Banani's mockup is desktop-only
+   (screenSize: 'desktop'), so this collapse pattern is our own design
+   decision: sidebar becomes a horizontal scrollable icon strip under
+   900px instead of a fixed 240px column, matching the mobile nav pattern
+   already used by the real clinic Sidebar (MobileQuickActionsBar). */
+@media (max-width: 899px) {
+  .platform-admin-shell {
+    flex-direction: column !important;
+  }
+  .platform-admin-sidebar {
+    width: 100% !important;
+    min-height: auto !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    overflow-x: auto;
+  }
+  .platform-admin-sidebar-header {
+    display: none !important;
+  }
+  .platform-admin-sidebar-nav {
+    flex-direction: row !important;
+    padding: 0.5rem 0.6rem !important;
+    gap: 4px !important;
+  }
+  .platform-admin-sidebar-nav button,
+  .platform-admin-sidebar-nav .coming-soon-item {
+    flex-direction: column !important;
+    gap: 3px !important;
+    font-size: 0.62rem !important;
+    padding: 6px 8px !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+  }
+  .platform-admin-sidebar-divider {
+    display: none !important;
+  }
+  /* Footer stays visible (it's the only way to exit the console / log out)
+     but becomes a compact horizontal action pair instead of a stacked block */
+  .platform-admin-sidebar-footer {
+    flex-direction: row !important;
+    border-top: none !important;
+    padding: 0.5rem 0.6rem !important;
+    gap: 4px !important;
+    flex-shrink: 0;
+  }
+  .platform-admin-sidebar-footer button {
+    flex-direction: column !important;
+    gap: 3px !important;
+    font-size: 0.58rem !important;
+    line-height: 1.15 !important;
+    padding: 6px 6px !important;
+    white-space: normal !important;
+    text-align: center !important;
+    max-width: 72px !important;
+  }
+  .platform-admin-sidebar-username {
+    display: none !important;
+  }
+  .platform-admin-main-header {
+    padding: 1rem 1.25rem !important;
+  }
+  .platform-admin-main-body {
+    padding: 1rem 1.25rem !important;
   }
 }
 

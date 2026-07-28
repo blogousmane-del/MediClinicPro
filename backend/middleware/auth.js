@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../database');
+const { isClinicExpired } = require('../utils/subscription');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -46,25 +47,26 @@ async function auth(req, res, next) {
       // arbitrary query string, e.g. POST /api/patients?x=/platform — a real,
       // exploitable bug caught in code review before this shipped.
       const requestPath = req.originalUrl.split('?')[0];
+      // Exact-segment match (not substring) — 'includes' would also match an
+      // unrelated future route sharing the same prefix, e.g. /settings/planning.
+      const pathIs = (base) => requestPath === base || requestPath.startsWith(base + '/');
       // A clinic that's actually expired must still be able to reach the renewal
       // endpoint itself — otherwise paying to unlock is blocked by the very
       // gate it's supposed to lift. (/settings/subscription never existed as a
       // real route; this previously meant expired clinics had NO way to renew.)
       const isBillingRoute =
-        requestPath.includes('/financials/subscription') ||
-        requestPath.includes('/settings/plan') ||
-        requestPath.includes('/auth/logout');
+        pathIs('/api/financials/subscription') ||
+        pathIs('/api/settings/plan') ||
+        pathIs('/api/auth/logout');
       // A Super Admin's OWN clinic being expired or suspended must never lock
       // them out of the Platform Admin console — that's the one place able to
       // lift a suspension in the first place. Safe to exempt broadly: every
       // /api/platform route is already gated by superAdminOnly (email
       // allowlist), so this doesn't open anything to a caller who couldn't
       // already reach it.
-      const isPlatformRoute = requestPath.includes('/platform');
+      const isPlatformRoute = pathIs('/api/platform');
 
-      const now = new Date();
-      const expiresAt = clinic.subscription_expires_at ? new Date(clinic.subscription_expires_at) : null;
-      const isExpired = clinic.subscription_status === 'expired' || (expiresAt && expiresAt < now);
+      const isExpired = isClinicExpired(clinic);
       const isSuspended = clinic.suspended_by_platform === true;
 
       // Suspension is a platform decision, not a billing state — unlike

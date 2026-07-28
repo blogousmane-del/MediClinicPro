@@ -276,8 +276,8 @@ CREATE INDEX idx_support_tickets_clinic ON support_tickets(clinic_id);
 -- SEED DATA FOR TESTING
 
 -- Insert default clinic (expiring 1 year from now)
-INSERT INTO clinics (id, name, address, phone, subscription_status, subscription_expires_at, settings) VALUES
-(1, 'Clinique Médicale de l''Avenir', 'Cocody Boulevard de France, Abidjan, CI', '+225 0707080910', 'active', NOW() + INTERVAL '1 year', '{
+INSERT INTO clinics (id, name, address, phone, plan, subscription_status, subscription_expires_at, settings) VALUES
+(1, 'Clinique Médicale de l''Avenir', 'Cocody Boulevard de France, Abidjan, CI', '+225 0707080910', 'hopital', 'active', NOW() + INTERVAL '1 year', '{
   "tariffs": {
     "consultation_general": 10000,
     "consultation_specialist": 20000,

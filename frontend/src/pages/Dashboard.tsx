@@ -15,6 +15,8 @@ import {
   Bell,
   ChevronRight,
   ChevronLeft,
+  Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 
 interface Stats {
@@ -33,7 +35,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickAction }) => {
-  const { user } = useAuth();
+  const { user, clinic } = useAuth();
   const { showToast } = useNotifications();
   const [stats, setStats] = useState<Stats | null>(null);
   const [todayAppts, setTodayAppts] = useState<any[]>([]);
@@ -94,6 +96,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
 
   const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
   const activeSelectedDay = isCurrentMonth ? today.getDate() : null;
+
+  // Trial countdown — Starter is the only free/trial tier (7 days, see
+  // backend/utils/plans.js). Same day-diff formula as Header.tsx's expiry chip.
+  const trialDaysRemaining = clinic?.subscription_expires_at
+    ? Math.ceil((new Date(clinic.subscription_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showTrialBanner = user?.role === 'admin' && clinic?.plan === 'starter' && trialDaysRemaining !== null && trialDaysRemaining > 0;
 
   if (loading) {
     return (
@@ -283,6 +292,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
           <FlaskConical size={17} color="var(--text-secondary)" />
           <span>Demande labo</span>
         </button>
+
+        {/* Trial countdown badge — Starter plan only (free, 7-day trial), admin only
+            (billing actions live in Paramètres, which non-admin roles can't reach) */}
+        {showTrialBanner && (
+          <button
+            onClick={() => setCurrentTab('settings')}
+            className="dashboard-trial-badge"
+            title="Souscrivez avant la fin de votre essai pour continuer à utiliser MediClinic sans interruption."
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginLeft: 'auto',
+              padding: '8px 14px',
+              background: 'linear-gradient(135deg, #e8a93e, #d4813a)',
+              border: 'none',
+              borderRadius: '10px',
+              color: '#ffffff',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(212, 129, 58, 0.3)'
+            }}
+          >
+            <Sparkles size={15} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              Essai : {trialDaysRemaining} jour{(trialDaysRemaining as number) > 1 ? 's' : ''} restant{(trialDaysRemaining as number) > 1 ? 's' : ''}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700, opacity: 0.95, whiteSpace: 'nowrap' }}>
+              Choisir un forfait
+              <ArrowRight size={13} />
+            </span>
+          </button>
+        )}
       </div>
 
       {/* 4 Stat Cards Row */}

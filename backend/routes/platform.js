@@ -10,6 +10,8 @@ const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
 const { superAdminOnly } = require('../middleware/superAdmin');
 const { sendTicketStatusEmail } = require('../utils/mailer');
+const { PLAN_IDS, getPlan, isRoleAllowedForPlan } = require('../utils/plans');
+const { isClinicExpired } = require('../utils/subscription');
 
 router.use(auth, superAdminOnly);
 
@@ -66,8 +68,7 @@ router.get('/overview', async (req, res) => {
     }
 
     const enrichedClinics = (clinics || []).map(c => {
-      const expiresAt = c.subscription_expires_at ? new Date(c.subscription_expires_at) : null;
-      const isExpired = c.subscription_status === 'expired' || (expiresAt && expiresAt < now);
+      const isExpired = isClinicExpired(c, now);
       return {
         id: c.id,
         name: c.name,
@@ -174,14 +175,13 @@ router.get('/subscriptions', async (req, res) => {
 
     res.json({
       clinics: clinics.map(c => {
-        const expiresAt = c.subscription_expires_at ? new Date(c.subscription_expires_at) : null;
         // subscription_status is only ever written as 'active' by the payment
         // webhook (backend/routes/webhooks.js) — nothing in this codebase ever
         // flips it to 'expired' on its own, so it can't be trusted alone.
-        // Compute the same way GET /overview's enrichedClinics does, so this
-        // tab's Actif/Expiré filter reflects reality instead of a column that
-        // silently stays 'active' forever.
-        const isExpired = c.subscription_status === 'expired' || (expiresAt && expiresAt < now);
+        // isClinicExpired computes the same way GET /overview's enrichedClinics
+        // does, so this tab's Actif/Expiré filter reflects reality instead of a
+        // column that silently stays 'active' forever.
+        const isExpired = isClinicExpired(c, now);
         return {
           id: c.id,
           name: c.name,
@@ -365,6 +365,72 @@ router.put('/clinics/:id/staff-override', async (req, res) => {
   } catch (error) {
     console.error("Platform staff-override error:", error);
     res.status(500).json({ error: "Erreur lors de la mise à jour de l'exception de personnel." });
+  }
+});
+
+// PUT /api/platform/clinics/:id/plan
+// Manually set a clinic's tier — bypasses the payment flow entirely (unlike
+// POST /financials/subscription/checkout, which only flips clinics.plan once
+// a provider confirms payment via webhooks.js). Does not touch
+// subscription_status/subscription_expires_at — this only changes which
+// tier's limits/features apply, not the clinic's billing cycle. Same
+// staff-limit/role validation as PUT /settings/plan (settings.js) so a
+// Super Admin can't switch a clinic into a tier its current team violates.
+router.put('/clinics/:id/plan', async (req, res) => {
+  try {
+    const { plan: targetPlanId } = req.body;
+    if (!PLAN_IDS.includes(targetPlanId)) {
+      return res.status(400).json({ error: "Plan invalide." });
+    }
+
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('id, name, plan, unlimited_staff')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (clinicError) throw clinicError;
+    if (!clinic) {
+      return res.status(404).json({ error: "Clinique introuvable." });
+    }
+
+    if (clinic.plan === targetPlanId) {
+      return res.status(400).json({ error: "Cette clinique est déjà sur ce plan." });
+    }
+
+    const targetPlan = getPlan(targetPlanId);
+
+    const { data: activeUsers, error: usersError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('clinic_id', req.params.id)
+      .eq('active', 1);
+    if (usersError) throw usersError;
+
+    if (!clinic.unlimited_staff && targetPlan.staffLimit !== null && (activeUsers || []).length > targetPlan.staffLimit) {
+      return res.status(400).json({ error: `Le plan ${targetPlan.name} est limité à ${targetPlan.staffLimit} collaborateurs actifs — cette clinique en compte ${(activeUsers || []).length}. Désactivez des comptes ou gardez l'exception "Illimité" avant de changer de plan.` });
+    }
+    const invalidRoleUser = (activeUsers || []).find(u => !isRoleAllowedForPlan(targetPlanId, u.role));
+    if (invalidRoleUser) {
+      return res.status(400).json({ error: `Le plan ${targetPlan.name} n'autorise pas tous les rôles actuellement utilisés par cette clinique.` });
+    }
+
+    const { error: updateError } = await supabase
+      .from('clinics')
+      .update({ plan: targetPlanId })
+      .eq('id', req.params.id);
+    if (updateError) throw updateError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: clinic.id,
+      user_id: req.user.userId,
+      action: 'PLATFORM_PLAN_CHANGE',
+      details: `Plan changé de ${getPlan(clinic.plan).name} à ${targetPlan.name} par l'administrateur de la plateforme.`
+    });
+
+    res.json({ success: true, message: `Plan mis à jour vers ${targetPlan.name}.` });
+  } catch (error) {
+    console.error("Platform plan change error:", error);
+    res.status(500).json({ error: "Erreur lors du changement de plan." });
   }
 });
 

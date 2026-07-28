@@ -4,7 +4,6 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Search,
-  Bell,
   FilePlus,
   Printer,
   Edit3,
@@ -494,84 +493,26 @@ export const OrdonnancesPage: React.FC = () => {
     return true;
   });
 
-  const countValidees = itemsToRender.filter(p => p.status === 'validee').length || 1;
-  const countRemises = itemsToRender.filter(p => p.status === 'remise').length || 2;
-  const countPartielles = itemsToRender.filter(p => p.status === 'partielle').length || 1;
+  const countValidees = itemsToRender.filter(p => p.status === 'validee').length;
+  const countRemises = itemsToRender.filter(p => p.status === 'remise').length;
+  const countPartielles = itemsToRender.filter(p => p.status === 'partielle').length;
+  const currentMonthLabel = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
   return (
     <div className="app-page">
-      
-      {/* 1. Header Breadcrumb matching Image 1 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
-            Gestion des ordonnances
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-            Lundi 14 juillet 2025
-          </p>
-        </div>
 
-        <div className="page-header-actions">
-          <div className="page-search-box">
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Rechercher un patient..."
-              className="input-control"
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                fontSize: '0.85rem'
-              }}
-            />
-          </div>
-
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)'
-            }}>
-              <Bell size={18} />
-            </div>
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--bg-primary)'
-            }}>3</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Main Title & Action Button matching Image 1 */}
+      {/* Main Title & Action Button — no page-local date/search/bell here:
+          the real Header above already has a search box and (currently
+          non-functional, tracked separately) notification bell; duplicating
+          them here with a hardcoded date and an unwired search input was
+          dead Banani-mockup chrome, not a second real feature. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
             Ordonnances
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
-            {itemsToRender.length} ordonnances · Juillet 2025
+            {itemsToRender.length} ordonnances · {currentMonthLabel}
           </p>
         </div>
 

@@ -372,7 +372,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <ShieldCheck size={18} color="#0d9488" />
               <span style={{ fontSize: '0.825rem', fontWeight: 600, color: '#64748b', maxWidth: '320px' }}>
-                Essai gratuit de 14 jours, sans engagement, sans carte bancaire
+                Essai gratuit de 7 jours, sans engagement, sans carte bancaire
               </span>
             </div>
           </div>

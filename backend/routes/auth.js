@@ -43,8 +43,9 @@ router.post('/register', async (req, res) => {
     }
 
     // Create Clinic
+    const starterPlan = getPlan('starter');
     const trialExpiry = new Date();
-    trialExpiry.setDate(trialExpiry.getDate() + 14); // 14 days free trial
+    trialExpiry.setDate(trialExpiry.getDate() + starterPlan.trialDays);
 
     const { data: clinicData, error: clinicError } = await supabase
       .from('clinics')
@@ -52,7 +53,10 @@ router.post('/register', async (req, res) => {
         name: clinicName,
         phone: normalizedPhone,
         address: '',
-        subscription_status: 'active',
+        plan: 'starter', // clinics.plan defaults to 'hopital' at the column level (existing-clinic
+        // migration grandfather, see supabase_schema.sql) — every new signup must set this
+        // explicitly or it silently gets the full paid tier for free.
+        subscription_status: 'trial',
         subscription_expires_at: trialExpiry.toISOString()
       })
       .select()
@@ -113,7 +117,8 @@ router.post('/register', async (req, res) => {
       clinic: {
         id: clinicId,
         name: clinicName,
-        subscription_status: 'active',
+        plan: 'starter',
+        subscription_status: 'trial',
         subscription_expires_at: trialExpiry.toISOString()
       }
     });
@@ -258,8 +263,9 @@ router.post('/google', async (req, res) => {
       // by the existing onboarding flow (triggered whenever clinic.address is empty).
       isNewAccount = true;
 
+      const starterPlan = getPlan('starter');
       const trialExpiry = new Date();
-      trialExpiry.setDate(trialExpiry.getDate() + 14);
+      trialExpiry.setDate(trialExpiry.getDate() + starterPlan.trialDays);
 
       const { data: clinicData, error: clinicError } = await supabase
         .from('clinics')
@@ -267,7 +273,9 @@ router.post('/google', async (req, res) => {
           name: `Clinique de ${displayName}`,
           phone: '',
           address: '',
-          subscription_status: 'active',
+          plan: 'starter', // see the same comment in POST /register — clinics.plan's column
+          // default is 'hopital' (existing-clinic migration grandfather), must be set explicitly here too
+          subscription_status: 'trial',
           subscription_expires_at: trialExpiry.toISOString()
         })
         .select()

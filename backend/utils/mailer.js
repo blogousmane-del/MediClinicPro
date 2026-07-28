@@ -16,7 +16,7 @@ const buildConfirmationEmail = (adminName, clinicName) => {
 
         <p>Nous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement <strong>"${clinicName}"</strong>.</p>
 
-        <p>Votre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de <strong>14 jours d'essai gratuit</strong> avec accès complet à toutes les fonctionnalités (Dossier patient, Agenda, Pharmacie, Labo et Comptabilité).</p>
+        <p>Votre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de <strong>7 jours d'essai gratuit</strong> avec accès complet à toutes les fonctionnalités (Dossier patient, Agenda, Pharmacie, Labo et Comptabilité).</p>
 
         <div style="background-color: #f7fafc; border-left: 4px solid #0d9488; padding: 15px; border-radius: 6px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2d3748; font-size: 16px;">Vos prochaines étapes :</h3>
@@ -40,7 +40,7 @@ const buildConfirmationEmail = (adminName, clinicName) => {
     </div>
   `;
 
-  const text = `Bonjour ${adminName},\n\nNous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement "${clinicName}".\n\nVotre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de 14 jours d'essai gratuit.\n\nAccédez à votre espace clinique à l'adresse : ${APP_URL}\n\nCordialement,\nL'équipe MediClinic Pro`;
+  const text = `Bonjour ${adminName},\n\nNous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement "${clinicName}".\n\nVotre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de 7 jours d'essai gratuit.\n\nAccédez à votre espace clinique à l'adresse : ${APP_URL}\n\nCordialement,\nL'équipe MediClinic Pro`;
 
   return { html, text };
 };

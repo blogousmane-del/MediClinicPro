@@ -214,6 +214,18 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     }
   };
 
+  const handleChangeClinicPlan = async (clinicId: number, plan: string) => {
+    try {
+      const result = await api.put(`/platform/clinics/${clinicId}/plan`, { plan });
+      showToast('success', 'Plan mis à jour', result.message);
+      const updated = await api.get('/platform/overview');
+      setOverview(updated);
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || "Impossible de changer le plan.");
+    }
+  };
+
   const handleToggleUserActive = async (userId: number, active: boolean) => {
     try {
       await api.put(`/platform/users/${userId}`, { active });
@@ -252,41 +264,40 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: 'var(--bg-secondary, #f4f3f0)' }}>
+    <div className="platform-admin-shell" style={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: 'var(--bg-primary)' }}>
       {/* Dedicated admin sidebar — deliberately NOT the clinic Sidebar (no Patients/Rendez-vous/Ordonnances here) */}
-      <aside style={{
+      <aside className="platform-admin-sidebar" style={{
         width: '240px',
         minHeight: '100vh',
-        backgroundColor: '#14201d',
-        color: '#a9b8b4',
+        backgroundColor: '#243333',
+        color: '#E8EDEC',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
         flexShrink: 0
       }}>
         <div>
-          <div style={{ padding: '1.25rem 1.25rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="platform-admin-sidebar-header" style={{ padding: '1.25rem 1.25rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <img src="/logo-icon.svg" alt="MediClinic" width={28} height={28} />
-              <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#ffffff' }}>MediClinic</span>
+              <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#E8EDEC', fontFamily: "'DM Sans', sans-serif" }}>MediClinic</span>
             </div>
             <div style={{
               marginTop: '10px',
               display: 'inline-block',
               padding: '3px 10px',
-              borderRadius: '999px',
-              backgroundColor: 'rgba(212, 164, 90, 0.18)',
-              color: '#d4a45a',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(61, 107, 94, 0.2)',
+              color: '#5FA290',
               fontSize: '0.7rem',
               fontWeight: 700,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase'
+              letterSpacing: '0.04em'
             }}>
               Super Admin
             </div>
           </div>
 
-          <nav style={{ padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <nav className="platform-admin-sidebar-nav" style={{ padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = section === item.id;
@@ -301,8 +312,8 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
                     padding: '10px 12px',
                     borderRadius: '8px',
                     border: 'none',
-                    backgroundColor: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
-                    color: isActive ? '#ffffff' : '#8fa19c',
+                    backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    color: isActive ? '#E8EDEC' : 'rgba(232,237,236,0.6)',
                     fontWeight: isActive ? 700 : 500,
                     fontSize: '0.875rem',
                     textAlign: 'left',
@@ -315,13 +326,14 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
               );
             })}
 
-            <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.08)', margin: '8px 4px' }} />
+            <div className="platform-admin-sidebar-divider" style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '8px 4px' }} />
 
             {comingSoonItems.map(item => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.label}
+                  className="coming-soon-item"
                   title="Bientôt disponible"
                   style={{
                     display: 'flex',
@@ -329,7 +341,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
                     gap: '10px',
                     padding: '10px 12px',
                     borderRadius: '8px',
-                    color: '#57655f',
+                    color: 'rgba(232,237,236,0.35)',
                     fontWeight: 500,
                     fontSize: '0.875rem',
                     cursor: 'not-allowed'
@@ -344,7 +356,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
                     letterSpacing: '0.03em',
                     textTransform: 'uppercase',
                     padding: '2px 6px',
-                    borderRadius: '999px',
+                    borderRadius: '6px',
                     backgroundColor: 'rgba(255,255,255,0.06)'
                   }}>
                     Bientôt
@@ -355,43 +367,44 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
           </nav>
         </div>
 
-        <div style={{ padding: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="platform-admin-sidebar-footer" style={{ padding: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <button
             onClick={onExit}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: 'none', background: 'none', color: '#8fa19c', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: 'none', background: 'none', color: 'rgba(232,237,236,0.6)', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}
           >
             <ArrowLeft size={15} />
             Retour à mon espace clinique
           </button>
           <button
             onClick={logout}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: 'none', background: 'none', color: '#8fa19c', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: 'none', background: 'none', color: 'rgba(232,237,236,0.6)', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}
           >
             <LogOut size={15} />
             Se déconnecter
           </button>
-          <div style={{ padding: '10px 12px', fontSize: '0.75rem', color: '#5f716c' }}>{user?.name}</div>
+          <div className="platform-admin-sidebar-username" style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'rgba(232,237,236,0.5)' }}>{user?.name}</div>
         </div>
       </aside>
 
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ padding: '1.25rem 2rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-primary, #fff)' }}>
+        <div className="platform-admin-main-header" style={{ padding: '1.25rem 2rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)' }}>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
             {sectionTitles[section]}
           </h1>
         </div>
 
-        <div style={{ padding: '1.5rem 2rem', flex: 1 }}>
+        <div className="platform-admin-main-body" style={{ padding: '1.5rem 2rem', flex: 1 }}>
           {loading && !overview ? (
             <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>
-          ) : !overview ? (
+          ) : (section === 'overview' || section === 'clinics') && !overview ? (
             <p style={{ color: 'var(--text-secondary)' }}>Aucune donnée disponible.</p>
           ) : (
             <>
-              {section === 'overview' && <OverviewSection overview={overview} onViewTickets={() => setSection('tickets')} />}
-              {section === 'clinics' && (
+              {section === 'overview' && overview && <OverviewSection overview={overview} onViewTickets={() => setSection('tickets')} />}
+              {section === 'clinics' && overview && (
                 <ClinicsSection
+                  onChangePlan={handleChangeClinicPlan}
                   clinics={overview.clinics}
                   onToggleOverride={handleToggleClinicOverride}
                   onToggleSuspend={handleToggleClinicSuspend}
@@ -434,10 +447,12 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
           return (
             <div key={i} className="card" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</span>
-                <Icon size={16} color="var(--text-muted)" />
+                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</span>
+                <div className="stat-icon-box">
+                  <Icon size={15} color="#3D6B5E" />
+                </div>
               </div>
-              <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)' }}>{s.value}</span>
+              <span style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--text-primary)' }}>{s.value}</span>
             </div>
           );
         })}
@@ -493,7 +508,7 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
             )}
             <button
               onClick={onViewTickets}
-              style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#1e4d40', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#3D6B5E', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
             >
               Voir tous les tickets →
             </button>
@@ -584,7 +599,8 @@ const ClinicsSection: React.FC<{
   clinics: ClinicOverview[];
   onToggleOverride: (clinicId: number, unlimited: boolean) => void;
   onToggleSuspend: (clinicId: number, suspended: boolean) => void;
-}> = ({ clinics, onToggleOverride, onToggleSuspend }) => {
+  onChangePlan: (clinicId: number, plan: string) => void;
+}> = ({ clinics, onToggleOverride, onToggleSuspend, onChangePlan }) => {
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -620,11 +636,11 @@ const ClinicsSection: React.FC<{
             <button
               key={p.value}
               onClick={() => setStatusFilter(p.value)}
+              className="filter-pill"
               style={{
                 padding: '6px 14px',
-                borderRadius: '999px',
                 border: '1px solid var(--border)',
-                backgroundColor: statusFilter === p.value ? '#1e4d40' : 'var(--bg-secondary)',
+                backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
                 color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
                 fontSize: '0.8rem',
                 fontWeight: 700,
@@ -681,7 +697,29 @@ const ClinicsSection: React.FC<{
                     {expandedId === c.id && (
                       <tr>
                         <td colSpan={8} style={{ backgroundColor: 'var(--bg-secondary)', padding: '1rem 1.25rem' }}>
-                          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              Plan :
+                              <select
+                                key={c.plan}
+                                defaultValue={c.plan}
+                                className="input-control"
+                                style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                                onChange={(e) => {
+                                  const nextPlan = e.target.value;
+                                  if (nextPlan === c.plan) return;
+                                  if (window.confirm(`Changer le plan de "${c.name}" vers ${planLabels[nextPlan] || nextPlan} ? Ceci ne modifie pas la facturation, seulement les limites/fonctionnalités appliquées.`)) {
+                                    onChangePlan(c.id, nextPlan);
+                                  } else {
+                                    e.target.value = c.plan;
+                                  }
+                                }}
+                              >
+                                {Object.keys(planLabels).map(p => (
+                                  <option key={p} value={p}>{planLabels[p]}</option>
+                                ))}
+                              </select>
+                            </label>
                             <button
                               onClick={() => onToggleOverride(c.id, !c.unlimitedStaff)}
                               className="btn btn-outline"
@@ -760,11 +798,11 @@ const UsersSection: React.FC<{
             <button
               key={p.value}
               onClick={() => setStatusFilter(p.value)}
+              className="filter-pill"
               style={{
                 padding: '6px 14px',
-                borderRadius: '999px',
                 border: '1px solid var(--border)',
-                backgroundColor: statusFilter === p.value ? '#1e4d40' : 'var(--bg-secondary)',
+                backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
                 color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
                 fontSize: '0.8rem',
                 fontWeight: 700,
@@ -862,7 +900,7 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
                   padding: '6px 14px',
                   borderRadius: '999px',
                   border: '1px solid var(--border)',
-                  backgroundColor: statusFilter === p.value ? '#1e4d40' : 'var(--bg-secondary)',
+                  backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
                   color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
                   fontSize: '0.8rem',
                   fontWeight: 700,
@@ -971,11 +1009,11 @@ const TicketsSection: React.FC<{
           <button
             key={p.value}
             onClick={() => onStatusFilterChange(p.value)}
+            className="filter-pill"
             style={{
               padding: '6px 14px',
-              borderRadius: '999px',
               border: '1px solid var(--border)',
-              backgroundColor: statusFilter === p.value ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
               color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
               fontSize: '0.8rem',
               fontWeight: 700,

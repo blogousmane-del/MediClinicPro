@@ -9,12 +9,12 @@ import {
   X,
   Plus,
   Loader2,
-  ShieldCheck,
   Star,
   Zap
 } from 'lucide-react';
 import { PhoneInput } from '../../components/PhoneInput';
 import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
+import { PasswordChangeForm } from '../../components/PasswordChangeForm';
 
 interface DaySchedule {
   day: number; // 0=Dimanche..6=Samedi (JS Date.getDay())
@@ -62,17 +62,11 @@ function formatSchedule(st: StaffUser): string | null {
 }
 
 export const SettingsPage: React.FC = () => {
-  const { user: currentUser, clinic, renewSubscription, pollSubscriptionStatus, activateFreePlan, refreshProfile, setPassword } = useAuth();
+  const { user: currentUser, clinic, renewSubscription, pollSubscriptionStatus, activateFreePlan, refreshProfile } = useAuth();
   const { showToast } = useNotifications();
 
   const [activeSubTab, setActiveSubTab] = useState<'billing' | 'clinic' | 'users' | 'security' | 'support'>('billing');
   const [loading, setLoading] = useState<boolean>(true);
-
-  // Password / security form states
-  const [currentPasswordInput, setCurrentPasswordInput] = useState<string>('');
-  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState<string>('');
-  const [isSavingPassword, setIsSavingPassword] = useState<boolean>(false);
 
   // Clinic config form states
   const [clinicName, setClinicName] = useState<string>('');
@@ -264,43 +258,6 @@ export const SettingsPage: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Erreur', err.error || 'Impossible de modifier le statut.');
-    }
-  };
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (newPasswordInput.length < 6) {
-      showToast('error', 'Mot de passe trop court', 'Le nouveau mot de passe doit contenir au moins 6 caractères.');
-      return;
-    }
-    if (newPasswordInput !== confirmPasswordInput) {
-      showToast('error', 'Les mots de passe ne correspondent pas', 'Veuillez confirmer le même mot de passe.');
-      return;
-    }
-    if (currentUser?.passwordSet && !currentPasswordInput) {
-      showToast('error', 'Mot de passe actuel requis', 'Veuillez saisir votre mot de passe actuel.');
-      return;
-    }
-
-    setIsSavingPassword(true);
-    try {
-      await setPassword(currentPasswordInput, newPasswordInput);
-      showToast(
-        'success',
-        currentUser?.passwordSet ? 'Mot de passe modifié' : 'Mot de passe défini',
-        currentUser?.passwordSet
-          ? 'Votre mot de passe a été mis à jour.'
-          : 'Vous pouvez désormais vous connecter avec votre email et ce mot de passe, en plus de Google.'
-      );
-      setCurrentPasswordInput('');
-      setNewPasswordInput('');
-      setConfirmPasswordInput('');
-    } catch (err: any) {
-      console.error(err);
-      showToast('error', 'Erreur', err.error || 'Impossible de mettre à jour le mot de passe.');
-    } finally {
-      setIsSavingPassword(false);
     }
   };
 
@@ -825,89 +782,6 @@ export const SettingsPage: React.FC = () => {
               </div>
             )}
 
-            {/* Payment form — only shown once a paid plan (Clinique/Hôpital) is targeted,
-                either because it's already the active plan (renewal) or just picked above.
-                Also requires plansCatalog to be loaded — renewalTargetPlanId alone isn't
-                enough to guarantee a real price is available to display. */}
-            {plansCatalog && renewalTargetPlanId && (
-              <form onSubmit={handleRenewSubmit} style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                borderRadius: '16px',
-                padding: '1.25rem',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                maxWidth: '420px',
-                width: '100%'
-              }}>
-                <span style={{ fontSize: '0.725rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  {renewalTargetPlanId === currentPlanId ? 'RENOUVELER' : 'PASSER AU PLAN'} {plansCatalog?.[renewalTargetPlanId]?.name?.toUpperCase()}
-                </span>
-
-                <div>
-                  <label style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>
-                    Durée
-                  </label>
-                  <select
-                    value={renewMonths}
-                    onChange={(e) => setRenewMonths(parseInt(e.target.value))}
-                    className="input-control"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '0.85rem' }}
-                  >
-                    {[1, 3, 6, 12].map(n => (
-                      <option key={n} value={n}>{n} mois — {(n * pricePerMonth).toLocaleString()} FCFA</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Paying MediClinic's own subscription fee always goes through the
-                    Bictorys/PayTech Mobile Money checkout, regardless of which tier is
-                    being purchased — the target plan's `paymentMethods` describes what
-                    the clinic can charge its OWN patients, not how the clinic pays us. */}
-                <div>
-                  <label style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>
-                    Numéro Mobile Money (optionnel)
-                  </label>
-                  <PhoneInput value={paymentPhone} onChange={setPaymentPhone} />
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-                    Vous choisirez Wave, Orange Money ou MTN MoMo sur la page de paiement sécurisée.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isRenewing}
-                  style={{
-                    width: '100%',
-                    padding: '11px 16px',
-                    borderRadius: '10px',
-                    backgroundColor: '#1e4d40',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 700,
-                    fontSize: '0.875rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    marginTop: '4px'
-                  }}
-                >
-                  {isRenewing ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Initialisation...</span>
-                    </>
-                  ) : (
-                    <span>Continuer vers le paiement ({(renewMonths * pricePerMonth).toLocaleString()} FCFA)</span>
-                  )}
-                </button>
-              </form>
-            )}
-
           </div>
         )}
 
@@ -1043,72 +917,7 @@ export const SettingsPage: React.FC = () => {
         )}
 
         {/* TAB 4: SÉCURITÉ */}
-        {activeSubTab === 'security' && (
-          <form onSubmit={handlePasswordSubmit} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', maxWidth: '480px', width: '100%', boxSizing: 'border-box' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border)', paddingBottom: '8px', margin: 0 }}>
-              {currentUser?.passwordSet ? 'Changer le mot de passe' : 'Définir un mot de passe'}
-            </h3>
-
-            {!currentUser?.passwordSet && (
-              <div style={{
-                display: 'flex', alignItems: 'flex-start', gap: '10px',
-                backgroundColor: 'var(--primary-light, #e6f4ea)', border: '1px solid #bbf7d0',
-                borderRadius: '10px', padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#1e4d40'
-              }}>
-                <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: '1px' }} />
-                <span>
-                  Votre compte a été créé via Google et n'a pas encore de mot de passe. Définissez-en un
-                  ci-dessous pour pouvoir aussi vous connecter avec votre email et ce mot de passe.
-                </span>
-              </div>
-            )}
-
-            {currentUser?.passwordSet && (
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>Mot de passe actuel</label>
-                <input
-                  type="password"
-                  value={currentPasswordInput}
-                  onChange={e => setCurrentPasswordInput(e.target.value)}
-                  className="input-control"
-                  required
-                />
-              </div>
-            )}
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Nouveau mot de passe</label>
-              <input
-                type="password"
-                placeholder="Minimum 6 caractères"
-                value={newPasswordInput}
-                onChange={e => setNewPasswordInput(e.target.value)}
-                className="input-control"
-                required
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Confirmer le nouveau mot de passe</label>
-              <input
-                type="password"
-                value={confirmPasswordInput}
-                onChange={e => setConfirmPasswordInput(e.target.value)}
-                className="input-control"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ alignSelf: 'flex-start', backgroundColor: '#1e4d40', borderRadius: '10px' }}
-              disabled={isSavingPassword}
-            >
-              {isSavingPassword ? 'Enregistrement...' : (currentUser?.passwordSet ? 'Mettre à jour le mot de passe' : 'Définir le mot de passe')}
-            </button>
-          </form>
-        )}
+        {activeSubTab === 'security' && <PasswordChangeForm />}
 
         {/* TAB 5: SUPPORT */}
         {activeSubTab === 'support' && (

@@ -23,6 +23,7 @@ import { AccountingPage } from './pages/Accounting/AccountingPage';
 import { DepositsPage } from './pages/Deposits/DepositsPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
 import { PlatformAdminPage } from './pages/PlatformAdmin/PlatformAdminPage';
+import { ProfilePage } from './pages/Profile/ProfilePage';
 
 const MainAppContent: React.FC = () => {
   const { user, clinic, loading } = useAuth();
@@ -49,6 +50,7 @@ const MainAppContent: React.FC = () => {
     accounting: 'Grand Livre & Recettes',
     deposits: 'Dépôts de garantie',
     settings: 'Paramètres du cabinet',
+    profile: 'Mon profil',
     'platform-admin': 'Administration plateforme'
   };
 
@@ -181,6 +183,7 @@ const MainAppContent: React.FC = () => {
         {currentTab === 'accounting' && <AccountingPage />}
         {currentTab === 'deposits' && <DepositsPage />}
         {currentTab === 'settings' && <SettingsPage />}
+        {currentTab === 'profile' && <ProfilePage />}
       </main>
 
       {/* Mobile-only quick action bar (hidden on desktop) */}
