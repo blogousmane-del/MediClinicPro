@@ -41,12 +41,20 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (
-      allowedOrigins.indexOf(origin) !== -1 || 
-      process.env.NODE_ENV !== 'production' || 
-      origin.includes('vercel.app')
-    ) {
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       return callback(null, true);
+    }
+    // Any Vercel preview/production URL, plus our own custom domain (apex or
+    // any subdomain, e.g. www.) — checked against the actual hostname, not a
+    // substring of the raw origin string, so a spoofed origin like
+    // "https://evil.com/vercel.app" can't slip through.
+    try {
+      const hostname = new URL(origin).hostname;
+      if (hostname.endsWith('.vercel.app') || hostname === 'mediclinicpro.com' || hostname.endsWith('.mediclinicpro.com')) {
+        return callback(null, true);
+      }
+    } catch (_err) {
+      // malformed origin header — fall through to rejection below
     }
     return callback(new Error('CORS Policy: Request from origin not allowed.'));
   },
