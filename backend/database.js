@@ -10,12 +10,23 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-// Initialize Supabase Client with service role key for administrative bypass of RLS on backend
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false
-  }
-});
+// createClient() throws synchronously if url/key are missing/malformed. Since
+// this module is required at the top of server.js, an unguarded throw here
+// used to crash the entire Vercel serverless function on cold start — for
+// EVERY route, including /health — surfacing only as an opaque
+// FUNCTION_INVOCATION_FAILED with no message. Guarding it turns a missing
+// env var into a clean, diagnosable 503 (see server.js) instead.
+let supabase = null;
+try {
+  // Initialize Supabase Client with service role key for administrative bypass of RLS on backend
+  supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false
+    }
+  });
+} catch (err) {
+  console.error("⚠️  Échec de l'initialisation du client Supabase:", err.message);
+}
 
 async function initDb() {
   try {

@@ -6,7 +6,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const { authLimiter } = require('./middleware/rateLimiter');
-const { initDb } = require('./database');
+const { initDb, supabase } = require('./database');
 const authRoutes = require('./routes/auth');
 const patientRoutes = require('./routes/patients');
 const appointmentRoutes = require('./routes/appointments');
@@ -60,6 +60,20 @@ app.use(cors({
   },
   credentials: true
 }));
+
+// If Supabase failed to initialize (missing/invalid SUPABASE_URL/SUPABASE_KEY),
+// fail every request with a clear, diagnosable JSON error instead of letting
+// each route crash on `supabase.from(...)` being called on null. /health is
+// exempt on purpose — it's a pure liveness check, not a DB check.
+app.use((req, res, next) => {
+  if (!supabase && req.path !== '/health') {
+    return res.status(503).json({
+      error: "Configuration serveur incomplète (SUPABASE_URL/SUPABASE_KEY manquant ou invalide). Contactez l'administrateur.",
+      code: "SERVER_MISCONFIGURED"
+    });
+  }
+  next();
+});
 
 // Capture the raw request body bytes for payment webhook signature verification
 // (Bictorys HMAC, PayTech dual signature). PayTech IPNs ship form-encoded by
