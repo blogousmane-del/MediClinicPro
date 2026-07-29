@@ -1214,11 +1214,9 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.85rem;
   color: var(--tp-muted);
   cursor: pointer;
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .terms-nav-actions a { display: inline; }
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .terms-header {

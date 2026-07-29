@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Info, Mail, Phone } from 'lucide-react';
+import { ShieldCheck, Info, Mail, Phone, ArrowLeft } from 'lucide-react';
 
 interface TermsOfServicePageProps {
   onBack: () => void;
@@ -76,7 +76,7 @@ export const TermsOfServicePage: React.FC<TermsOfServicePageProps> = ({ onBack, 
         </div>
 
         <div className="terms-nav-actions">
-          <a onClick={onBack}>Retour au site</a>
+          <a onClick={onBack}><ArrowLeft size={14} /> Retour</a>
           <button
             onClick={onRegister}
             style={{
