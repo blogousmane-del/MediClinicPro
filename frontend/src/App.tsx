@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, Suspense, lazy } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { OfflineProvider } from './contexts/OfflineContext';
@@ -7,23 +7,30 @@ import { Header } from './components/Header';
 import { MobileQuickActionsBar } from './components/MobileQuickActionsBar';
 import { initRippleEffect } from './utils/ripple';
 
-// Pages
+// Logged-out entry pages: kept eager (small, must render instantly on first paint).
 import { LandingPage } from './pages/LandingPage';
 import { TermsOfServicePage } from './pages/TermsOfServicePage';
 import { AuthPage } from './pages/Auth/AuthPage';
-import { OnboardingPage } from './pages/OnboardingPage';
-import { Dashboard } from './pages/Dashboard';
-import { PatientsPage } from './pages/Patients/PatientsPage';
-import { PatientDetailPage } from './pages/Patients/PatientDetailPage';
-import { AppointmentsPage } from './pages/Appointments/AppointmentsPage';
-import { PharmacyPage } from './pages/Pharmacy/PharmacyPage';
-import { OrdonnancesPage } from './pages/Prescriptions/OrdonnancesPage';
-import { LaboratoryPage } from './pages/Laboratory/LaboratoryPage';
-import { AccountingPage } from './pages/Accounting/AccountingPage';
-import { DepositsPage } from './pages/Deposits/DepositsPage';
-import { SettingsPage } from './pages/Settings/SettingsPage';
-import { PlatformAdminPage } from './pages/PlatformAdmin/PlatformAdminPage';
-import { ProfilePage } from './pages/Profile/ProfilePage';
+
+// Authenticated pages: code-split so the initial bundle doesn't ship every
+// tab's code upfront. Each is only fetched the first time its tab is opened.
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then(m => ({ default: m.OnboardingPage })));
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const PatientsPage = lazy(() => import('./pages/Patients/PatientsPage').then(m => ({ default: m.PatientsPage })));
+const PatientDetailPage = lazy(() => import('./pages/Patients/PatientDetailPage').then(m => ({ default: m.PatientDetailPage })));
+const AppointmentsPage = lazy(() => import('./pages/Appointments/AppointmentsPage').then(m => ({ default: m.AppointmentsPage })));
+const PharmacyPage = lazy(() => import('./pages/Pharmacy/PharmacyPage').then(m => ({ default: m.PharmacyPage })));
+const OrdonnancesPage = lazy(() => import('./pages/Prescriptions/OrdonnancesPage').then(m => ({ default: m.OrdonnancesPage })));
+const LaboratoryPage = lazy(() => import('./pages/Laboratory/LaboratoryPage').then(m => ({ default: m.LaboratoryPage })));
+const AccountingPage = lazy(() => import('./pages/Accounting/AccountingPage').then(m => ({ default: m.AccountingPage })));
+const DepositsPage = lazy(() => import('./pages/Deposits/DepositsPage').then(m => ({ default: m.DepositsPage })));
+const SettingsPage = lazy(() => import('./pages/Settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const PlatformAdminPage = lazy(() => import('./pages/PlatformAdmin/PlatformAdminPage').then(m => ({ default: m.PlatformAdminPage })));
+const ProfilePage = lazy(() => import('./pages/Profile/ProfilePage').then(m => ({ default: m.ProfilePage })));
+
+const TabFallback: React.FC = () => (
+  <div style={{ padding: '3rem', textAlign: 'center', opacity: 0.6 }}>Chargement...</div>
+);
 
 const MainAppContent: React.FC = () => {
   const { user, clinic, loading } = useAuth();
@@ -31,6 +38,11 @@ const MainAppContent: React.FC = () => {
   // Navigation tabs
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
+
+  // Tabs stay mounted (hidden via CSS) once visited instead of unmounting on
+  // switch, so their data fetches aren't repeated every time the user comes back.
+  const visitedTabsRef = useRef<Set<string>>(new Set(['dashboard']));
+  visitedTabsRef.current.add(currentTab);
 
   // Auth pages switching states (when not logged in)
   const [loggedOutTab, setLoggedOutTab] = useState<'landing' | 'login' | 'register' | 'terms'>('landing');
@@ -105,13 +117,17 @@ const MainAppContent: React.FC = () => {
   // 2. Onboarding workflow (If clinic address is not configured yet)
   const needsOnboarding = !clinic?.address || clinic.address.trim() === '';
   if (needsOnboarding && user.role === 'admin') {
-    return <OnboardingPage />;
+    return <Suspense fallback={<TabFallback />}><OnboardingPage /></Suspense>;
   }
 
   // 3. Cross-clinic platform admin — a wholly separate console, not a tab
   // inside the normal clinic app (no Patients/Rendez-vous/Ordonnances here).
   if (currentTab === 'platform-admin') {
-    return <PlatformAdminPage onExit={() => setCurrentTab('dashboard')} />;
+    return (
+      <Suspense fallback={<TabFallback />}>
+        <PlatformAdminPage onExit={() => setCurrentTab('dashboard')} />
+      </Suspense>
+    );
   }
 
   // 4. Main Authenticated Interface
@@ -152,41 +168,65 @@ const MainAppContent: React.FC = () => {
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
         
-        {/* Render Tab components */}
-        {currentTab === 'dashboard' && (
-          <Dashboard setCurrentTab={setCurrentTab} onQuickAction={handleQuickAction} />
-        )}
-        
-        {currentTab === 'appointments' && (
-          <AppointmentsPage
-            triggerOpenModal={openApptModal}
-            onModalClosed={() => setOpenApptModal(false)}
-            onViewPatient={(patientId) => { setSelectedPatientId(patientId); setCurrentTab('patients'); }}
-          />
-        )}
-        
-        {currentTab === 'patients' && (
-          selectedPatientId ? (
-            <PatientDetailPage 
-              patientId={selectedPatientId} 
-              onBack={() => setSelectedPatientId(null)} 
-            />
-          ) : (
-            <PatientsPage 
-              onSelectPatient={setSelectedPatientId} 
-              triggerOpenModal={openPatientModal} 
-              onModalClosed={() => setOpenPatientModal(false)} 
-            />
-          )
-        )}
-        
-        {currentTab === 'pharmacy' && <PharmacyPage />}
-        {currentTab === 'prescriptions' && <OrdonnancesPage />}
-        {currentTab === 'laboratory' && <LaboratoryPage />}
-        {currentTab === 'accounting' && <AccountingPage />}
-        {currentTab === 'deposits' && <DepositsPage />}
-        {currentTab === 'settings' && <SettingsPage />}
-        {currentTab === 'profile' && <ProfilePage />}
+        {/* Render Tab components. Once a tab has been visited it stays mounted
+            (hidden via CSS) instead of unmounting, so switching back doesn't
+            re-run its data fetch. */}
+        <Suspense fallback={<TabFallback />}>
+          {visitedTabsRef.current.has('dashboard') && (
+            <div style={{ display: currentTab === 'dashboard' ? undefined : 'none' }}>
+              <Dashboard setCurrentTab={setCurrentTab} onQuickAction={handleQuickAction} />
+            </div>
+          )}
+
+          {visitedTabsRef.current.has('appointments') && (
+            <div style={{ display: currentTab === 'appointments' ? undefined : 'none' }}>
+              <AppointmentsPage
+                triggerOpenModal={openApptModal}
+                onModalClosed={() => setOpenApptModal(false)}
+                onViewPatient={(patientId) => { setSelectedPatientId(patientId); setCurrentTab('patients'); }}
+              />
+            </div>
+          )}
+
+          {visitedTabsRef.current.has('patients') && (
+            <div style={{ display: currentTab === 'patients' ? undefined : 'none' }}>
+              {selectedPatientId ? (
+                <PatientDetailPage
+                  patientId={selectedPatientId}
+                  onBack={() => setSelectedPatientId(null)}
+                />
+              ) : (
+                <PatientsPage
+                  onSelectPatient={setSelectedPatientId}
+                  triggerOpenModal={openPatientModal}
+                  onModalClosed={() => setOpenPatientModal(false)}
+                />
+              )}
+            </div>
+          )}
+
+          {visitedTabsRef.current.has('pharmacy') && (
+            <div style={{ display: currentTab === 'pharmacy' ? undefined : 'none' }}><PharmacyPage /></div>
+          )}
+          {visitedTabsRef.current.has('prescriptions') && (
+            <div style={{ display: currentTab === 'prescriptions' ? undefined : 'none' }}><OrdonnancesPage /></div>
+          )}
+          {visitedTabsRef.current.has('laboratory') && (
+            <div style={{ display: currentTab === 'laboratory' ? undefined : 'none' }}><LaboratoryPage /></div>
+          )}
+          {visitedTabsRef.current.has('accounting') && (
+            <div style={{ display: currentTab === 'accounting' ? undefined : 'none' }}><AccountingPage /></div>
+          )}
+          {visitedTabsRef.current.has('deposits') && (
+            <div style={{ display: currentTab === 'deposits' ? undefined : 'none' }}><DepositsPage /></div>
+          )}
+          {visitedTabsRef.current.has('settings') && (
+            <div style={{ display: currentTab === 'settings' ? undefined : 'none' }}><SettingsPage /></div>
+          )}
+          {visitedTabsRef.current.has('profile') && (
+            <div style={{ display: currentTab === 'profile' ? undefined : 'none' }}><ProfilePage /></div>
+          )}
+        </Suspense>
       </main>
 
       {/* Mobile-only quick action bar (hidden on desktop) */}
