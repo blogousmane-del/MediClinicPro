@@ -30,7 +30,10 @@ app.set('trust proxy', 1);
 // Security Middlewares
 app.use(helmet({
   contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  // Default 'same-origin' blocks the postMessage handshake Google Identity
+  // Services needs for its Sign-In popup/One Tap flow.
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
 }));
 
 // CORS configuration - Restrict to frontend origin
