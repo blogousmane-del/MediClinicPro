@@ -78,11 +78,14 @@ const MainAppContent: React.FC = () => {
         color: 'white',
         height: '100vh',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: '1.25rem',
         fontSize: '1.2rem',
         fontWeight: 600
       }}>
+        <img src="/logo-icon.svg" alt="MediClinic" width={56} height={56} className="app-loading-logo" />
         Initialisation de MediClinic...
       </div>
     );
