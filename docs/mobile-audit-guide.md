@@ -24,13 +24,17 @@ Audit page par page de l'app en largeur mobile (référence : ~375px, iPhone SE 
 **Problème :** couleur rouge (`--danger`) réservée aux actions destructives ailleurs dans l'app, utilisée ici pour une simple déconnexion.
 **Correction :** remplacé par `btn btn-primary` (dégradé teal des actions principales).
 
+### 6. Landing page — stat-banner / feature-pills qui s'effondraient sous 380px
+**Problème :** `landing-stats-grid` et la grille de feature-pills passaient en liste empilée simple sous ~380px, perdant la mise en page carte à 2 colonnes des tailles au-dessus.
+**Correction :** media query dédiée dans `index.css` pour garder un layout carte 2 colonnes jusqu'à 380px. Tagline de l'écran de chargement (auth) mise à jour en "Soigner. Gérer. Grandir".
+
 ## Vérifié — déjà correct, aucune correction nécessaire
 
 - **Modales** (`.modal-content` / `.modal-grid`) : passent déjà en 1 colonne sous 640px sur toutes les pages (Pharmacy, Laboratory, Patients, Ordonnances, Settings, Appointments, PaymentCheckoutModal). Centrage géré par `.modal-backdrop` (flexbox `align-items/justify-content: center`), robuste à toute taille d'écran.
 - **Tableaux** (Patients, Settings, Deposits, Accounting) : déjà dans un `.table-container` à défilement horizontal contrôlé — pattern volontaire pour les données tabulaires plutôt qu'un empilement de colonnes.
 - **Formulaire de connexion** (`AuthPage`) : `.auth-right-panel` centre déjà la carte de formulaire (flex `center`/`center`), le panneau de marque gauche disparaît proprement sous 960px.
 - **Onboarding** : conteneur racine déjà centré (`flex`, `align-items/justify-content: center`), stepper à 3 colonnes déjà dégradé en icônes seules sous 560px.
-- **Landing page** : grilles (`landing-hero-grid`, `landing-stats-grid`, etc.) déjà gérées par media queries dédiées à 900px/500px.
+- **Landing page** : grilles (`landing-hero-grid`, etc.) déjà gérées par media queries dédiées à 900px/500px — voir correction #6 ci-dessus pour le cas 380px du stat-banner/feature-pills.
 - **Sidebar / Header / MobileQuickActionsBar** : bascule mobile déjà en place (`.sidebar`, `.main-content`, `.mobile-quick-actions` à 768px).
 - **Appointments** : page déjà construite mobile-first (colonnes qui s'empilent sous 700px), aucune retouche nécessaire.
 - **Textes qui débordent** : recherche ciblée (`white-space: nowrap` sans troncature, `overflow: hidden` sans ellipsis) sur tout le code — aucun cas trouvé sur du contenu dynamique (noms de patients, adresses) qui ne soit pas déjà protégé par un `textOverflow: ellipsis` ou un simple retour à la ligne naturel.
