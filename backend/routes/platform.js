@@ -522,4 +522,70 @@ router.put('/users/:id', async (req, res) => {
   }
 });
 
+// POST /api/platform/notifications
+// Broadcast a message to one, several, or all clinics — the only
+// Super-Admin-to-clinic-user communication channel in this app. Surfaced in
+// each targeted clinic's notification bell via GET /api/notifications.
+// Fire-and-forget: no edit/delete/recipient-list endpoint in this iteration,
+// matching the "single-message-plus-status" simplicity already used for
+// support tickets elsewhere in this file.
+router.post('/notifications', async (req, res) => {
+  try {
+    const { title, body, targetAll, clinicIds } = req.body;
+    if (!title || !String(title).trim() || !body || !String(body).trim()) {
+      return res.status(400).json({ error: "Le titre et le message sont requis." });
+    }
+    if (!targetAll && (!Array.isArray(clinicIds) || clinicIds.length === 0)) {
+      return res.status(400).json({ error: "Sélectionnez au moins une clinique, ou choisissez « Toutes les cliniques »." });
+    }
+
+    let targetClinics = [];
+    if (!targetAll) {
+      const { data: clinics, error: clinicsError } = await supabase
+        .from('clinics')
+        .select('id')
+        .in('id', clinicIds);
+      if (clinicsError) throw clinicsError;
+      targetClinics = clinics || [];
+      if (targetClinics.length === 0) {
+        return res.status(400).json({ error: "Aucune des cliniques sélectionnées n'existe." });
+      }
+    }
+
+    const { data: notification, error: insertError } = await supabase
+      .from('notifications')
+      .insert({ created_by: req.user.userId, title, body, target_all: !!targetAll })
+      .select('id')
+      .single();
+    if (insertError) throw insertError;
+
+    if (!targetAll) {
+      const rows = targetClinics.map(c => ({ notification_id: notification.id, clinic_id: c.id }));
+      const { error: linkError } = await supabase.from('notification_clinics').insert(rows);
+      if (linkError) throw linkError;
+    }
+
+    let affectedClinicIds = targetClinics.map(c => c.id);
+    if (targetAll) {
+      const { data: allClinics, error: allClinicsError } = await supabase.from('clinics').select('id');
+      if (allClinicsError) throw allClinicsError;
+      affectedClinicIds = (allClinics || []).map(c => c.id);
+    }
+
+    await Promise.all(affectedClinicIds.map(clinicId =>
+      supabase.from('activity_logs').insert({
+        clinic_id: clinicId,
+        user_id: req.user.userId,
+        action: 'PLATFORM_NOTIFICATION_SENT',
+        details: `Notification "${title}" envoyée par l'administrateur de la plateforme.`
+      })
+    ));
+
+    res.json({ success: true, message: "Notification envoyée." });
+  } catch (error) {
+    console.error("Platform send notification error:", error);
+    res.status(500).json({ error: "Erreur lors de l'envoi de la notification." });
+  }
+});
+
 module.exports = router;
