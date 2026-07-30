@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { NotificationsSection } from './NotificationsSection';
 import {
   LayoutDashboard,
   Building2,
@@ -16,7 +17,8 @@ import {
   BarChart2,
   Shield,
   Settings as SettingsIcon,
-  Activity
+  Activity,
+  Megaphone
 } from 'lucide-react';
 
 interface ClinicOverview {
@@ -102,7 +104,7 @@ interface RecentTicket {
   status: string;
 }
 
-type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets';
+type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets' | 'notifications';
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrateur',
@@ -238,12 +240,23 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     }
   };
 
+  const handleSendNotification = async (payload: { title: string; body: string; targetAll: boolean; clinicIds?: number[] }) => {
+    try {
+      await api.post('/platform/notifications', payload);
+      showToast('success', 'Notification envoyée', 'Les cliniques ciblées la verront dans leur cloche de notifications.');
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || "Impossible d'envoyer la notification.");
+    }
+  };
+
   const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
     { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
     { id: 'clinics', label: 'Cliniques', icon: Building2 },
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'subscriptions', label: 'Abonnements', icon: CreditCard },
-    { id: 'tickets', label: 'Support', icon: LifeBuoy }
+    { id: 'tickets', label: 'Support', icon: LifeBuoy },
+    { id: 'notifications', label: 'Notifications', icon: Megaphone }
   ];
 
   // Shown in the sidebar to match the full admin-console layout, but not yet
@@ -260,7 +273,8 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     clinics: 'Cliniques enregistrées',
     users: 'Utilisateurs de la plateforme',
     subscriptions: 'Abonnements',
-    tickets: 'Tickets support'
+    tickets: 'Tickets support',
+    notifications: 'Notifications aux cliniques'
   };
 
   return (
@@ -421,6 +435,9 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
                   onStatusFilterChange={setTicketStatusFilter}
                   onUpdateStatus={handleUpdateTicketStatus}
                 />
+              )}
+              {section === 'notifications' && (
+                <NotificationsSection clinics={overview?.clinics.map(c => ({ id: c.id, name: c.name })) || []} onSend={handleSendNotification} />
               )}
             </>
           )}
