@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../utils/api';
 import { useNotifications } from '../contexts/NotificationContext';
-import { Sun, Moon, Bell, AlertTriangle, ShieldAlert, Menu, ChevronDown } from 'lucide-react';
+import { Sun, Moon, Bell, AlertTriangle, ShieldAlert, Menu, ChevronDown, Inbox, CheckCheck } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -15,6 +15,15 @@ const AVAILABILITY_OPTIONS: { value: 'available' | 'busy' | 'away'; label: strin
   { value: 'away', label: 'Absent', color: '#94a3b8' }
 ];
 
+interface NotificationItem {
+  id: string;
+  type: 'broadcast' | 'system';
+  title: string;
+  body: string;
+  createdAt: string;
+  read: boolean;
+}
+
 export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
   const { user, clinic, refreshProfile } = useAuth();
   const { showToast } = useNotifications();
@@ -22,6 +31,9 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [availabilityMenuOpen, setAvailabilityMenuOpen] = useState<boolean>(false);
   const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [notificationsMenuOpen, setNotificationsMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     // Theme setup
@@ -38,6 +50,21 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
       setDaysRemaining(diffDays);
     }
   }, [clinic]);
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        const result = await api.get('/notifications');
+        setNotifications(result.items);
+        setUnreadCount(result.unreadCount);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -58,6 +85,28 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
       showToast('error', 'Erreur', err.error || 'Impossible de mettre à jour votre statut de disponibilité.');
     } finally {
       setIsUpdatingAvailability(false);
+    }
+  };
+
+  const handleMarkRead = async (id: string) => {
+    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    setUnreadCount(prev => Math.max(0, prev - (notifications.find(n => n.id === id)?.read ? 0 : 1)));
+    try {
+      await api.post(`/notifications/${id}/read`, {});
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    const ids = notifications.filter(n => !n.read).map(n => n.id);
+    if (ids.length === 0) return;
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setUnreadCount(0);
+    try {
+      await api.post('/notifications/read-all', { ids });
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -260,6 +309,7 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
         {/* Notification Bell */}
         <div style={{ position: 'relative' }}>
           <button
+            onClick={() => setNotificationsMenuOpen(o => !o)}
             style={{
               background: 'none',
               border: '1px solid var(--border)',
@@ -271,18 +321,91 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
               justifyContent: 'center',
               color: 'var(--text-secondary)'
             }}
+            aria-label="Notifications"
           >
             <Bell size={18} />
           </button>
-          <span style={{
-            position: 'absolute',
-            top: '-2px',
-            right: '-2px',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--danger)'
-          }} />
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '-2px',
+              right: '-2px',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--danger)'
+            }} />
+          )}
+
+          {notificationsMenuOpen && (
+            <>
+              <div
+                onClick={() => setNotificationsMenuOpen(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 95 }}
+              />
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                boxShadow: 'var(--shadow-md)',
+                width: '320px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                zIndex: 96
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  borderBottom: '1px solid var(--border)'
+                }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>Notifications</span>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600 }}
+                    >
+                      <CheckCheck size={13} /> Tout marquer comme lu
+                    </button>
+                  )}
+                </div>
+
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <Inbox size={22} style={{ marginBottom: '6px' }} />
+                    <p style={{ fontSize: '0.8rem', margin: 0 }}>Aucune notification.</p>
+                  </div>
+                ) : (
+                  notifications.map(n => (
+                    <button
+                      key={n.id}
+                      onClick={() => handleMarkRead(n.id)}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 12px',
+                        border: 'none',
+                        borderBottom: '1px solid var(--border)',
+                        background: n.read ? 'none' : 'var(--bg-tertiary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        {n.type === 'system' ? <AlertTriangle size={13} color="var(--warning)" /> : <Bell size={13} color="var(--primary)" />}
+                        <span style={{ fontSize: '0.8rem', fontWeight: n.read ? 500 : 700, color: 'var(--text-primary)' }}>{n.title}</span>
+                      </div>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>{n.body}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>
