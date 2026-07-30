@@ -19,6 +19,7 @@ const depositsRoutes = require('./routes/deposits');
 const webhooksRoutes = require('./routes/webhooks');
 const platformRoutes = require('./routes/platform');
 const cronRoutes = require('./routes/cron');
+const notificationsRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -107,6 +108,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/deposits', depositsRoutes);
 app.use('/api/platform', platformRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/notifications', notificationsRoutes);
 // (webhooksRoutes is mounted earlier, before auth-adjacent middleware)
 
 // Health check endpoint — registered at both paths since this file is hit
