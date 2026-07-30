@@ -147,6 +147,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} />
               </div>
 
+              {/* Logout — moved up next to the logo/close button so it's
+                  reachable without scrolling the nav to the footer, easy
+                  to miss on mobile */}
+              <button
+                onClick={() => setShowLogoutConfirm(true)}
+                title="Se déconnecter"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9bb0a9',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#9bb0a9'}
+              >
+                <LogOut size={18} />
+              </button>
+
               {/* Mobile Close Button */}
               <button
                 onClick={onClose}
@@ -315,27 +337,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             </div>
           </div>
 
-          {/* Logout Icon */}
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            title="Se déconnecter"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#6b8078',
-              cursor: 'pointer',
-              padding: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '6px',
-              flexShrink: 0
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#6b8078'}
-          >
-            <LogOut size={16} />
-          </button>
         </div>
 
       </aside>
