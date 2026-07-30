@@ -247,6 +247,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Erreur', err.error || "Impossible d'envoyer la notification.");
+      throw err;
     }
   };
 

@@ -89,12 +89,19 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
   };
 
   const handleMarkRead = async (id: string) => {
+    const wasUnread = !notifications.find(n => n.id === id)?.read;
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
-    setUnreadCount(prev => Math.max(0, prev - (notifications.find(n => n.id === id)?.read ? 0 : 1)));
+    if (wasUnread) setUnreadCount(prev => Math.max(0, prev - 1));
     try {
       await api.post(`/notifications/${id}/read`, {});
     } catch (err) {
       console.error(err);
+      // Roll back the optimistic update — otherwise the item shows as read
+      // until the next 60s poll silently reverts it with no user feedback.
+      if (wasUnread) {
+        setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: false } : n)));
+        setUnreadCount(prev => prev + 1);
+      }
     }
   };
 
@@ -107,6 +114,11 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
       await api.post('/notifications/read-all', { ids });
     } catch (err) {
       console.error(err);
+      // Roll back — restore the previously-unread items and count so a
+      // failed call doesn't silently mark everything read in the UI.
+      const idSet = new Set(ids);
+      setNotifications(prev => prev.map(n => (idSet.has(n.id) ? { ...n, read: false } : n)));
+      setUnreadCount(ids.length);
     }
   };
 

@@ -56,21 +56,37 @@ router.get('/', async (req, res) => {
   try {
     const clinicId = req.user.clinicId;
 
-    const { data: broadcastRows, error: broadcastError } = await supabase
+    // Scope the notifications fetch server-side to this clinic's own
+    // targeted broadcasts plus target_all ones, instead of pulling every
+    // clinic's broadcasts (and recipient lists) and filtering in JS — that
+    // both leaked other clinics' targeting data and risked PostgREST's
+    // default row cap truncating results before this clinic's own targeted
+    // broadcast was even reached.
+    const { data: links, error: linksError } = await supabase
+      .from('notification_clinics')
+      .select('notification_id')
+      .eq('clinic_id', clinicId);
+    if (linksError) throw linksError;
+    const ownIds = (links || []).map(l => l.notification_id);
+
+    let broadcastQuery = supabase
       .from('notifications')
-      .select('id, title, body, target_all, created_at, notification_clinics(clinic_id)')
-      .order('created_at', { ascending: false });
+      .select('id, title, body, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    broadcastQuery = ownIds.length > 0
+      ? broadcastQuery.or(`target_all.eq.true,id.in.(${ownIds.join(',')})`)
+      : broadcastQuery.eq('target_all', true);
+    const { data: broadcastRows, error: broadcastError } = await broadcastQuery;
     if (broadcastError) throw broadcastError;
 
-    const broadcasts = (broadcastRows || [])
-      .filter(n => n.target_all || (n.notification_clinics || []).some(nc => nc.clinic_id === clinicId))
-      .map(n => ({
-        id: String(n.id),
-        type: 'broadcast',
-        title: n.title,
-        body: n.body,
-        createdAt: n.created_at
-      }));
+    const broadcasts = (broadcastRows || []).map(n => ({
+      id: String(n.id),
+      type: 'broadcast',
+      title: n.title,
+      body: n.body,
+      createdAt: n.created_at
+    }));
 
     const systemAlerts = await getSystemAlerts(clinicId);
 

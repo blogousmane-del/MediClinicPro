@@ -65,6 +65,13 @@ async function auth(req, res, next) {
       // allowlist), so this doesn't open anything to a caller who couldn't
       // already reach it.
       const isPlatformRoute = pathIs('/api/platform');
+      // Notifications (marking read/read-all) must keep working even for a
+      // suspended/expired clinic — per the design spec, a suspended or
+      // expired clinic's users still see and read notifications normally.
+      // Safe to exempt: these POST routes only ever write the caller's OWN
+      // row in notification_reads keyed by req.user.userId, no clinic data
+      // is read or written there.
+      const isNotificationsRoute = pathIs('/api/notifications');
 
       const isExpired = isClinicExpired(clinic);
       const isSuspended = clinic.suspended_by_platform === true;
@@ -73,7 +80,7 @@ async function auth(req, res, next) {
       // SUBSCRIPTION_EXPIRED there is deliberately no billing-route bypass:
       // paying does not lift a suspension, only a Super Admin reversing the
       // toggle does. Checked first so its message wins if both are true.
-      if (isSuspended && !isReadRequest && !isPlatformRoute) {
+      if (isSuspended && !isReadRequest && !isPlatformRoute && !isNotificationsRoute) {
         return res.status(403).json({
           error: "Compte suspendu",
           code: "ACCOUNT_SUSPENDED",
@@ -81,7 +88,7 @@ async function auth(req, res, next) {
         });
       }
 
-      if (isExpired && !isReadRequest && !isBillingRoute && !isPlatformRoute) {
+      if (isExpired && !isReadRequest && !isBillingRoute && !isPlatformRoute && !isNotificationsRoute) {
         return res.status(403).json({
           error: "Abonnement MediClinic expiré",
           code: "SUBSCRIPTION_EXPIRED",

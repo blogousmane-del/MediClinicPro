@@ -33,6 +33,9 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ clin
       setTitle('');
       setBody('');
       setSelectedClinicIds([]);
+    } catch {
+      // swallow — PlatformAdminPage already showed a toast; keep the form
+      // populated so the operator doesn't lose their draft
     } finally {
       setSending(false);
     }
