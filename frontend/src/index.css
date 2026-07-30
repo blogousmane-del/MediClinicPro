@@ -1354,9 +1354,22 @@ h1, h2, h3, h4, h5, h6 {
   .landing-hero-title {
     font-size: 1.85rem !important;
   }
+  /* Keep a 2-column grid instead of collapsing to one tall stacked list —
+     a dense grid of small cards reads as "designed"; a full-width list of
+     rows reads as unstyled/unfinished. */
   .landing-stats-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
   }
+  .landing-feature-pills {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+  }
+}
+
+/* Very narrow phones: 2 columns get too cramped, drop to 1 */
+@media (max-width: 380px) {
+  .landing-stats-grid,
   .landing-feature-pills {
     grid-template-columns: 1fr !important;
   }
@@ -1522,8 +1535,7 @@ h1, h2, h3, h4, h5, h6 {
   transform: scale(1.15);
 }
 
-/* Stats grid: divider lines between items (divide-x on desktop single row,
-   divide-x + divide-y on the 2x2 tablet grid, stacked top-dividers on narrow mobile) */
+/* Stats grid: divider lines between items on desktop's single row */
 .landing-stats-grid > .landing-highlight {
   padding: 0.25rem 1rem;
 }
@@ -1532,19 +1544,24 @@ h1, h2, h3, h4, h5, h6 {
     border-left: 1px solid rgba(255, 255, 255, 0.12);
   }
 }
-@media (max-width: 900px) and (min-width: 501px) {
-  .landing-stats-grid > .landing-highlight:nth-child(even) {
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
+/* Tablet/mobile: a thin-divider text list reads as unstyled, not a designed
+   component — swap to tinted rounded chip cards (icon beside, not above,
+   the label) so a 2-column phone grid still looks intentional. */
+@media (max-width: 900px) {
+  .landing-stats-grid > .landing-highlight {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    text-align: left;
+    padding: 0.85rem 0.9rem;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
   }
-  .landing-stats-grid > .landing-highlight:nth-child(n+3) {
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-    padding-top: 1rem;
-  }
-}
-@media (max-width: 500px) {
-  .landing-stats-grid > .landing-highlight:not(:first-child) {
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-    padding-top: 1rem;
+  .landing-stats-grid > .landing-highlight svg {
+    margin-bottom: 0 !important;
+    flex-shrink: 0;
   }
 }
 

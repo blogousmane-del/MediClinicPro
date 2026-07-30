@@ -98,7 +98,7 @@ const MainAppContent: React.FC = () => {
         fontWeight: 600
       }}>
         <img src="/logo-icon.svg" alt="MediClinic" width={56} height={56} className="app-loading-logo" />
-        Initialisation de MediClinic...
+        Soigner. Gérer. Grandir
       </div>
     );
   }
