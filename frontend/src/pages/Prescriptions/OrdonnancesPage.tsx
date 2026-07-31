@@ -162,13 +162,13 @@ export const OrdonnancesPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await api.get('/pharmacy/prescriptions');
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setPrescriptions(data.map((p: any) => ({
           id: p.id,
           patient_name: `${p.patient_first_name} ${p.patient_last_name}`,
           patient_age: '45 ans',
-          doctor_name: p.doctor_name || 'Dr. Aminata Koné',
-          date: p.date_time ? new Date(p.date_time).toLocaleDateString('fr-FR') : '14 juil. 2025',
+          doctor_name: p.doctor_name,
+          date: new Date(p.date_time).toLocaleDateString('fr-FR'),
           diagnostic: 'Consultation générale',
           status: p.status === 'dispensed' ? 'remise' : p.status === 'partial' ? 'partielle' : 'validee',
           notes: 'Prendre selon les indications.',
@@ -292,7 +292,7 @@ export const OrdonnancesPage: React.FC = () => {
 
       if (editingPrescriptionId) {
         // Edit existing
-        setPrescriptions(itemsToRender.map(p => p.id === editingPrescriptionId ? {
+        setPrescriptions(prescriptions.map(p => p.id === editingPrescriptionId ? {
           ...p,
           patient_name: selectedPatientName.split(' (')[0],
           doctor_name: doctorName,
@@ -314,7 +314,7 @@ export const OrdonnancesPage: React.FC = () => {
           notes: notes || undefined,
           items: formattedItems
         };
-        setPrescriptions([newPresc, ...itemsToRender]);
+        setPrescriptions([newPresc, ...prescriptions]);
         showToast('success', 'Ordonnance créée', `Ordonnance générée avec succès pour ${selectedPatientName}.`);
       }
 
@@ -397,7 +397,7 @@ export const OrdonnancesPage: React.FC = () => {
       status: 'validee',
       patient_name: `${presc.patient_name} (Copie)`
     };
-    setPrescriptions([duplicatedPresc, ...itemsToRender]);
+    setPrescriptions([duplicatedPresc, ...prescriptions]);
     showToast('info', 'Duplication', `Ordonnance de ${presc.patient_name} dupliquée.`);
   };
 
@@ -423,68 +423,7 @@ export const OrdonnancesPage: React.FC = () => {
     }
   };
 
-  // Default sample prescriptions data matching Image 1 exact UI wireframe
-  const defaultMockPrescriptions: Prescription[] = [
-    {
-      id: 1,
-      patient_name: 'Adjobi Kouassi',
-      patient_age: '67 ans',
-      doctor_name: 'Dr. Yao Bernard',
-      date: '14 juil. 2025',
-      diagnostic: 'Infection des voies respiratoires supérieures',
-      status: 'remise',
-      notes: "À prendre avec de la nourriture. Éviter l'alcool.",
-      items: [
-        { id: 101, medication_name: 'Amoxicilline 500mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 7 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 7, quantity_prescribed: 21, quantity_dispensed: 21 },
-        { id: 102, medication_name: 'Paracétamol 500mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 8 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 8, quantity_prescribed: 10, quantity_dispensed: 10 }
-      ]
-    },
-    {
-      id: 2,
-      patient_name: 'Fatou Diomandé',
-      patient_age: '48 ans',
-      doctor_name: 'Dr. Soro Mariam',
-      date: '14 juil. 2025',
-      diagnostic: 'Suivi Diabète type 2',
-      status: 'remise',
-      items: [
-        { id: 201, medication_name: 'Métformine 850mg', form: 'Comprimé', posology: '1 comprimé - x2/jour - 30 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 30, quantity_prescribed: 60, quantity_dispensed: 48 },
-        { id: 202, medication_name: 'Linagliptine 5mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', frequency: 'x1/jour (Matin)', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 30 }
-      ]
-    },
-    {
-      id: 3,
-      patient_name: 'Brahima Ouattara',
-      patient_age: '52 ans',
-      doctor_name: 'Dr. Coulibaly A.',
-      date: '13 juil. 2025',
-      diagnostic: 'Hypertension artérielle',
-      status: 'partielle',
-      notes: 'Vérifier la tension tous les 3 jours.',
-      items: [
-        { id: 301, medication_name: 'Lisinopril 10mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', frequency: 'x1/jour (Matin)', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 18 },
-        { id: 302, medication_name: 'Amlodipine 5mg', form: 'Comprimé', posology: '1 comprimé - x1/jour - 30 jours', frequency: 'x1/jour (Matin)', durationDays: 30, quantity_prescribed: 30, quantity_dispensed: 30 }
-      ]
-    },
-    {
-      id: 4,
-      patient_name: 'Raïssa Gnahore',
-      patient_age: '31 ans',
-      doctor_name: 'Dr. Soro Mariam',
-      date: '12 juil. 2025',
-      diagnostic: 'Gastrite aiguë',
-      status: 'validee',
-      items: [
-        { id: 401, medication_name: 'Oméprazole 20mg', form: 'Gélule', posology: '1 comprimé - x1/jour - 14 jours', frequency: 'x1/jour (Matin)', durationDays: 14, quantity_prescribed: 14, quantity_dispensed: 0 },
-        { id: 402, medication_name: 'Dompéridone 10mg', form: 'Comprimé', posology: '1 comprimé - x3/jour - 7 jours', frequency: 'x3/jour (Matin, Midi & Soir)', durationDays: 7, quantity_prescribed: 21, quantity_dispensed: 0 },
-        { id: 403, medication_name: 'Sels de réhydratation', form: 'Sachet', posology: '1 sachet - x2/jour - 3 jours', frequency: 'x2/jour (Matin & Soir)', durationDays: 3, quantity_prescribed: 6, quantity_dispensed: 0 }
-      ]
-    }
-  ];
-
-  const itemsToRender = (prescriptions && prescriptions.length > 0) ? prescriptions : defaultMockPrescriptions;
-
-  const filteredItems = itemsToRender.filter(p => {
+  const filteredItems = prescriptions.filter(p => {
     const matchesSearch = p.patient_name.toLowerCase().includes(search.toLowerCase()) || p.diagnostic.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (filterStatus === 'validee') return p.status === 'validee';
@@ -493,9 +432,9 @@ export const OrdonnancesPage: React.FC = () => {
     return true;
   });
 
-  const countValidees = itemsToRender.filter(p => p.status === 'validee').length;
-  const countRemises = itemsToRender.filter(p => p.status === 'remise').length;
-  const countPartielles = itemsToRender.filter(p => p.status === 'partielle').length;
+  const countValidees = prescriptions.filter(p => p.status === 'validee').length;
+  const countRemises = prescriptions.filter(p => p.status === 'remise').length;
+  const countPartielles = prescriptions.filter(p => p.status === 'partielle').length;
   const currentMonthLabel = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
   return (
@@ -512,7 +451,7 @@ export const OrdonnancesPage: React.FC = () => {
             Ordonnances
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
-            {itemsToRender.length} ordonnances · {currentMonthLabel}
+            {prescriptions.length} ordonnances · {currentMonthLabel}
           </p>
         </div>
 
@@ -556,7 +495,7 @@ export const OrdonnancesPage: React.FC = () => {
               cursor: 'pointer'
             }}
           >
-            Tous ({itemsToRender.length})
+            Tous ({prescriptions.length})
           </button>
 
           <button
@@ -632,6 +571,11 @@ export const OrdonnancesPage: React.FC = () => {
 
       {/* 4. Prescription Cards List Stack matching Image 1 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {!loading && filteredItems.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+            {prescriptions.length === 0 ? 'Aucune ordonnance enregistrée.' : 'Aucune ordonnance ne correspond à ce filtre.'}
+          </div>
+        )}
         {filteredItems.map((presc) => {
           let statusPill = null;
           if (presc.status === 'remise') {
