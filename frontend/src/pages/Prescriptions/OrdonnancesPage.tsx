@@ -113,11 +113,26 @@ export const OrdonnancesPage: React.FC = () => {
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Real patients & prescribing doctors for the modal's selectors — fetched
+  // from the clinic's own data instead of a hardcoded demo list, which was
+  // showing made-up patients/doctors as if they were real clinic records.
+  const [patients, setPatients] = useState<{ id: number; first_name: string; last_name: string; birth_date: string }[]>([]);
+  const [doctors, setDoctors] = useState<{ id: number; name: string }[]>([]);
+
+  const calculateAge = (birthDateStr: string): number => {
+    const birth = new Date(birthDateStr);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
   // New & Edit prescription modal state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingPrescriptionId, setEditingPrescriptionId] = useState<number | null>(null);
-  const [selectedPatientName, setSelectedPatientName] = useState<string>('Adjobi Kouassi (67 ans)');
-  const [doctorName, setDoctorName] = useState<string>('Dr. Aminata Koné');
+  const [selectedPatientName, setSelectedPatientName] = useState<string>('');
+  const [doctorName, setDoctorName] = useState<string>('');
   const [diagnostic, setDiagnostic] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -193,12 +208,18 @@ export const OrdonnancesPage: React.FC = () => {
 
   useEffect(() => {
     fetchPrescriptions();
+    api.get('/patients')
+      .then((data) => setPatients(Array.isArray(data) ? data : []))
+      .catch((err) => console.error(err));
+    api.get('/settings/users')
+      .then((data) => setDoctors((Array.isArray(data) ? data : []).filter((u: any) => u.role === 'doctor' && u.active === 1)))
+      .catch((err) => console.error(err));
   }, []);
 
   const handleOpenNewModal = () => {
     setEditingPrescriptionId(null);
-    setSelectedPatientName('Adjobi Kouassi (67 ans)');
-    setDoctorName('Dr. Aminata Koné');
+    setSelectedPatientName('');
+    setDoctorName('');
     setDiagnostic('');
     setNotes('');
     setMedicationLines([
@@ -901,11 +922,12 @@ export const OrdonnancesPage: React.FC = () => {
                       style={{ width: '100%', padding: '8px 12px', borderRadius: '8px' }}
                       required
                     >
-                      <option value="Adjobi Kouassi (67 ans)">Adjobi Kouassi (67 ans)</option>
-                      <option value="Fatou Diomandé (48 ans)">Fatou Diomandé (48 ans)</option>
-                      <option value="Brahima Ouattara (52 ans)">Brahima Ouattara (52 ans)</option>
-                      <option value="Raïssa Gnahore (31 ans)">Raïssa Gnahore (31 ans)</option>
-                      <option value="Mamadou Coulibaly (45 ans)">Mamadou Coulibaly (45 ans)</option>
+                      <option value="" disabled>-- Choisir un patient --</option>
+                      {patients.length === 0 && <option value="" disabled>Aucun patient enregistré.</option>}
+                      {patients.map((p) => {
+                        const label = `${p.first_name} ${p.last_name} (${calculateAge(p.birth_date)} ans)`;
+                        return <option key={p.id} value={label}>{label}</option>;
+                      })}
                     </select>
                   </div>
 
@@ -920,10 +942,11 @@ export const OrdonnancesPage: React.FC = () => {
                       style={{ width: '100%', padding: '8px 12px', borderRadius: '8px' }}
                       required
                     >
-                      <option value="Dr. Aminata Koné">Dr. Aminata Koné</option>
-                      <option value="Dr. Yao Bernard">Dr. Yao Bernard</option>
-                      <option value="Dr. Soro Mariam">Dr. Soro Mariam</option>
-                      <option value="Dr. Coulibaly A.">Dr. Coulibaly A.</option>
+                      <option value="" disabled>-- Choisir un médecin --</option>
+                      {doctors.length === 0 && <option value="" disabled>Aucun médecin actif. Ajoutez-en un dans Paramètres.</option>}
+                      {doctors.map((d) => (
+                        <option key={d.id} value={d.name}>{d.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
