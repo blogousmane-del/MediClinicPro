@@ -57,7 +57,7 @@ router.get('/users', auth, checkRole(['admin', 'manager', 'secretary', 'doctor',
   try {
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, name, email, role, active, availability_status, work_schedule, created_at')
+      .select('id, name, email, role, active, availability_status, work_schedule, specialty, created_at')
       .eq('clinic_id', req.user.clinicId)
       .order('role', { ascending: true })
       .order('name', { ascending: true });
@@ -126,7 +126,7 @@ router.put('/availability', auth, checkRole(['doctor', 'nurse']), async (req, re
 // Create a new staff user
 router.post('/users', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { name, email: rawEmail, password, role } = req.body;
+    const { name, email: rawEmail, password, role, specialty } = req.body;
     const email = (rawEmail || '').trim().toLowerCase();
 
     if (!name || !email || !password || !role) {
@@ -183,7 +183,8 @@ router.post('/users', auth, checkRole(['admin']), async (req, res) => {
         password_hash: passwordHash,
         role,
         active: 1,
-        work_schedule: schedule.workSchedule
+        work_schedule: schedule.workSchedule,
+        specialty: specialty || null
       })
       .select()
       .single();
@@ -216,7 +217,7 @@ router.post('/users', auth, checkRole(['admin']), async (req, res) => {
 router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
   try {
     const userId = req.params.id;
-    const { active, role, name } = req.body;
+    const { active, role, name, specialty } = req.body;
 
     const schedule = parseScheduleInput(req.body);
     if (schedule.error) {
@@ -275,7 +276,8 @@ router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
         active: active !== undefined ? (active ? 1 : 0) : undefined,
         role: role || undefined,
         name: name || undefined,
-        work_schedule: schedule.workSchedule
+        work_schedule: schedule.workSchedule,
+        specialty: specialty !== undefined ? (specialty || null) : undefined
       })
       .eq('id', userId)
       .eq('clinic_id', req.user.clinicId);

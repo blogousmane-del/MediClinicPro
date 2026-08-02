@@ -1,6 +1,6 @@
 # Banani implementation status
 
-Last updated: 2026-07-27 (Dashboard trial-countdown banner)
+Last updated: 2026-08-02 (Nouveau Rendez-vous pixel-parity correction pass)
 
 Full import requested by user 2026-07-22 — all 25 pages + 16 shared components. After comparing Banani's mocks against the existing app, most existing pages turned out to already be more capable than Banani's static designs (theme-aware, role-gated, live-data-wired). User decision: light visual/icon polish on existing pages, keep all logic; full builds only for genuinely new/missing content.
 
@@ -146,3 +146,35 @@ Several smaller items in one session, not all MCP-driven:
 - **Dashboard trial-countdown banner** (from a user-supplied screenshot, not an MCP fetch) — new amber gradient card on `Dashboard.tsx`, shown only to `admin` role on `clinic.plan === 'starter'` with `subscription_expires_at` still in the future (Starter's 7-day trial, see `backend/utils/plans.js`), same day-diff formula already used by `Header.tsx`'s expiry chip. Copy adapted from Banani's generic "Pro"/"premium" wording to this app's real tier language (no such tier exists) — CTA routes to `Paramètres`'s billing tab. Gated to admin since non-admin roles can't reach the billing tab to act on it anyway. Visually verified by temporarily forcing the condition true, then reverted before considering the change done.
 
 All of the above: `tsc -b` and `npm run lint` clean, no new warnings.
+
+## 2026-08-02 Banani fetch — Nouveau Rendez-vous (full-page rebuild, not a modal restyle)
+Fetched `new_screen11.jsx` ("Nouveau Rendez-vous", desktop) + `NewAppointmentMobile.jsx` (plan: `nouveau-rendez-vous.md`). Genuinely new UX, not a polish pass on the existing small booking modal in `AppointmentsPage.tsx` — user explicitly chose (batched question, before any code) to turn "Ajouter un RDV" into a dedicated full view instead of enriching the modal, same `PatientDetailPage`-style local view-toggle pattern (no new Sidebar entry, no new `App.tsx` tab).
+
+New: `frontend/src/pages/Appointments/NewAppointmentPage.tsx` (single file, mobile-first CSS, 2-col ≥1024px). `AppointmentsPage.tsx`'s old modal (state + JSX) removed entirely; "Ajouter un RDV" now flips a local `view: 'list'|'new'` state.
+
+User decisions (all bigger-scope options chosen over the no-fabrication defaults):
+1. **`appointments.priority`** (`normal|urgent|critical`) added as a real column — wired end-to-end (`GET/POST/PUT /api/appointments`).
+2. **`users.specialty`** (free text) added as a real column — wired into `GET/POST/PUT /api/settings/users` and a new input in `SettingsPage.tsx`'s staff-add form (doctor role only).
+3. Banani's fixed "Type de consultation" dropdown → quick-fill suggestion chips writing into the existing real `motif` field (no new schema, no fake taxonomy).
+4. "Salle / Espace" kept as free text (already real) rather than becoming Banani's fixed-option dropdown — a fixed room list would reintroduce the fabricated "rooms" concept already rejected on `Dashboard.tsx` (2026-07-22 audit).
+5. Mini-calendar (off-days greyed) + time-slot grid (taken/free) are **real**, derived from the selected doctor's `work_schedule` and existing `GET /appointments?practitionerId=&date=` — not hardcoded like Banani's mock.
+6. "Patients récents" strip = 3 most-recently-created active patients (`created_at desc`), an interpretation flagged in the plan file, not literally "recently seen."
+7. Doctor `UserAvatar` (AI photography) → initials-in-a-circle, established pattern. Banani's mock `Sidebar`/`TopBar` dropped, real components reused.
+
+**Requires 2 manual migrations before this works against live Supabase** (same schema-drift pattern as every prior column addition):
+```sql
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'urgent', 'critical'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty TEXT;
+```
+(Already run by the user this session against the shared dev Supabase project — confirmed via a live `GET /settings/users` call returning the new `specialty` field with no error.)
+
+**Incidental fixes made while testing (unrelated to Banani, pre-existing data drift)**: seeded `admin@mediclinic.com` and all 6 other seeded staff accounts were found with `active: 0` in the live DB, contradicting CLAUDE.md's "Test accounts (seeded)" table — reactivated all 7 directly via the service-role client to restore the documented baseline. Root cause not investigated (out of scope), flagged here in case it recurs.
+
+Verified end-to-end against the running local backend + dev-server Playwright session: real doctors (with null `specialty`, correctly hidden rather than showing a placeholder), real recent patients, calendar/slot generation from `work_schedule` (falls back to 08:00–18:00 in 30-min steps when no schedule configured, per the existing "no schedule = always available" convention), a full booking submitted and confirmed present in the DB with `priority: 'normal'` persisted, then cleaned up. Screenshotted at 375/768/1280px, no console errors at any width. `tsc -b`, `npm run lint`, and `npm run build` all clean.
+
+### 2026-08-02 addendum — pixel-parity correction pass (user screenshot feedback)
+User compared 2 Banani source screenshots against 2 of the shipped implementation and flagged 3 concrete deltas: missing header-level Annuler/Confirmer button pair, a stray/wrongly-styled Annuler button inside the bottom dark recap box (doesn't exist in Banani's source), and the Priorité selector's selected state missing a background-color fill (unlike doctor-card/patient-chip selected states elsewhere on the same page).
+
+Fixed all 3 in `NewAppointmentPage.tsx`: restructured so `<form>` now wraps a new header row (back-button + title on the left, "Annuler" + "Confirmer le rendez-vous" pair on the right, `justifyContent: 'space-between'`); removed the recap box's stray Annuler button and shortened its remaining button label to just "Confirmer" (matching Banani's distinct copy for the two CTAs); added a `bgLight` field to each `PRIORITIES` entry (`var(--primary-light)`/`var(--warning-light)`/`var(--danger-light)`) wired into the selected button's `backgroundColor`.
+
+Re-verified with a fresh Playwright pass at 375/768/1280px (screenshots regenerated, all 3 widths viewed) — header buttons wrap sensibly on narrow mobile, recap box shows only "Confirmer", Normal priority shows the teal-tinted fill when selected. `tsc -b`, `npm run lint` (only pre-existing unrelated warnings elsewhere in the codebase), and `npm run build` all clean.

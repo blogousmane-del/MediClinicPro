@@ -83,6 +83,7 @@ export const SettingsPage: React.FC = () => {
   const [newUserPass, setNewUserPass] = useState<string>('');
   const [newUserRole, setNewUserRole] = useState<string>('doctor');
   const [newUserSchedule, setNewUserSchedule] = useState<DaySchedule[]>(DEFAULT_SCHEDULE);
+  const [newUserSpecialty, setNewUserSpecialty] = useState<string>('');
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
 
   // Billing & Subscription states
@@ -226,6 +227,7 @@ export const SettingsPage: React.FC = () => {
         email: newUserEmail,
         password: newUserPass,
         role: newUserRole,
+        ...(newUserRole === 'doctor' ? { specialty: newUserSpecialty || undefined } : {}),
         ...(isSchedulable ? {
           workSchedule: newUserSchedule.map(d => d.off
             ? { day: d.day, off: true }
@@ -240,6 +242,7 @@ export const SettingsPage: React.FC = () => {
       setNewUserEmail('');
       setNewUserPass('');
       setNewUserSchedule(DEFAULT_SCHEDULE);
+      setNewUserSpecialty('');
       fetchStaffUsers();
     } catch (err: any) {
       console.error(err);
@@ -1028,6 +1031,19 @@ export const SettingsPage: React.FC = () => {
                       <option value="manager">Gestionnaire Financier</option>
                     </select>
                   </div>
+
+                  {newUserRole === 'doctor' && (
+                    <div className="form-group">
+                      <label>Spécialité (optionnel)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex : Cardiologie, Pédiatrie, Médecine générale..."
+                        value={newUserSpecialty}
+                        onChange={e => setNewUserSpecialty(e.target.value)}
+                        className="input-control"
+                      />
+                    </div>
+                  )}
 
                   {(newUserRole === 'doctor' || newUserRole === 'nurse') && (
                     <div className="form-group">

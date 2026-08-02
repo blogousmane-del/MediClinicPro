@@ -3,14 +3,7 @@ import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Clock, User, Plus, X, Check, Phone, CalendarCheck, Download, DoorOpen, Stethoscope } from 'lucide-react';
-
-interface Patient {
-  id: number;
-  first_name: string;
-  last_name: string;
-  folder_number: string;
-  phone: string;
-}
+import { NewAppointmentPage } from './NewAppointmentPage';
 
 interface Practitioner {
   id: number;
@@ -64,19 +57,9 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Booking Modal Form states
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [patientSearch, setPatientSearch] = useState<string>('');
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  const [bookingPractitionerId, setBookingPractitionerId] = useState<string>('');
-  const [bookingDate, setBookingDate] = useState<string>('');
-  const [bookingTime, setBookingTime] = useState<string>('');
-  const [bookingDuration, setBookingDuration] = useState<number>(30);
-  const [bookingMotif, setBookingMotif] = useState<string>('');
-  const [bookingRoom, setBookingRoom] = useState<string>('');
-  const [bookingNotes, setBookingNotes] = useState<string>('');
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  // 'new' shows the full-page NewAppointmentPage (Banani "Nouveau Rendez-vous")
+  // in place of the list, instead of the small modal this used to be.
+  const [view, setView] = useState<'list' | 'new'>('list');
   const [smsPopup, setSmsPopup] = useState<any | null>(null);
 
   const fetchAppointments = async () => {
@@ -106,19 +89,6 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
     }
   };
 
-  const searchPatients = async (query: string) => {
-    if (!query) {
-      setPatients([]);
-      return;
-    }
-    try {
-      const data = await api.get(`/patients?q=${encodeURIComponent(query)}`);
-      setPatients(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
     fetchAppointments();
   }, [filterDate, selectedPractitioner]);
@@ -128,15 +98,8 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
   }, []);
 
   useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-      searchPatients(patientSearch);
-    }, 300);
-    return () => clearTimeout(delayDebounce);
-  }, [patientSearch]);
-
-  useEffect(() => {
     if (triggerOpenModal) {
-      setIsModalOpen(true);
+      setView('new');
     }
   }, [triggerOpenModal]);
 
@@ -146,62 +109,22 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
     setStatusFilter('all');
   }, [filterDate, selectedPractitioner]);
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedPatientId('');
-    setPatientSearch('');
-    setBookingPractitionerId('');
-    setBookingDate('');
-    setBookingTime('');
-    setBookingDuration(30);
-    setBookingMotif('');
-    setBookingRoom('');
-    setBookingNotes('');
-
+  const handleCloseNewAppointment = () => {
+    setView('list');
     if (onModalClosed) {
       onModalClosed();
     }
   };
 
-  const handleBookingSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPatientId || !bookingPractitionerId || !bookingDate || !bookingTime || !bookingMotif) {
-      showToast('error', 'Formulaire incomplet', 'Veuillez remplir tous les champs obligatoires.');
-      return;
+  const handleAppointmentBooked = (smsSimulated: any) => {
+    if (smsSimulated) {
+      setSmsPopup(smsSimulated);
     }
-
-    setIsSubmitting(true);
-    try {
-      const dateTime = `${bookingDate}T${bookingTime}:00`;
-      const payload = {
-        patientId: parseInt(selectedPatientId),
-        practitionerId: parseInt(bookingPractitionerId),
-        dateTime,
-        duration: bookingDuration,
-        motif: bookingMotif,
-        room: bookingRoom || undefined,
-        notes: bookingNotes || undefined
-      };
-
-      const response = await api.post('/appointments', payload);
-      showToast('success', 'Rendez-vous planifié', 'Le rendez-vous a été enregistré.');
-
-      if (response.smsSimulated) {
-        setSmsPopup(response.smsSimulated);
-      }
-
-      handleCloseModal();
-      fetchAppointments();
-    } catch (err: any) {
-      console.error(err);
-      if (err.conflict) {
-        showToast('error', 'Conflit d\'horaire', err.error);
-      } else {
-        showToast('error', 'Échec de planification', err.error || 'Erreur lors de la prise de rendez-vous.');
-      }
-    } finally {
-      setIsSubmitting(false);
+    setView('list');
+    if (onModalClosed) {
+      onModalClosed();
     }
+    fetchAppointments();
   };
 
   const handleUpdateStatus = async (apptId: number, status: 'completed' | 'cancelled') => {
@@ -248,6 +171,10 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
   const formattedFilterDate = new Date(`${filterDate}T00:00:00`).toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
+
+  if (view === 'new') {
+    return <NewAppointmentPage onCancel={handleCloseNewAppointment} onBooked={handleAppointmentBooked} />;
+  }
 
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -362,7 +289,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
 
         {['admin', 'secretary'].includes(user?.role || '') && (
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setView('new')}
             className="btn btn-primary page-cta-btn"
             style={{ gap: '6px', flexShrink: 0 }}
           >
@@ -559,171 +486,6 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
           })
         )}
       </div>
-
-      {/* BOOKING MODAL */}
-      {isModalOpen && (
-        <div className="modal-backdrop" onClick={handleCloseModal}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 600 }}>Planifier un Rendez-vous</h3>
-              <button onClick={handleCloseModal} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
-            </div>
-
-            <form onSubmit={handleBookingSubmit}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-                {/* Search Patient */}
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Rechercher le patient *</label>
-                  <input
-                    type="text"
-                    placeholder="Tapez le nom du patient..."
-                    value={patientSearch}
-                    onChange={e => setPatientSearch(e.target.value)}
-                    className="input-control"
-                  />
-                  {patients.length > 0 && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      backgroundColor: 'var(--bg-secondary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      boxShadow: 'var(--shadow-md)',
-                      maxHeight: '150px',
-                      overflowY: 'auto',
-                      zIndex: 110,
-                      marginTop: '4px'
-                    }}>
-                      {patients.map(p => (
-                        <div
-                          key={p.id}
-                          onClick={() => {
-                            setSelectedPatientId(p.id.toString());
-                            setPatientSearch(`${p.last_name.toUpperCase()} ${p.first_name}`);
-                            setPatients([]);
-                          }}
-                          style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            borderBottom: '1px solid var(--border)',
-                            fontSize: '0.85rem'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                          <strong>{p.last_name.toUpperCase()} {p.first_name}</strong> ({p.folder_number})
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Practitioner */}
-                <div className="form-group">
-                  <label>Médecin / Praticien *</label>
-                  <select
-                    value={bookingPractitionerId}
-                    onChange={e => setBookingPractitionerId(e.target.value)}
-                    className="input-control"
-                    required
-                  >
-                    <option value="">-- Sélectionner le médecin --</option>
-                    {practitioners.map(doc => (
-                      <option key={doc.id} value={doc.id}>{doc.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Date & Time */}
-                <div className="modal-grid">
-                  <div className="form-group">
-                    <label>Date du RDV *</label>
-                    <input
-                      type="date"
-                      value={bookingDate}
-                      onChange={e => setBookingDate(e.target.value)}
-                      className="input-control"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Heure du RDV *</label>
-                    <input
-                      type="time"
-                      value={bookingTime}
-                      onChange={e => setBookingTime(e.target.value)}
-                      className="input-control"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Duration & Motif */}
-                <div className="modal-grid">
-                  <div className="form-group">
-                    <label>Durée (min)</label>
-                    <input
-                      type="number"
-                      value={bookingDuration}
-                      onChange={e => setBookingDuration(parseInt(e.target.value) || 30)}
-                      className="input-control"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Motif de visite *</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Fièvre, Bilan sanguin"
-                      value={bookingMotif}
-                      onChange={e => setBookingMotif(e.target.value)}
-                      className="input-control"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Room & Notes (optional) */}
-                <div className="modal-grid">
-                  <div className="form-group">
-                    <label>Salle (optionnel)</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Salle 1"
-                      value={bookingRoom}
-                      onChange={e => setBookingRoom(e.target.value)}
-                      className="input-control"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Notes (optionnel)</label>
-                    <input
-                      type="text"
-                      placeholder="Note libre pour ce RDV"
-                      value={bookingNotes}
-                      onChange={e => setBookingNotes(e.target.value)}
-                      className="input-control"
-                    />
-                  </div>
-                </div>
-
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" onClick={handleCloseModal} className="btn btn-secondary">
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? 'Planification...' : 'Planifier'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* SMS CONFIRMATION POPUP BANNER */}
       {smsPopup && (

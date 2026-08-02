@@ -46,6 +46,7 @@ CREATE TABLE users (
   active INTEGER DEFAULT 1, -- 1=true, 0=false
   availability_status TEXT NOT NULL DEFAULT 'available' CHECK (availability_status IN ('available', 'busy', 'away')), -- manual override for doctor/nurse, only meaningful during their work_schedule hours below; used to orient walk-in patients
   work_schedule JSONB DEFAULT NULL, -- doctor/nurse only: per-day hours, e.g. [{"day":1,"off":false,"start":"08:40","end":"17:15"}, {"day":0,"off":true}, ...]. day: 0=Sunday..6=Saturday (JS Date.getDay() convention). NULL/empty = no schedule configured (always available). Clinic-local time (Côte d'Ivoire is UTC+0 year-round, no DST, so server UTC time == local time)
+  specialty TEXT, -- doctor/nurse only: free-text medical specialty (e.g. "Cardiologie"), shown on the appointment-booking doctor picker. NULL = not set, no fabricated taxonomy enforced
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -79,6 +80,7 @@ CREATE TABLE appointments (
   status TEXT DEFAULT 'scheduled', -- scheduled, completed, cancelled
   room TEXT, -- optional exam room / cabinet label, e.g. "Salle 1"
   notes TEXT, -- optional free-text note for the visit
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'urgent', 'critical')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

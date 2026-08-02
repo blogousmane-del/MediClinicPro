@@ -50,7 +50,11 @@ router.get('/', auth, async (req, res) => {
 // Book a new appointment
 router.post('/', auth, async (req, res) => {
   try {
-    const { patientId, practitionerId, dateTime, duration, motif, room, notes } = req.body;
+    const { patientId, practitionerId, dateTime, duration, motif, room, notes, priority } = req.body;
+
+    if (priority && !['normal', 'urgent', 'critical'].includes(priority)) {
+      return res.status(400).json({ error: "Priorité invalide." });
+    }
 
     if (!patientId || !practitionerId || !dateTime || !motif) {
       return res.status(400).json({ error: "Tous les champs obligatoires doivent être renseignés." });
@@ -112,6 +116,7 @@ router.post('/', auth, async (req, res) => {
         motif,
         room: room || null,
         notes: notes || null,
+        priority: priority || 'normal',
         status: 'scheduled'
       })
       .select()
@@ -172,8 +177,12 @@ router.post('/', auth, async (req, res) => {
 // Update / Reschedule or Cancel appointment
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { dateTime, duration, motif, status, room, notes } = req.body;
+    const { dateTime, duration, motif, status, room, notes, priority } = req.body;
     const apptId = req.params.id;
+
+    if (priority && !['normal', 'urgent', 'critical'].includes(priority)) {
+      return res.status(400).json({ error: "Priorité invalide." });
+    }
 
     const { data: appt, error: checkError } = await supabase
       .from('appointments')
@@ -213,7 +222,8 @@ router.put('/:id', auth, async (req, res) => {
         motif: motif || appt.motif,
         status: status || appt.status,
         room: room !== undefined ? room : appt.room,
-        notes: notes !== undefined ? notes : appt.notes
+        notes: notes !== undefined ? notes : appt.notes,
+        priority: priority || appt.priority
       })
       .eq('id', apptId)
       .eq('clinic_id', req.user.clinicId);

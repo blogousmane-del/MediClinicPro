@@ -47,6 +47,8 @@ ALTER TABLE clinics ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'hopital
 ALTER TABLE subscription_payments ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'hopital' CHECK (plan IN ('clinique', 'hopital'));
 ALTER TABLE clinics ADD COLUMN IF NOT EXISTS unlimited_staff BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE clinics ADD COLUMN IF NOT EXISTS suspended_by_platform BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'urgent', 'critical'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty TEXT;
 -- 17. Notifications Table (Super Admin broadcasts to clinic users — surfaced
 -- in the notification bell alongside system-generated alerts, which are
 -- computed live in backend/routes/notifications.js and have no row here)
