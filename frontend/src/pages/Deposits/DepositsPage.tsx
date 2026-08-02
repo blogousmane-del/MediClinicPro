@@ -457,8 +457,8 @@ export const DepositsPage: React.FC = () => {
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>Coût estimé</span>
                       <input
                         type="number"
-                        value={item.cost}
-                        onChange={(e) => handleUpdateItem(item.id, 'cost', parseFloat(e.target.value) || 0)}
+                        value={item.cost || ''}
+                        onChange={(e) => handleUpdateItem(item.id, 'cost', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                         style={{ ...inputStyle, fontSize: '0.8rem' }}
                       />
                     </div>
@@ -523,8 +523,8 @@ export const DepositsPage: React.FC = () => {
                 <label style={labelStyle}>Montant du dépôt (FCFA)</label>
                 <input
                   type="number"
-                  value={depositAmount}
-                  onChange={(e) => { setDepositAmount(parseFloat(e.target.value) || 0); setAmountTouched(true); }}
+                  value={depositAmount || ''}
+                  onChange={(e) => { setDepositAmount(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0); setAmountTouched(true); }}
                   style={{ ...inputStyle, fontWeight: 700, fontSize: '1rem' }}
                 />
                 <div className="dep-quick-amounts" style={{ marginTop: '8px' }}>
