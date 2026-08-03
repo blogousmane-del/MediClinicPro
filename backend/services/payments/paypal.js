@@ -8,7 +8,7 @@ const API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const FETCH_TIMEOUT_MS = 15_000;
 const TOKEN_EXPIRY_MARGIN_MS = 60_000; // renouvelle 1 min avant l'expiration réelle
 
-let cachedToken = null; // { value: string, expiresAt: number }
+let cachedToken = null; // { key: string, value: string, expiresAt: number }
 
 function isConfigured() {
   return !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
@@ -16,6 +16,13 @@ function isConfigured() {
 
 function apiUrl() {
   return (process.env.PAYPAL_MODE || 'sandbox') === 'live' ? API_LIVE : API_SANDBOX;
+}
+
+// Clé du cache de jeton : base API + client id, pour qu'un jeton obtenu en
+// sandbox ne soit jamais envoyé en live si PAYPAL_MODE change en cours de
+// process (ex. process worker réutilisé entre requêtes).
+function tokenCacheKey() {
+  return `${apiUrl()}::${process.env.PAYPAL_CLIENT_ID || ''}`;
 }
 
 /**
@@ -26,8 +33,16 @@ function apiUrl() {
  * @returns {number|null} montant USD arrondi à 2 décimales (exigé par PayPal)
  */
 function xofToUsd(amountXof) {
-  const rate = parseFloat(process.env.XOF_TO_USD_RATE || '');
-  if (!rate || rate <= 0 || !Number.isFinite(rate)) return null;
+  const raw = String(process.env.XOF_TO_USD_RATE || '').trim();
+  // Format strict "chiffres[.chiffres]" uniquement : parseFloat() accepterait
+  // silencieusement une virgule décimale ("600,5" -> 6) ou un séparateur de
+  // milliers espace ("6 000" -> 6), une saisie francophone plausible qui
+  // multiplierait chaque paiement par ~100. La fourchette 100-2000 borne le
+  // taux FCFA/USD à des valeurs plausibles pour rejeter toute valeur
+  // manifestement mal saisie (ex. un taux inversé USD/FCFA).
+  if (!/^\d+(\.\d+)?$/.test(raw)) return null;
+  const rate = parseFloat(raw);
+  if (!Number.isFinite(rate) || rate < 100 || rate > 2000) return null;
   const usd = Math.round((amountXof / rate) * 100) / 100;
   return usd > 0 ? usd : null;
 }
@@ -48,7 +63,8 @@ async function paypalFetch(path, init) {
  * @returns {Promise<{ok: true, token: string} | {ok: false, error: string}>}
  */
 async function getAccessToken() {
-  if (cachedToken && cachedToken.expiresAt > Date.now()) {
+  const key = tokenCacheKey();
+  if (cachedToken && cachedToken.key === key && cachedToken.expiresAt > Date.now()) {
     return { ok: true, token: cachedToken.value };
   }
 
@@ -82,10 +98,51 @@ async function getAccessToken() {
   }
 
   cachedToken = {
+    key,
     value: data.access_token,
     expiresAt: Date.now() + (data.expires_in || 3600) * 1000 - TOKEN_EXPIRY_MARGIN_MS
   };
   return { ok: true, token: data.access_token };
+}
+
+/**
+ * Exécute un appel authentifié à PayPal. Si le jeton en cache est rejeté par
+ * PayPal (401 — expiré côté serveur avant notre marge, ou invalidé après un
+ * changement de mode en cours de process), vide le cache et réessaie l'appel
+ * une seule fois avec un jeton neuf ; un second 401 remonte tel quel.
+ * @param {(token: string) => Promise<Response>} makeRequest
+ * @returns {Promise<{ok: true, res: Response, data: any} | {ok: false, error: string}>}
+ */
+async function callWithAuth(makeRequest) {
+  const auth = await getAccessToken();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  let res;
+  try {
+    res = await makeRequest(auth.token);
+  } catch (err) {
+    return { ok: false, error: `Erreur réseau vers PayPal: ${err.message}` };
+  }
+
+  if (res.status === 401) {
+    cachedToken = null;
+    const retryAuth = await getAccessToken();
+    if (!retryAuth.ok) return { ok: false, error: retryAuth.error };
+    try {
+      res = await makeRequest(retryAuth.token);
+    } catch (err) {
+      return { ok: false, error: `Erreur réseau vers PayPal: ${err.message}` };
+    }
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    return { ok: false, error: `PayPal a répondu ${res.status} (réponse non JSON)` };
+  }
+
+  return { ok: true, res, data };
 }
 
 /**
@@ -100,11 +157,14 @@ async function getAccessToken() {
  * @param {string} params.returnUrl
  * @param {string} params.cancelUrl
  * @param {string} [params.customerEmail]
- * @param {string} [params.customerName]
  */
 async function initiateCheckout(params) {
   if (!isConfigured()) {
     return { ok: false, error: 'not_configured' };
+  }
+
+  if (!params || typeof params.reference !== 'string' || !params.reference.trim()) {
+    return { ok: false, error: 'PayPal: référence de paiement manquante.' };
   }
 
   const amountUsd = xofToUsd(params.amount);
@@ -112,8 +172,18 @@ async function initiateCheckout(params) {
     return { ok: false, error: 'PayPal: taux de conversion XOF_TO_USD_RATE absent ou invalide.' };
   }
 
-  const auth = await getAccessToken();
-  if (!auth.ok) return { ok: false, error: auth.error };
+  const paypalSource = {
+    experience_context: {
+      brand_name: 'MediClinic Pro',
+      locale: 'fr-FR',
+      user_action: 'PAY_NOW',
+      return_url: params.returnUrl,
+      cancel_url: params.cancelUrl
+    }
+  };
+  if (typeof params.customerEmail === 'string' && params.customerEmail.trim()) {
+    paypalSource.email_address = params.customerEmail.trim();
+  }
 
   const body = {
     intent: 'CAPTURE',
@@ -125,39 +195,24 @@ async function initiateCheckout(params) {
         amount: { currency_code: 'USD', value: amountUsd.toFixed(2) }
       }
     ],
-    payment_source: {
-      paypal: {
-        experience_context: {
-          brand_name: 'MediClinic Pro',
-          locale: 'fr-FR',
-          user_action: 'PAY_NOW',
-          return_url: params.returnUrl,
-          cancel_url: params.cancelUrl
-        }
-      }
-    }
+    payment_source: { paypal: paypalSource }
   };
 
-  let res;
-  try {
-    res = await paypalFetch('/v2/checkout/orders', {
+  const call = await callWithAuth((token) =>
+    paypalFetch('/v2/checkout/orders', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${auth.token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        // Empêche PayPal de créer une commande en double si cet appel est
+        // rejoué (timeout, retry applicatif) — clé sur notre référence maison.
+        'PayPal-Request-Id': params.reference
       },
       body: JSON.stringify(body)
-    });
-  } catch (err) {
-    return { ok: false, error: `Erreur réseau vers PayPal: ${err.message}` };
-  }
-
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    return { ok: false, error: `PayPal a répondu ${res.status} (réponse non JSON)` };
-  }
+    })
+  );
+  if (!call.ok) return { ok: false, error: call.error };
+  const { res, data } = call;
 
   if (!res.ok || !data.id) {
     return { ok: false, error: `PayPal a refusé la commande (${res.status}): ${data.message || 'raison inconnue'}` };
@@ -179,32 +234,26 @@ async function initiateCheckout(params) {
 async function captureOrder(orderId) {
   if (!isConfigured()) return { ok: false, error: 'not_configured' };
 
-  const auth = await getAccessToken();
-  if (!auth.ok) return { ok: false, error: auth.error };
-
-  let res;
-  try {
-    res = await paypalFetch(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
+  const call = await callWithAuth((token) =>
+    paypalFetch(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${auth.token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        // Empêche une capture en double si cet appel est rejoué — clé sur
+        // l'id de commande PayPal, stable pour une capture donnée.
+        'PayPal-Request-Id': orderId
       },
       body: '{}'
-    });
-  } catch (err) {
-    return { ok: false, error: `Erreur réseau vers PayPal: ${err.message}` };
-  }
-
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    return { ok: false, error: `PayPal a répondu ${res.status} (réponse non JSON)` };
-  }
+    })
+  );
+  if (!call.ok) return { ok: false, error: call.error };
+  const { res, data } = call;
 
   // ORDER_ALREADY_CAPTURED = le webhook ou un rechargement de page a déjà fait
-  // le travail. Ce n'est pas une erreur pour nous.
+  // le travail. Ce n'est pas une erreur pour nous, mais ce n'est pas non plus
+  // une preuve que la capture existante a réussi (elle peut être PENDING ou
+  // DECLINED) : on ne réinvente jamais un statut que PayPal n'a pas rapporté.
   const alreadyCaptured =
     data.name === 'UNPROCESSABLE_ENTITY' &&
     (data.details || []).some((d) => d.issue === 'ORDER_ALREADY_CAPTURED');
@@ -213,7 +262,11 @@ async function captureOrder(orderId) {
     return { ok: false, error: `PayPal capture a échoué (${res.status}): ${data.message || 'raison inconnue'}` };
   }
 
-  return { ok: true, status: data.status || 'COMPLETED' };
+  if (alreadyCaptured) {
+    return { ok: true, status: 'already_captured' };
+  }
+
+  return { ok: true, status: data.status || 'unknown' };
 }
 
 /**
@@ -256,15 +309,11 @@ async function verifyWebhookSignature(req, rawBody) {
     return { ok: false, error: 'PayPal: corps de requête illisible' };
   }
 
-  const auth = await getAccessToken();
-  if (!auth.ok) return { ok: false, error: auth.error };
-
-  let res;
-  try {
-    res = await paypalFetch('/v1/notifications/verify-webhook-signature', {
+  const call = await callWithAuth((token) =>
+    paypalFetch('/v1/notifications/verify-webhook-signature', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${auth.token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -276,17 +325,10 @@ async function verifyWebhookSignature(req, rawBody) {
         webhook_id: webhookId,
         webhook_event: webhookEvent
       })
-    });
-  } catch (err) {
-    return { ok: false, error: `Erreur réseau vers PayPal: ${err.message}` };
-  }
-
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    return { ok: false, error: `PayPal a répondu ${res.status} (réponse non JSON)` };
-  }
+    })
+  );
+  if (!call.ok) return { ok: false, error: call.error };
+  const { res, data } = call;
 
   if (data.verification_status !== 'SUCCESS') {
     return { ok: false, error: `PayPal: signature webhook invalide (${data.verification_status || res.status})` };
@@ -305,10 +347,12 @@ function parseEvent(body) {
 
   const resource = body.resource;
   const eventType = String(body.event_type || '');
-  const reference =
-    resource.custom_id ||
-    resource.invoice_id ||
-    (resource.purchase_units && resource.purchase_units[0] && resource.purchase_units[0].custom_id);
+  // custom_id est le seul champ fiable ici : initiateCheckout() ne renseigne
+  // jamais invoice_id (le suivre élargirait sans raison la surface de
+  // référence de confiance à de l'activité que cette app n'a pas générée),
+  // et resource.purchase_units n'existe pas sur les événements PAYMENT.CAPTURE.*
+  // traités par cette fonction (resource y est un objet capture, pas commande).
+  const reference = resource.custom_id;
 
   if (!reference) return null;
 
@@ -326,7 +370,7 @@ function parseEvent(body) {
     };
   }
 
-  if (eventType === 'PAYMENT.CAPTURE.DENIED' || eventType === 'PAYMENT.CAPTURE.REVERSED') {
+  if (eventType === 'PAYMENT.CAPTURE.DENIED') {
     return {
       providerReference: resource.id,
       status: 'failed',
@@ -336,6 +380,13 @@ function parseEvent(body) {
       paymentReference: reference
     };
   }
+
+  // PAYMENT.CAPTURE.REVERSED = rétrofacturation sur un paiement déjà réussi,
+  // pas une capture qui n'a jamais abouti : la mapper sur 'failed' serait un
+  // no-op silencieux (fulfillEvent ne met à jour que les lignes encore
+  // 'pending') qui déguiserait un chargeback en simple échec. Les
+  // rétrofacturations sont volontairement hors périmètre pour l'instant et
+  // nécessiteraient leur propre traitement dédié.
 
   return null; // pending/en attente/autres types -> ignoré
 }
