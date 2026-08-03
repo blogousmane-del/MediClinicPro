@@ -429,6 +429,22 @@ router.put('/plan', auth, checkRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: "Ce plan nécessite un paiement — utilisez le renouvellement par Mobile Money ou en espèces." });
     }
 
+    // A clinic that has ever completed a real paid subscription can't use this
+    // free-tier switch to dodge an expired paid plan — that turned an expired
+    // Clinique/Hôpital clinic into an infinite loop of free 7-day Starter
+    // trials (switch to Starter → expire → switch again), never actually
+    // requiring payment. Brand-new clinics (no paid history) keep their
+    // normal one-time free trial.
+    const { count: paidHistoryCount, error: paidHistoryError } = await supabase
+      .from('subscription_payments')
+      .select('*', { count: 'exact', head: true })
+      .eq('clinic_id', req.user.clinicId)
+      .eq('status', 'paid');
+    if (paidHistoryError) throw paidHistoryError;
+    if ((paidHistoryCount || 0) > 0) {
+      return res.status(400).json({ error: "Ce compte a déjà eu un abonnement payant — le renouvellement doit se faire par paiement (Mobile Money ou espèces), le plan Starter gratuit n'est plus disponible." });
+    }
+
     const plan = getPlan('starter');
 
     const { data: activeUsers, error: usersError } = await supabase
