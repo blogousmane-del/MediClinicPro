@@ -443,12 +443,15 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       .eq('id', subPayment.id);
 
     if (checkoutUpdateError) {
-      // 42703 = colonne inexistante. amount_usd est une migration encore en
-      // attente d'exécution manuelle sur la base live (voir la section
-      // « schema drift » de CLAUDE.md) : on rejoue sans elle plutôt que de faire
-      // échouer un paiement déjà initié chez PayPal. La vérification webhook
-      // retombera sur la reconversion au taux courant.
-      if (checkoutUpdateError.code === '42703' && checkoutUpdate.amount_usd !== undefined) {
+      // Colonne inexistante. amount_usd est une migration encore en attente
+      // d'exécution manuelle sur la base live (voir la section « schema drift »
+      // de CLAUDE.md) : on rejoue sans elle plutôt que de faire échouer un
+      // paiement déjà initié chez PayPal. La vérification webhook retombera sur
+      // la reconversion au taux courant.
+      // Deux codes, pas un : PostgREST refuse une colonne inconnue présente dans
+      // le CORPS d'un UPDATE avec PGRST204 (cache de schéma), avant que Postgres
+      // ne voie la requête. 42703 n'apparaît que pour un SELECT/filtre.
+      if (['42703', 'PGRST204'].includes(checkoutUpdateError.code) && checkoutUpdate.amount_usd !== undefined) {
         console.error("[FINANCIALS] Colonne subscription_payments.amount_usd absente (migration à exécuter) — enregistrement sans le montant USD.");
         delete checkoutUpdate.amount_usd;
         const { error: retryError } = await supabase

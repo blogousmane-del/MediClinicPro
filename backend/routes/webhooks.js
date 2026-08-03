@@ -307,6 +307,16 @@ router.post('/paypal', async (req, res) => {
     const event = paypal.parseEvent(req.body);
     if (!event) return res.json({ received: true, ignored: true });
 
+    // PayPal est réservé aux abonnements (ni paiements patients, ni dépôts) :
+    // une référence d'un autre type serait routée vers un flux jamais prévu
+    // pour lui — on refuse explicitement plutôt que de laisser fulfillEvent
+    // décider. Ce contrôle passe AVANT la capture ci-dessous : capturer d'abord
+    // et refuser ensuite encaisserait de l'argent que rien ne pourrait créditer.
+    if (!String(event.paymentReference || '').startsWith('sub-')) {
+      console.error('[WEBHOOKS] Référence PayPal hors périmètre abonnement, événement ignoré:', event.paymentReference);
+      return res.json({ received: true, ignored: true });
+    }
+
     // Commande approuvée par l'acheteur mais pas encore capturée : la capture
     // n'est autrement déclenchée que par le retour navigateur, donc un acheteur
     // qui ferme l'onglet ne serait jamais encaissé. On capture ici ; c'est le
@@ -321,15 +331,6 @@ router.post('/paypal', async (req, res) => {
         console.log(`[WEBHOOKS] Capture PayPal déclenchée par webhook (commande ${event.orderId}) — statut: ${capture.status}`);
       }
       return res.json({ received: true, captured: true });
-    }
-
-    // PayPal est réservé aux abonnements (ni paiements patients, ni dépôts) :
-    // une référence d'un autre type serait routée vers un flux jamais prévu
-    // pour lui — on refuse explicitement plutôt que de laisser fulfillEvent
-    // décider.
-    if (!String(event.paymentReference || '').startsWith('sub-')) {
-      console.error('[WEBHOOKS] Référence PayPal hors périmètre abonnement, événement ignoré:', event.paymentReference);
-      return res.json({ received: true, ignored: true });
     }
 
     await fulfillEvent('paypal', event);
