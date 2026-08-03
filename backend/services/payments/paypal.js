@@ -167,6 +167,14 @@ async function initiateCheckout(params) {
     return { ok: false, error: 'PayPal: référence de paiement manquante.' };
   }
 
+  // Vérifié séparément du résultat de xofToUsd() : cette dernière renvoie null
+  // aussi bien pour un taux invalide que pour un montant nul/négatif/non
+  // numérique, ce qui afficherait à tort le message sur XOF_TO_USD_RATE pour
+  // un problème de montant.
+  if (typeof params.amount !== 'number' || !Number.isFinite(params.amount) || params.amount <= 0) {
+    return { ok: false, error: 'PayPal: montant invalide (doit être un nombre positif).' };
+  }
+
   const amountUsd = xofToUsd(params.amount);
   if (amountUsd === null) {
     return { ok: false, error: 'PayPal: taux de conversion XOF_TO_USD_RATE absent ou invalide.' };
@@ -228,8 +236,24 @@ async function initiateCheckout(params) {
 
 /**
  * Capture une commande déjà approuvée par l'acheteur. Idempotent côté PayPal :
- * recapturer une commande déjà capturée renvoie son statut, sans double débit.
+ * recapturer une commande déjà capturée ne provoque pas de double débit, mais
+ * renvoie le sentinel 'already_captured' plutôt que le statut réel de la
+ * capture existante (voir @returns).
  * @param {string} orderId
+ * @returns {Promise<{ok: true, status: string} | {ok: false, error: string}>}
+ *   `status` recouvre trois familles distinctes, à ne jamais traiter comme
+ *   équivalentes :
+ *   - le statut réel renvoyé par PayPal pour une capture qui vient d'aboutir
+ *     (2xx) : peut valoir 'COMPLETED', mais aussi 'PENDING' ou une autre
+ *     valeur non terminale — seul 'COMPLETED' prouve que le paiement est
+ *     réglé ;
+ *   - 'already_captured' (sentinel maison) : PayPal a rejeté la capture car
+ *     la commande l'était déjà, mais ne rapporte pas le statut de cette
+ *     capture existante — elle peut être PENDING ou DECLINED ;
+ *   - 'unknown' (sentinel maison) : PayPal a répondu 2xx sans champ `status`.
+ *   Dans tous les cas hors 'COMPLETED', l'appelant NE DOIT PAS créditer
+ *   l'abonnement sur la seule foi de `ok: true` — il doit attendre le webhook
+ *   signé (`verifyWebhookSignature` + `parseEvent`) avant tout crédit.
  */
 async function captureOrder(orderId) {
   if (!isConfigured()) return { ok: false, error: 'not_configured' };
@@ -277,6 +301,8 @@ async function captureOrder(orderId) {
  * @param {Buffer} rawBody
  */
 async function verifyWebhookSignature(req, rawBody) {
+  if (!isConfigured()) return { ok: false, error: 'not_configured' };
+
   const webhookId = process.env.PAYPAL_WEBHOOK_ID;
   if (!webhookId) return { ok: false, error: 'PAYPAL_WEBHOOK_ID non configuré' };
 
@@ -330,6 +356,15 @@ async function verifyWebhookSignature(req, rawBody) {
   if (!call.ok) return { ok: false, error: call.error };
   const { res, data } = call;
 
+  // Un échec d'authentification (ex. PAYPAL_CLIENT_SECRET invalide) n'a pas de
+  // verification_status dans le corps — sans cette branche, il tombait dans le
+  // message "signature webhook invalide" ci-dessous, qui pointe à tort
+  // l'opérateur vers PAYPAL_WEBHOOK_ID alors que le vrai problème est
+  // l'authentification à l'API PayPal elle-même.
+  if (!res.ok) {
+    return { ok: false, error: `PayPal: échec d'authentification à l'API de vérification (${res.status}): ${data.message || 'raison inconnue'}` };
+  }
+
   if (data.verification_status !== 'SUCCESS') {
     return { ok: false, error: `PayPal: signature webhook invalide (${data.verification_status || res.status})` };
   }
@@ -341,6 +376,12 @@ async function verifyWebhookSignature(req, rawBody) {
  * Normalise un événement PayPal vers la forme attendue par fulfillEvent().
  * reportedAmount est en USD — c'est amountMatches() qui gère la comparaison
  * avec le montant FCFA stocké en base.
+ * Note : `providerReference` renvoyé ici est l'id de la **capture**
+ * (resource.id sur un événement PAYMENT.CAPTURE.*), pas l'id de **commande**
+ * renvoyé par `initiateCheckout()`. Contrairement aux adaptateurs
+ * bictorys.js/paytech.js, qui renvoient le même identifiant à l'initiation et
+ * à la confirmation, PayPal expose deux ids distincts — ne pas supposer
+ * qu'ils sont interchangeables lors d'un rapprochement.
  */
 function parseEvent(body) {
   if (!body || !body.resource) return null;
@@ -387,6 +428,10 @@ function parseEvent(body) {
   // 'pending') qui déguiserait un chargeback en simple échec. Les
   // rétrofacturations sont volontairement hors périmètre pour l'instant et
   // nécessiteraient leur propre traitement dédié.
+  if (eventType === 'PAYMENT.CAPTURE.REVERSED') {
+    console.error(`[PAYPAL] Rétrofacturation/chargeback reçu et non traité — capture id: ${resource.id}, référence: ${reference}`);
+    return null;
+  }
 
   return null; // pending/en attente/autres types -> ignoré
 }
