@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { supabase } = require('../database');
 const bictorys = require('../services/payments/bictorys');
 const paytech = require('../services/payments/paytech');
+const paypal = require('../services/payments/paypal');
 
 // Returns true if this exact webhook body was already processed (dedup via
 // the payment_webhook_events UNIQUE(provider, event_hash) constraint).
@@ -23,6 +24,14 @@ async function isDuplicateEvent(provider, rawBody) {
 // initiation time (sub-12, pay-45, dep-7) and echoed back by the provider.
 function amountMatches(provider, expected, reported) {
   if (reported === undefined || reported === null) return false; // no amount to verify against — fail closed, needs manual review
+  if (provider === 'paypal') {
+    // `expected` est en FCFA (colonne en base), `reported` en USD (PayPal ne
+    // règle pas en XOF). On compare dans la même unité, tolérance 2% pour les
+    // arrondis de conversion et les frais.
+    const expectedUsd = paypal.xofToUsd(expected);
+    if (expectedUsd === null) return false; // taux non configuré -> refus, pas de confiance aveugle
+    return Math.abs(reported - expectedUsd) <= expectedUsd * 0.02;
+  }
   const tolerance = provider === 'paytech' ? expected * 0.05 : 1; // PayTech absorbs ~3% fees; Bictorys settles exact
   return Math.abs(reported - expected) <= tolerance;
 }
@@ -202,6 +211,61 @@ router.post('/paytech', async (req, res) => {
     res.json({ received: true });
   } catch (err) {
     console.error('[WEBHOOKS] Erreur webhook PayTech:', err);
+    res.status(500).json({ error: 'Erreur interne' });
+  }
+});
+
+// Retour navigateur après approbation sur la page PayPal (?token=<orderId>).
+// Cette route ne fait QUE déclencher la capture — la mise à jour de
+// l'abonnement passe exclusivement par le webhook signé ci-dessous.
+router.get('/paypal/return', async (req, res) => {
+  const appUrl = process.env.APP_URL || '/';
+  const orderId = req.query.token;
+
+  if (orderId) {
+    try {
+      const capture = await paypal.captureOrder(String(orderId));
+      if (!capture.ok) {
+        console.error('[WEBHOOKS] Échec de capture PayPal:', capture.error);
+      } else if (capture.status !== 'COMPLETED') {
+        // Réponse 2xx mais règlement non prouvé (PENDING, already_captured,
+        // unknown...) — pas une erreur, mais rien à créditer sur cette seule
+        // base. Ligne distincte pour qu'un opérateur retrouve une capture qui
+        // n'a pas silencieusement abouti. Le webhook signé reste seul juge.
+        console.error('[WEBHOOKS] Capture PayPal non réglée (statut non COMPLETED):', capture.status);
+      }
+    } catch (err) {
+      console.error('[WEBHOOKS] Erreur de capture PayPal:', err);
+    }
+  }
+
+  // Redirection systématique : que la capture ait réussi ou non, l'utilisateur
+  // revient dans l'app, qui interroge déjà le statut du paiement.
+  res.redirect(appUrl);
+});
+
+router.post('/paypal', async (req, res) => {
+  try {
+    const rawBody = req.rawBody;
+    if (!rawBody) return res.status(400).json({ error: 'Corps de requête brut manquant' });
+
+    const verify = await paypal.verifyWebhookSignature(req, rawBody);
+    if (!verify.ok) {
+      console.error('[WEBHOOKS] Signature PayPal invalide:', verify.error);
+      return res.status(401).json({ error: verify.error });
+    }
+
+    const event = paypal.parseEvent(req.body);
+    if (!event) return res.json({ received: true, ignored: true });
+
+    if (await isDuplicateEvent('paypal', rawBody)) {
+      return res.json({ received: true, deduped: true });
+    }
+
+    await fulfillEvent('paypal', event);
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[WEBHOOKS] Erreur webhook PayPal:', err);
     res.status(500).json({ error: 'Erreur interne' });
   }
 });
