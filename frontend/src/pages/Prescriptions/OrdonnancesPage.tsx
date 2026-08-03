@@ -1083,8 +1083,8 @@ export const OrdonnancesPage: React.FC = () => {
                               </span>
                               <input
                                 type="number"
-                                value={line.quantity}
-                                onChange={(e) => handleUpdateMedicationLine(line.id, 'quantity', parseInt(e.target.value) || 1)}
+                                value={line.quantity || ''}
+                                onChange={(e) => handleUpdateMedicationLine(line.id, 'quantity', e.target.value === '' ? 1 : parseInt(e.target.value) || 1)}
                                 style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.8rem' }}
                               />
                             </div>

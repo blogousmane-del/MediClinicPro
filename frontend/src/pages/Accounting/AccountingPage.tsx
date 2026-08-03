@@ -740,8 +740,8 @@ export const AccountingPage: React.FC = () => {
                             </span>
                             <input
                               type="number"
-                              value={serv.quantity}
-                              onChange={(e) => handleUpdateService(serv.id, 'quantity', parseInt(e.target.value) || 1)}
+                              value={serv.quantity || ''}
+                              onChange={(e) => handleUpdateService(serv.id, 'quantity', e.target.value === '' ? 1 : parseInt(e.target.value) || 1)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', fontSize: '0.8rem', boxSizing: 'border-box' }}
                             />
                           </div>
@@ -753,8 +753,8 @@ export const AccountingPage: React.FC = () => {
                             </span>
                             <input
                               type="number"
-                              value={serv.unitPrice}
-                              onChange={(e) => handleUpdateService(serv.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                              value={serv.unitPrice || ''}
+                              onChange={(e) => handleUpdateService(serv.id, 'unitPrice', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                               style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)', fontSize: '0.8rem', boxSizing: 'border-box' }}
                             />
                           </div>

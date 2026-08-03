@@ -230,7 +230,7 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
   const handleBillItemChange = (idx: number, field: string, value: any) => {
     const updated = [...billItems];
     if (field === 'cost') {
-      updated[idx][field] = parseFloat(value) || 0;
+      updated[idx][field] = value === '' ? 0 : parseFloat(value) || 0;
     } else {
       updated[idx][field] = value;
     }
@@ -769,7 +769,7 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
                         <input
                           type="number"
                           placeholder="Coût"
-                          value={bit.cost}
+                          value={bit.cost || ''}
                           onChange={e => handleBillItemChange(idx, 'cost', e.target.value)}
                           className="input-control"
                           style={{ padding: '4px', fontSize: '0.8rem', width: '80px' }}

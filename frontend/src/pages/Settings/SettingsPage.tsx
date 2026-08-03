@@ -831,8 +831,8 @@ export const SettingsPage: React.FC = () => {
                 <label>Consultation Générale</label>
                 <input
                   type="number"
-                  value={tariffs.consultation_general || 0}
-                  onChange={e => setTariffs({ ...tariffs, consultation_general: parseInt(e.target.value) || 0 })}
+                  value={tariffs.consultation_general || ''}
+                  onChange={e => setTariffs({ ...tariffs, consultation_general: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                   className="input-control"
                 />
               </div>
@@ -841,8 +841,8 @@ export const SettingsPage: React.FC = () => {
                 <label>Consultation Spécialisée</label>
                 <input
                   type="number"
-                  value={tariffs.consultation_specialist || 0}
-                  onChange={e => setTariffs({ ...tariffs, consultation_specialist: parseInt(e.target.value) || 0 })}
+                  value={tariffs.consultation_specialist || ''}
+                  onChange={e => setTariffs({ ...tariffs, consultation_specialist: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
                   className="input-control"
                 />
               </div>
