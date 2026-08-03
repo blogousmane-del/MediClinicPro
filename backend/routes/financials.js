@@ -4,6 +4,7 @@ const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { initiateCheckoutWithFailover } = require('../services/payments');
+const paypal = require('../services/payments/paypal');
 const { getPlan, isPaymentMethodAllowed } = require('../utils/plans');
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
@@ -304,7 +305,10 @@ router.get('/stats', auth, async (req, res) => {
 // subscription is only extended once the provider's webhook confirms payment.
 router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { months, phoneNumber, planId } = req.body;
+    const { months, phoneNumber, planId, provider } = req.body;
+    // PayPal est une alternative explicite, pas un maillon de la chaîne de
+    // failover Bictorys->PayTech : l'admin choisit, aucun repli automatique.
+    const useProvider = provider === 'paypal' ? 'paypal' : 'mobile_money';
     const qtyMonths = parseInt(months, 10);
 
     if (![1, 3, 6, 12].includes(qtyMonths)) {
@@ -378,20 +382,41 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       .single();
     if (insertError) throw insertError;
 
-    const checkout = await initiateCheckoutWithFailover(
-      {
+    const checkoutDescription = `Abonnement MediClinic ${getPlan(targetPlanId).name} — ${clinic.name} (${qtyMonths} mois)`;
+
+    let checkout;
+    if (useProvider === 'paypal') {
+      if (!paypal.isConfigured()) {
+        await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
+        return res.status(400).json({ error: "Le paiement PayPal n'est pas configuré pour cette installation. Utilisez le Mobile Money ou contactez le support MediClinic." });
+      }
+      checkout = await paypal.initiateCheckout({
         amount,
-        currency: 'XOF',
-        description: `Abonnement MediClinic ${getPlan(targetPlanId).name} — ${clinic.name} (${qtyMonths} mois)`,
+        description: checkoutDescription,
         reference: `sub-${subPayment.id}`,
-        returnUrl: `${APP_URL}/`,
+        // Le retour pointe vers l'API, pas vers le front : cette URL déclenche
+        // la capture côté serveur avant de renvoyer le navigateur dans l'app.
+        returnUrl: `${API_PUBLIC_URL}/api/webhooks/paypal/return`,
         cancelUrl: `${APP_URL}/`,
-        customerName: adminUser?.name || clinic.name,
-        customerEmail: adminUser?.email,
-        customerPhone: normalizedPhone
-      },
-      { itemName: 'Abonnement MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
-    );
+        customerEmail: adminUser?.email
+      });
+      if (checkout.ok) checkout.provider = 'paypal';
+    } else {
+      checkout = await initiateCheckoutWithFailover(
+        {
+          amount,
+          currency: 'XOF',
+          description: checkoutDescription,
+          reference: `sub-${subPayment.id}`,
+          returnUrl: `${APP_URL}/`,
+          cancelUrl: `${APP_URL}/`,
+          customerName: adminUser?.name || clinic.name,
+          customerEmail: adminUser?.email,
+          customerPhone: normalizedPhone
+        },
+        { itemName: 'Abonnement MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
+      );
+    }
 
     if (!checkout.ok) {
       await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
