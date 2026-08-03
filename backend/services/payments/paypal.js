@@ -6,6 +6,12 @@
 const API_LIVE = 'https://api-m.paypal.com';
 const API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const FETCH_TIMEOUT_MS = 15_000;
+// Budget réseau plus court réservé à la vérification de signature webhook :
+// cet appel s'exécute à l'intérieur d'une fonction serverless dont la durée est
+// bornée (voir vercel.json, maxDuration), et le crédit de l'abonnement se fait
+// APRÈS lui. La vérification ne doit donc jamais pouvoir consommer tout le
+// budget de la requête et laisser le traitement se faire couper en plein vol.
+const VERIFY_FETCH_TIMEOUT_MS = 8_000;
 const TOKEN_EXPIRY_MARGIN_MS = 60_000; // renouvelle 1 min avant l'expiration réelle
 
 let cachedToken = null; // { key: string, value: string, expiresAt: number }
@@ -47,9 +53,9 @@ function xofToUsd(amountXof) {
   return usd > 0 ? usd : null;
 }
 
-async function paypalFetch(path, init) {
+async function paypalFetch(path, init, timeoutMs = FETCH_TIMEOUT_MS) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     return await fetch(`${apiUrl()}${path}`, { ...init, signal: ctrl.signal });
   } finally {
@@ -111,9 +117,15 @@ async function getAccessToken() {
  * changement de mode en cours de process), vide le cache et réessaie l'appel
  * une seule fois avec un jeton neuf ; un second 401 remonte tel quel.
  * @param {(token: string) => Promise<Response>} makeRequest
+ * @param {object} [options]
+ * @param {boolean} [options.retryOn401=true] - à mettre à false sur les chemins
+ *   sensibles à la latence (vérification de webhook) : y rejouer l'appel
+ *   doublerait le temps passé avant de pouvoir traiter l'événement, alors que
+ *   PayPal redistribue de toute façon un webhook non acquitté.
  * @returns {Promise<{ok: true, res: Response, data: any} | {ok: false, error: string}>}
  */
-async function callWithAuth(makeRequest) {
+async function callWithAuth(makeRequest, options = {}) {
+  const retryOn401 = options.retryOn401 !== false;
   const auth = await getAccessToken();
   if (!auth.ok) return { ok: false, error: auth.error };
 
@@ -124,7 +136,7 @@ async function callWithAuth(makeRequest) {
     return { ok: false, error: `Erreur réseau vers PayPal: ${err.message}` };
   }
 
-  if (res.status === 401) {
+  if (res.status === 401 && retryOn401) {
     cachedToken = null;
     const retryAuth = await getAccessToken();
     if (!retryAuth.ok) return { ok: false, error: retryAuth.error };
@@ -231,7 +243,10 @@ async function initiateCheckout(params) {
     return { ok: false, error: "PayPal: réponse sans lien d'approbation." };
   }
 
-  return { ok: true, providerReference: data.id, checkoutUrl: approveLink.href, status: 'pending' };
+  // `provider` est posé ici (le producteur), comme le fait l'orchestrateur
+  // frère services/payments/index.js pour Bictorys/PayTech — l'appelant n'a
+  // pas à le rajouter après coup.
+  return { ok: true, provider: 'paypal', providerReference: data.id, checkoutUrl: approveLink.href, status: 'pending' };
 }
 
 /**
@@ -335,23 +350,33 @@ async function verifyWebhookSignature(req, rawBody) {
     return { ok: false, error: 'PayPal: corps de requête illisible' };
   }
 
-  const call = await callWithAuth((token) =>
-    paypalFetch('/v1/notifications/verify-webhook-signature', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        auth_algo: authAlgo,
-        cert_url: certUrl,
-        transmission_id: transmissionId,
-        transmission_sig: transmissionSig,
-        transmission_time: transmissionTime,
-        webhook_id: webhookId,
-        webhook_event: webhookEvent
-      })
-    })
+  // Timeout court et AUCUN rejeu sur 401 ici : la vérification s'exécute avant
+  // le traitement de l'événement, dans une fonction serverless à durée bornée.
+  // Un échec d'authentification doit remonter une erreur (401 au webhook) pour
+  // que PayPal redistribue, plutôt que de doubler la latence en réessayant.
+  const call = await callWithAuth(
+    (token) =>
+      paypalFetch(
+        '/v1/notifications/verify-webhook-signature',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            auth_algo: authAlgo,
+            cert_url: certUrl,
+            transmission_id: transmissionId,
+            transmission_sig: transmissionSig,
+            transmission_time: transmissionTime,
+            webhook_id: webhookId,
+            webhook_event: webhookEvent
+          })
+        },
+        VERIFY_FETCH_TIMEOUT_MS
+      ),
+    { retryOn401: false }
   );
   if (!call.ok) return { ok: false, error: call.error };
   const { res, data } = call;
@@ -388,6 +413,26 @@ function parseEvent(body) {
 
   const resource = body.resource;
   const eventType = String(body.event_type || '');
+
+  // CHECKOUT.ORDER.APPROVED : l'acheteur a approuvé, mais RIEN n'est encaissé
+  // tant que la commande n'est pas capturée. Ce n'est donc pas un événement de
+  // crédit et il ne doit jamais atteindre fulfillEvent() — d'où une forme de
+  // retour volontairement distincte (`kind: 'order_approved'`), sur laquelle la
+  // route branche pour déclencher la capture côté serveur (filet quand
+  // l'acheteur ferme l'onglet avant le retour navigateur).
+  // Sur ce type d'événement, la ressource est une **commande** : l'id utile est
+  // resource.id (id de commande) et la référence maison se trouve dans
+  // purchase_units[0].custom_id, pas dans resource.custom_id.
+  if (eventType === 'CHECKOUT.ORDER.APPROVED') {
+    const unit = Array.isArray(resource.purchase_units) ? resource.purchase_units[0] : null;
+    const approvedRef = unit && unit.custom_id;
+    if (!resource.id || !approvedRef) {
+      console.error(`[PAYPAL] Commande approuvée inexploitable (id ou custom_id manquant) — commande id: ${resource.id || 'inconnu'}`);
+      return null;
+    }
+    return { kind: 'order_approved', orderId: resource.id, paymentReference: approvedRef };
+  }
+
   // custom_id est le seul champ fiable ici : initiateCheckout() ne renseigne
   // jamais invoice_id (le suivre élargirait sans raison la surface de
   // référence de confiance à de l'activité que cette app n'a pas générée),
@@ -395,7 +440,16 @@ function parseEvent(body) {
   // traités par cette fonction (resource y est un objet capture, pas commande).
   const reference = resource.custom_id;
 
-  if (!reference) return null;
+  if (!reference) {
+    // Cas critique et autrement totalement silencieux : si PayPal ne propage
+    // pas custom_id sur la ressource capture, l'argent est encaissé mais aucun
+    // abonnement n'est crédité et aucune ligne de log n'est écrite. On trace
+    // explicitement l'id de capture pour permettre un rattrapage manuel.
+    if (eventType.startsWith('PAYMENT.CAPTURE.')) {
+      console.error(`[PAYPAL] Événement ${eventType} sans custom_id — paiement impossible à rattacher, rattrapage manuel requis. Capture id: ${resource.id || 'inconnu'}`);
+    }
+    return null;
+  }
 
   const rawAmount = resource.amount && resource.amount.value;
   const amount = rawAmount === undefined || rawAmount === null ? undefined : parseFloat(rawAmount);

@@ -14,6 +14,11 @@ interface PaymentCheckoutModalProps {
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 3 * 60 * 1000;
+// PayPal : connexion au compte + 2FA éventuelle + approbation + capture +
+// livraison du webhook dépassent régulièrement les 3 minutes calibrées pour le
+// Mobile Money, ce qui afficherait « Délai d'attente dépassé » sur des
+// paiements qui aboutissent quelques instants plus tard.
+const PAYPAL_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 // Shared "pay via a hosted Mobile Money page, then wait for webhook
 // confirmation" UX — used by subscription renewal, Accounting checkout and
@@ -39,6 +44,7 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
     }
 
     const startedAt = Date.now();
+    const timeoutMs = provider === 'paypal' ? PAYPAL_POLL_TIMEOUT_MS : POLL_TIMEOUT_MS;
 
     const tick = async () => {
       if (stoppedRef.current) return;
@@ -61,7 +67,7 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
         console.error('Erreur de vérification du paiement:', err);
       }
 
-      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+      if (Date.now() - startedAt > timeoutMs) {
         stoppedRef.current = true;
         setState('timeout');
         return;

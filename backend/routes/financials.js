@@ -388,7 +388,10 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
     if (useProvider === 'paypal') {
       if (!paypal.isConfigured()) {
         await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
-        return res.status(400).json({ error: "Le paiement PayPal n'est pas configuré pour cette installation. Utilisez le Mobile Money ou contactez le support MediClinic." });
+        // 502 et non 400 : un fournisseur non configuré est une indisponibilité
+        // côté serveur, pas une erreur de saisie du client — même code que la
+        // branche Mobile Money ci-dessous.
+        return res.status(502).json({ error: "Le paiement PayPal n'est pas configuré pour cette installation. Utilisez le Mobile Money ou contactez le support MediClinic." });
       }
       checkout = await paypal.initiateCheckout({
         amount,
@@ -400,7 +403,6 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
         cancelUrl: `${APP_URL}/`,
         customerEmail: adminUser?.email
       });
-      if (checkout.ok) checkout.provider = 'paypal';
     } else {
       checkout = await initiateCheckoutWithFailover(
         {
@@ -423,14 +425,41 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       return res.status(502).json({ error: checkout.error });
     }
 
-    await supabase
+    const checkoutUpdate = {
+      provider: checkout.provider,
+      provider_reference: checkout.providerReference,
+      checkout_url: checkout.checkoutUrl
+    };
+    if (checkout.provider === 'paypal') {
+      // Montant USD réellement proposé à PayPal, figé ici : la vérification du
+      // webhook s'appuiera dessus au lieu de reconvertir au XOF_TO_USD_RATE en
+      // vigueur à la réception, qui peut avoir changé entre-temps.
+      checkoutUpdate.amount_usd = paypal.xofToUsd(amount);
+    }
+
+    const { error: checkoutUpdateError } = await supabase
       .from('subscription_payments')
-      .update({
-        provider: checkout.provider,
-        provider_reference: checkout.providerReference,
-        checkout_url: checkout.checkoutUrl
-      })
+      .update(checkoutUpdate)
       .eq('id', subPayment.id);
+
+    if (checkoutUpdateError) {
+      // 42703 = colonne inexistante. amount_usd est une migration encore en
+      // attente d'exécution manuelle sur la base live (voir la section
+      // « schema drift » de CLAUDE.md) : on rejoue sans elle plutôt que de faire
+      // échouer un paiement déjà initié chez PayPal. La vérification webhook
+      // retombera sur la reconversion au taux courant.
+      if (checkoutUpdateError.code === '42703' && checkoutUpdate.amount_usd !== undefined) {
+        console.error("[FINANCIALS] Colonne subscription_payments.amount_usd absente (migration à exécuter) — enregistrement sans le montant USD.");
+        delete checkoutUpdate.amount_usd;
+        const { error: retryError } = await supabase
+          .from('subscription_payments')
+          .update(checkoutUpdate)
+          .eq('id', subPayment.id);
+        if (retryError) console.error('[FINANCIALS] Échec de mise à jour du paiement d\'abonnement:', retryError);
+      } else {
+        console.error('[FINANCIALS] Échec de mise à jour du paiement d\'abonnement:', checkoutUpdateError);
+      }
+    }
 
     res.status(201).json({
       success: true,

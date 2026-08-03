@@ -45,6 +45,7 @@ ALTER TABLE medications ADD COLUMN IF NOT EXISTS manufacturer TEXT;
 ALTER TABLE medications ADD COLUMN IF NOT EXISTS unit TEXT;
 ALTER TABLE clinics ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'hopital' CHECK (plan IN ('starter', 'clinique', 'hopital'));
 ALTER TABLE subscription_payments ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'hopital' CHECK (plan IN ('clinique', 'hopital'));
+ALTER TABLE subscription_payments ADD COLUMN IF NOT EXISTS amount_usd NUMERIC(10,2);
 ALTER TABLE clinics ADD COLUMN IF NOT EXISTS unlimited_staff BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE clinics ADD COLUMN IF NOT EXISTS suspended_by_platform BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'urgent', 'critical'));
