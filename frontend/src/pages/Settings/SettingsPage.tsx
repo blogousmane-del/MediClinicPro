@@ -264,13 +264,12 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleRenewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRenewSubmit = async (provider: 'mobile_money' | 'paypal') => {
     if (!renewalTargetPlanId) return;
 
     setIsRenewing(true);
     try {
-      const result = await renewSubscription(paymentPhone || undefined, renewMonths, renewalTargetPlanId);
+      const result = await renewSubscription(paymentPhone || undefined, renewMonths, renewalTargetPlanId, provider);
       setActiveCheckout(result);
     } catch (err: any) {
       console.error(err);
@@ -782,6 +781,73 @@ export const SettingsPage: React.FC = () => {
                   </span>
                 </div>
                 <div style={{ flex: 1, borderTop: '1px solid var(--border)' }} />
+              </div>
+            )}
+
+            {/* Étape de paiement — apparaît une fois un plan payant sélectionné.
+                Mobile Money et PayPal sont deux choix explicites : PayPal n'est
+                pas un repli automatique du Mobile Money. */}
+            {!loading && renewalTargetPlanId && (
+              <div className="card" style={{ maxWidth: '900px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1rem' }}>Régler l'abonnement {plansCatalog?.[renewalTargetPlanId]?.name}</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Votre abonnement est activé dès la confirmation du paiement.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '180px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Durée</span>
+                    <select
+                      className="input-control"
+                      value={renewMonths}
+                      onChange={(e) => setRenewMonths(parseInt(e.target.value, 10))}
+                    >
+                      <option value={1}>1 mois</option>
+                      <option value={3}>3 mois</option>
+                      <option value={6}>6 mois</option>
+                      <option value={12}>12 mois</option>
+                    </select>
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Téléphone Mobile Money (optionnel)</span>
+                    <PhoneInput value={paymentPhone} onChange={setPaymentPhone} />
+                  </label>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', justifyContent: 'flex-end' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Total</span>
+                    <strong style={{ fontSize: '1.2rem' }}>
+                      {(renewMonths * pricePerMonth).toLocaleString()} FCFA
+                    </strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={isRenewing}
+                    onClick={() => handleRenewSubmit('mobile_money')}
+                  >
+                    {isRenewing ? 'Initialisation...' : 'Payer par Mobile Money'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={isRenewing}
+                    onClick={() => handleRenewSubmit('paypal')}
+                    style={{ border: '1px solid var(--border)' }}
+                  >
+                    {isRenewing ? 'Initialisation...' : 'Payer par PayPal'}
+                  </button>
+                </div>
+
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>
+                  PayPal ne règle pas en FCFA : le montant est converti en dollars américains au taux
+                  appliqué par MediClinic. Le montant débité peut donc différer légèrement du total ci-dessus.
+                </p>
               </div>
             )}
 
