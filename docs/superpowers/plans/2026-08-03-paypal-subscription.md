@@ -946,7 +946,9 @@ Dans `backend/.env`, mettre `API_PUBLIC_URL=https://<sous-domaine>.ngrok-free.ap
 
 Sur `developer.paypal.com` > l'app sandbox > Webhooks > Add Webhook :
 - URL : `https://<sous-domaine>.ngrok-free.app/api/webhooks/paypal`
-- Événements : `PAYMENT.CAPTURE.COMPLETED` et `PAYMENT.CAPTURE.DENIED`
+- Événements : `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REVERSED` et **`CHECKOUT.ORDER.APPROVED`**
+
+`CHECKOUT.ORDER.APPROVED` a été ajouté après la revue finale : sans lui, la capture n'est déclenchée que par le retour navigateur, donc un acheteur qui approuve puis ferme l'onglet n'est jamais encaissé et son abonnement n'est jamais renouvelé. Le design supposait à tort qu'un événement `DENIED` rattraperait ce cas — PayPal n'émet aucun événement `PAYMENT.CAPTURE.*` quand aucune capture n'a été tentée.
 
 Copier le Webhook ID généré dans `PAYPAL_WEBHOOK_ID` (`backend/.env`), redémarrer le backend.
 
@@ -1004,10 +1006,20 @@ git commit -m "docs: document PayPal subscription provider in architecture notes
 
 À faire une fois la Task 6 validée, pas avant :
 
+0. **Exécuter la migration en attente** dans l'éditeur SQL Supabase — sans elle, la protection contre la dérive de taux ne fonctionne pas (le code retombe silencieusement sur une reconversion au taux courant) :
+```sql
+ALTER TABLE subscription_payments ADD COLUMN IF NOT EXISTS amount_usd NUMERIC(10,2);
+```
 1. Sur `developer.paypal.com`, basculer en **Live**, créer l'app, relever `Client ID` et `Secret` live.
-2. Déclarer un webhook live sur `https://<domaine-prod>/api/webhooks/paypal` avec les deux mêmes événements, relever son Webhook ID (différent du sandbox).
+2. Déclarer un webhook live sur `https://<domaine-prod>/api/webhooks/paypal` avec les **quatre** mêmes événements qu'en sandbox (`PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REVERSED`, `CHECKOUT.ORDER.APPROVED`), relever son Webhook ID (différent du sandbox).
 3. Dans Vercel > Project Settings > Environment Variables : `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MODE=live`, `PAYPAL_WEBHOOK_ID`, `XOF_TO_USD_RATE`. Ces valeurs ne sont jamais lues depuis un `.env` en production.
 4. Vérifier que `API_PUBLIC_URL` est bien l'URL HTTPS publique du backend.
 5. Faire un premier paiement réel de faible montant (1 mois) et vérifier les trois mêmes tables qu'à l'étape 6 de la Task 6.
 
 **Préalable métier, à confirmer avant l'étape 1 :** vérifier que le compte PayPal Business peut *recevoir* des paiements. Les comptes ouverts en Côte d'Ivoire sont historiquement limités à l'envoi. Le sandbox fonctionnera quoi qu'il arrive — il ne prouve donc rien sur ce point.
+
+## Règles d'exploitation (ajoutées après la revue finale)
+
+- **`XOF_TO_USD_RATE` doit être identique dans tous les environnements** et ne jamais être modifié tant qu'un paiement est en cours. La colonne `amount_usd` fige le montant proposé à PayPal au moment du checkout, mais elle n'existe qu'une fois la migration ci-dessus exécutée ; avant cela, une modification du taux de plus de 2 % pendant qu'une commande est en vol fait échouer un paiement légitime (argent encaissé, ligne bloquée en `pending`).
+- **`vercel.json` déclare `maxDuration: 60` pour `api/index.js`.** La vérification de signature PayPal est un aller-retour réseau, contrairement au HMAC local de Bictorys/PayTech : sans marge explicite, une fonction tuée en cours de traitement laisse un paiement encaissé sans abonnement activé.
+- **Réconciliation :** aucune interface n'affiche aujourd'hui les lignes `subscription_payments` bloquées en `pending`. En cas de doute sur un paiement, les repérer en SQL (`SELECT * FROM subscription_payments WHERE status = 'pending' AND created_at < NOW() - INTERVAL '1 hour'`), croiser `provider_reference` avec le tableau de bord PayPal, et si le webhook a été refusé pour cause de montant, supprimer la ligne correspondante de `payment_webhook_events` avant de demander à PayPal de renvoyer l'événement — sinon la relance est répondue « deduped ».

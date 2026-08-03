@@ -46,7 +46,11 @@ Gains an optional `provider` field in the request body: `'mobile_money'` (defaul
 
 ## Error handling
 - `paypal.isConfigured() === false` → checkout endpoint returns the same "not configured yet" French error pattern as Bictorys/PayTech, button can be hidden/disabled client-side if desired (mirrors how Mobile Money is hidden when neither provider is configured).
-- Capture failure at the return-URL step (e.g. buyer's PayPal balance issue after approval) → `subscription_payments` row stays `pending`; the webhook (if PayPal still sends a `DENIED` event) or a manual admin retry via a fresh checkout resolves it. No FCFA/XOF ever moves without a matching webhook confirmation, so there's no risk of "charged but not activated."
+- Capture failure at the return-URL step (e.g. buyer's PayPal balance issue after approval) → `subscription_payments` row stays `pending`; a manual admin retry via a fresh checkout resolves it.
+
+> **Correction (revue finale, 2026-08-03).** Two claims in the paragraph above were wrong, and the implementation departs from them deliberately:
+> 1. *"the webhook (if PayPal still sends a `DENIED` event)"* — PayPal emits no `PAYMENT.CAPTURE.*` event when no capture was ever attempted, so a buyer who approves and then closes the tab would never be captured and never recovered. The implementation therefore also subscribes `CHECKOUT.ORDER.APPROVED` and drives the capture from the signed webhook; the browser return route is a convenience, not the sole trigger.
+> 2. *"there's no risk of 'charged but not activated'"* — this is inverted. The webhook confirms *after* the charge, so charged-but-not-activated is precisely the residual risk class this feature introduces (a killed serverless function mid-fulfillment, a conversion-rate change mid-flight, a rejected amount check). The mitigations are: dedup-after-fulfillment on the PayPal route so a redelivery can heal an interrupted request, an explicit `maxDuration`, and the `amount_usd` column freezing the quoted USD figure at checkout. See the plan's "Règles d'exploitation" section for the reconciliation procedure.
 
 ## Testing
 - `node -c` on all touched backend files.
