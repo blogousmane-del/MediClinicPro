@@ -32,7 +32,12 @@ interface AuthContextType {
   register: (clinicName: string, adminName: string, email: string, password: string, phone: string) => Promise<void>;
   logout: () => void;
   onboardClinic: (address: string, phone: string, staff: any[], modules: string[]) => Promise<void>;
-  renewSubscription: (phone: string | undefined, months: number, planId?: 'clinique' | 'hopital') => Promise<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string }>;
+  renewSubscription: (
+    phone: string | undefined,
+    months: number,
+    planId?: 'clinique' | 'hopital',
+    provider?: 'mobile_money' | 'paypal'
+  ) => Promise<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string }>;
   pollSubscriptionStatus: (subscriptionPaymentId: number) => Promise<{ status: 'pending' | 'paid' | 'failed'; clinic?: Clinic }>;
   activateFreePlan: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -144,11 +149,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const renewSubscription = async (phone: string | undefined, months: number, planId?: 'clinique' | 'hopital') => {
+  const renewSubscription = async (
+    phone: string | undefined,
+    months: number,
+    planId?: 'clinique' | 'hopital',
+    provider: 'mobile_money' | 'paypal' = 'mobile_money'
+  ) => {
     const data = await api.post('/financials/subscription/checkout', {
       phoneNumber: phone,
       months,
-      planId
+      planId,
+      provider
     });
     return {
       checkoutUrl: data.checkoutUrl,

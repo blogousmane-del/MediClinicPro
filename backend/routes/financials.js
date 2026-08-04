@@ -4,6 +4,7 @@ const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { initiateCheckoutWithFailover } = require('../services/payments');
+const paypal = require('../services/payments/paypal');
 const { getPlan, isPaymentMethodAllowed } = require('../utils/plans');
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
@@ -304,7 +305,10 @@ router.get('/stats', auth, async (req, res) => {
 // subscription is only extended once the provider's webhook confirms payment.
 router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { months, phoneNumber, planId } = req.body;
+    const { months, phoneNumber, planId, provider } = req.body;
+    // PayPal est une alternative explicite, pas un maillon de la chaîne de
+    // failover Bictorys->PayTech : l'admin choisit, aucun repli automatique.
+    const useProvider = provider === 'paypal' ? 'paypal' : 'mobile_money';
     const qtyMonths = parseInt(months, 10);
 
     if (![1, 3, 6, 12].includes(qtyMonths)) {
@@ -346,8 +350,12 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       }
     }
 
+    // Le numéro ne sert qu'au Mobile Money (pré-remplissage de la page hébergée
+    // Bictorys/PayTech). Le front envoie le même champ quel que soit le bouton
+    // cliqué : sans cette exclusion, un numéro mal saisi faisait échouer un
+    // paiement PayPal qui n'en fait aucun usage.
     let normalizedPhone;
-    if (phoneNumber) {
+    if (phoneNumber && useProvider !== 'paypal') {
       const phoneCheck = validateAndNormalizePhone(phoneNumber);
       if (!phoneCheck.valid) {
         return res.status(400).json({ error: phoneCheck.error });
@@ -378,34 +386,87 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       .single();
     if (insertError) throw insertError;
 
-    const checkout = await initiateCheckoutWithFailover(
-      {
+    const checkoutDescription = `Abonnement MediClinic ${getPlan(targetPlanId).name} — ${clinic.name} (${qtyMonths} mois)`;
+
+    let checkout;
+    if (useProvider === 'paypal') {
+      if (!paypal.isConfigured()) {
+        await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
+        // 502 et non 400 : un fournisseur non configuré est une indisponibilité
+        // côté serveur, pas une erreur de saisie du client — même code que la
+        // branche Mobile Money ci-dessous.
+        return res.status(502).json({ error: "Le paiement PayPal n'est pas configuré pour cette installation. Utilisez le Mobile Money ou contactez le support MediClinic." });
+      }
+      checkout = await paypal.initiateCheckout({
         amount,
-        currency: 'XOF',
-        description: `Abonnement MediClinic ${getPlan(targetPlanId).name} — ${clinic.name} (${qtyMonths} mois)`,
+        description: checkoutDescription,
         reference: `sub-${subPayment.id}`,
-        returnUrl: `${APP_URL}/`,
+        // Le retour pointe vers l'API, pas vers le front : cette URL déclenche
+        // la capture côté serveur avant de renvoyer le navigateur dans l'app.
+        returnUrl: `${API_PUBLIC_URL}/api/webhooks/paypal/return`,
         cancelUrl: `${APP_URL}/`,
-        customerName: adminUser?.name || clinic.name,
-        customerEmail: adminUser?.email,
-        customerPhone: normalizedPhone
-      },
-      { itemName: 'Abonnement MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
-    );
+        customerEmail: adminUser?.email
+      });
+    } else {
+      checkout = await initiateCheckoutWithFailover(
+        {
+          amount,
+          currency: 'XOF',
+          description: checkoutDescription,
+          reference: `sub-${subPayment.id}`,
+          returnUrl: `${APP_URL}/`,
+          cancelUrl: `${APP_URL}/`,
+          customerName: adminUser?.name || clinic.name,
+          customerEmail: adminUser?.email,
+          customerPhone: normalizedPhone
+        },
+        { itemName: 'Abonnement MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
+      );
+    }
 
     if (!checkout.ok) {
       await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
       return res.status(502).json({ error: checkout.error });
     }
 
-    await supabase
+    const checkoutUpdate = {
+      provider: checkout.provider,
+      provider_reference: checkout.providerReference,
+      checkout_url: checkout.checkoutUrl
+    };
+    if (checkout.provider === 'paypal') {
+      // Montant USD réellement proposé à PayPal, figé ici : la vérification du
+      // webhook s'appuiera dessus au lieu de reconvertir au XOF_TO_USD_RATE en
+      // vigueur à la réception, qui peut avoir changé entre-temps.
+      checkoutUpdate.amount_usd = paypal.xofToUsd(amount);
+    }
+
+    const { error: checkoutUpdateError } = await supabase
       .from('subscription_payments')
-      .update({
-        provider: checkout.provider,
-        provider_reference: checkout.providerReference,
-        checkout_url: checkout.checkoutUrl
-      })
+      .update(checkoutUpdate)
       .eq('id', subPayment.id);
+
+    if (checkoutUpdateError) {
+      // Colonne inexistante. amount_usd est une migration encore en attente
+      // d'exécution manuelle sur la base live (voir la section « schema drift »
+      // de CLAUDE.md) : on rejoue sans elle plutôt que de faire échouer un
+      // paiement déjà initié chez PayPal. La vérification webhook retombera sur
+      // la reconversion au taux courant.
+      // Deux codes, pas un : PostgREST refuse une colonne inconnue présente dans
+      // le CORPS d'un UPDATE avec PGRST204 (cache de schéma), avant que Postgres
+      // ne voie la requête. 42703 n'apparaît que pour un SELECT/filtre.
+      if (['42703', 'PGRST204'].includes(checkoutUpdateError.code) && checkoutUpdate.amount_usd !== undefined) {
+        console.error("[FINANCIALS] Colonne subscription_payments.amount_usd absente (migration à exécuter) — enregistrement sans le montant USD.");
+        delete checkoutUpdate.amount_usd;
+        const { error: retryError } = await supabase
+          .from('subscription_payments')
+          .update(checkoutUpdate)
+          .eq('id', subPayment.id);
+        if (retryError) console.error('[FINANCIALS] Échec de mise à jour du paiement d\'abonnement:', retryError);
+      } else {
+        console.error('[FINANCIALS] Échec de mise à jour du paiement d\'abonnement:', checkoutUpdateError);
+      }
+    }
 
     res.status(201).json({
       success: true,
