@@ -350,8 +350,12 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       }
     }
 
+    // Le numéro ne sert qu'au Mobile Money (pré-remplissage de la page hébergée
+    // Bictorys/PayTech). Le front envoie le même champ quel que soit le bouton
+    // cliqué : sans cette exclusion, un numéro mal saisi faisait échouer un
+    // paiement PayPal qui n'en fait aucun usage.
     let normalizedPhone;
-    if (phoneNumber) {
+    if (phoneNumber && useProvider !== 'paypal') {
       const phoneCheck = validateAndNormalizePhone(phoneNumber);
       if (!phoneCheck.valid) {
         return res.status(400).json({ error: phoneCheck.error });

@@ -37,8 +37,7 @@ function amountMatches(provider, expected, event, row) {
       return false;
     }
     // `expected` est en FCFA (colonne en base), `reported` en USD (PayPal ne
-    // règle pas en XOF). On compare dans la même unité, tolérance 2% pour les
-    // arrondis de conversion et les frais.
+    // règle pas en XOF). On compare dans la même unité.
     // Priorité au montant USD figé au moment du checkout (colonne amount_usd) :
     // le recalculer ici le soumettrait au XOF_TO_USD_RATE courant, qu'un
     // changement d'exploitant pendant qu'une commande est en vol ferait échouer
@@ -47,10 +46,19 @@ function amountMatches(provider, expected, event, row) {
     // la section « schema drift » de CLAUDE.md) : une colonne absente ne doit
     // jamais bloquer un paiement qui se vérifierait autrement.
     const storedUsd = row ? row.amount_usd : undefined;
-    const expectedUsd =
-      storedUsd === undefined || storedUsd === null ? paypal.xofToUsd(expected) : Number(storedUsd);
+    const hasStoredUsd = storedUsd !== undefined && storedUsd !== null;
+    const expectedUsd = hasStoredUsd ? Number(storedUsd) : paypal.xofToUsd(expected);
     if (expectedUsd === null || !Number.isFinite(expectedUsd) || expectedUsd <= 0) return false; // taux non configuré/montant illisible -> refus, pas de confiance aveugle
-    return Math.abs(reported - expectedUsd) <= expectedUsd * 0.02;
+
+    // Deux tolérances, pas une. `resource.amount.value` est le montant BRUT
+    // encaissé (PayPal prélève ses frais après, contrairement à PayTech qui
+    // rapporte un net) : quand amount_usd existe, c'est très exactement la
+    // valeur envoyée à PayPal en `amount.value`, donc l'égalité est attendue au
+    // centime près et une fenêtre à 2% laisserait passer un sous-paiement.
+    // Le repli sans amount_usd reconvertit au taux courant, qui peut avoir
+    // bougé depuis le checkout — d'où 2% conservés sur cette seule branche.
+    const tolerance = hasStoredUsd ? 0.01 : expectedUsd * 0.02;
+    return Math.abs(reported - expectedUsd) <= tolerance;
   }
   const tolerance = provider === 'paytech' ? expected * 0.05 : 1; // PayTech absorbs ~3% fees; Bictorys settles exact
   return Math.abs(reported - expected) <= tolerance;
@@ -244,6 +252,32 @@ router.get('/paypal/return', async (req, res) => {
 
   if (orderId) {
     try {
+      // Périmètre vérifié AVANT la capture, comme sur le chemin webhook : cette
+      // route est publique (montée hors du middleware `auth`) et son seul
+      // paramètre vient du navigateur. Sans ce contrôle, n'importe qui pouvait
+      // faire capturer une commande arbitraire de notre compte marchand, et
+      // surtout déclencher deux appels sortants vers PayPal (OAuth + capture)
+      // par requête anonyme sur une fonction serverless à durée bornée.
+      // On n'accepte donc que les commandes que ce serveur a lui-même créées :
+      // provider_reference est renseigné à l'initiation du checkout
+      // (financials.js) avec l'id de commande PayPal.
+      const { data: ownedOrder, error: ownedOrderError } = await supabase
+        .from('subscription_payments')
+        .select('id')
+        .eq('provider', 'paypal')
+        .eq('provider_reference', String(orderId))
+        .maybeSingle();
+
+      if (ownedOrderError) throw ownedOrderError;
+
+      if (!ownedOrder) {
+        // Ni capture ni erreur visible pour l'appelant : on redirige comme
+        // d'habitude pour ne pas transformer cette route en oracle permettant
+        // de tester l'existence d'un id de commande.
+        console.error('[WEBHOOKS] Retour PayPal avec une commande inconnue, capture refusée — commande id:', String(orderId));
+        return res.redirect(appUrl);
+      }
+
       const capture = await paypal.captureOrder(String(orderId));
       if (!capture.ok) {
         console.error('[WEBHOOKS] Échec de capture PayPal:', capture.error);
