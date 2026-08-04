@@ -20,8 +20,25 @@ function isConfigured() {
   return !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 }
 
+let warnedAboutMode = false;
+
+// PAYPAL_MODE n'accepte que 'sandbox' ou 'live'. Toute autre valeur retombe en
+// sandbox — direction sûre (aucun argent réel ne circule), mais elle doit être
+// BRUYANTE : une URL saisie à la place du mot-clé (ex.
+// PAYPAL_MODE=https://api-m.paypal.com, saisie plausible pour « passer en
+// production ») laissait l'installation en sandbox sans le moindre message,
+// et des paiements en argent fictif y créditent de vrais abonnements.
 function apiUrl() {
-  return (process.env.PAYPAL_MODE || 'sandbox') === 'live' ? API_LIVE : API_SANDBOX;
+  const mode = String(process.env.PAYPAL_MODE || 'sandbox').trim().toLowerCase();
+  if (mode === 'live') return API_LIVE;
+  if (mode !== 'sandbox' && !warnedAboutMode) {
+    warnedAboutMode = true;
+    console.error(
+      `[PAYPAL] PAYPAL_MODE="${process.env.PAYPAL_MODE}" non reconnu — valeurs acceptées: "sandbox" ou "live". ` +
+      'Repli sur sandbox : AUCUN paiement réel ne sera encaissé.'
+    );
+  }
+  return API_SANDBOX;
 }
 
 // Clé du cache de jeton : base API + client id, pour qu'un jeton obtenu en
