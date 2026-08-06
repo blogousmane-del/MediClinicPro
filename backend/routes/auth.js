@@ -10,6 +10,7 @@ const { validateAndNormalizePhone } = require('../utils/phone');
 const { computeEffectiveAvailability } = require('../utils/schedule');
 const { getPlan, isRoleAllowedForPlan, isStaffLimitReached } = require('../utils/plans');
 const { getSettings } = require('../utils/platformSettings');
+const { recordLoginFailure, REASONS } = require('../utils/loginFailures');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
@@ -152,11 +153,18 @@ router.post('/login', async (req, res) => {
 
     if (userError) throw userError;
     if (!user) {
+      // Motif enregistré côté serveur UNIQUEMENT — le message client reste
+      // identique dans tous les cas, sinon la route devient un oracle
+      // indiquant quels emails existent.
+      await recordLoginFailure({ email, reason: REASONS.UNKNOWN_OR_INACTIVE, ip: req.ip });
       return res.status(400).json({ error: "Identifiants invalides." });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
+      await recordLoginFailure({
+        email, clinicId: user.clinic_id, reason: REASONS.BAD_PASSWORD, ip: req.ip
+      });
       return res.status(400).json({ error: "Identifiants invalides." });
     }
 
