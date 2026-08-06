@@ -54,6 +54,10 @@ function queryBuilder(table) {
     eq(column, value) { state.filters.push([column, value]); return builder; },
     limit() { return builder; },
     order() { return builder; },
+    // Filtres de plage ignorés : les tests posent des dates explicites et
+    // vérifient le calcul applicatif, pas le filtrage PostgREST.
+    gte() { return builder; },
+    lt() { return builder; },
     insert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
     update(payload) { state.op = 'update'; state.payload = payload; return builder; },
     upsert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
