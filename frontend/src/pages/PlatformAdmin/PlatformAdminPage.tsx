@@ -5,6 +5,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { NotificationsSection } from './NotificationsSection';
 import SystemConfigSection from './sections/SystemConfigSection';
 import SecuritySection from './sections/SecuritySection';
+import ReportsSection from './sections/ReportsSection';
 import {
   LayoutDashboard,
   Building2,
@@ -106,7 +107,7 @@ interface RecentTicket {
   status: string;
 }
 
-type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets' | 'notifications' | 'security' | 'system';
+type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets' | 'notifications' | 'reports' | 'security' | 'system';
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrateur',
@@ -260,18 +261,18 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     { id: 'subscriptions', label: 'Abonnements', icon: CreditCard },
     { id: 'tickets', label: 'Support', icon: LifeBuoy },
     { id: 'notifications', label: 'Notifications', icon: Megaphone },
+    { id: 'reports', label: 'Rapports', icon: BarChart2 },
     { id: 'security', label: 'Sécurité', icon: Shield },
     { id: 'system', label: 'Config. système', icon: SettingsIcon }
   ];
 
-  // Shown in the sidebar to match the full admin-console layout, but not yet
-  // functional — no reporting backend exists yet. Disabled + "Bientôt" rather
-  // than silently omitted. Specced in
-  // docs/superpowers/specs/2026-08-06-platform-admin-sections-design.md and
-  // planned in docs/superpowers/plans/2026-08-06-platform-reports-section.md.
-  const comingSoonItems: { label: string; icon: React.ElementType }[] = [
-    { label: 'Rapports', icon: BarChart2 }
-  ];
+  // Plus aucune section « Bientôt » : Rapports, Sécurité et Config. système
+  // sont toutes implémentées (voir
+  // docs/superpowers/specs/2026-08-06-platform-admin-sections-design.md).
+  // Le tableau reste déclaré pour que le bloc de rendu ci-dessous, et son
+  // style de nav désactivée, servent immédiatement à une éventuelle prochaine
+  // section en préparation.
+  const comingSoonItems: { label: string; icon: React.ElementType }[] = [];
 
   const sectionTitles: Record<Section, string> = {
     overview: "Vue d'ensemble",
@@ -280,6 +281,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     subscriptions: 'Abonnements',
     tickets: 'Tickets support',
     notifications: 'Notifications aux cliniques',
+    reports: 'Rapports',
     security: 'Sécurité de la plateforme',
     system: 'Configuration système'
   };
@@ -446,6 +448,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
               {section === 'notifications' && (
                 <NotificationsSection clinics={overview?.clinics.map(c => ({ id: c.id, name: c.name })) || []} onSend={handleSendNotification} />
               )}
+              {section === 'reports' && <ReportsSection />}
               {section === 'security' && <SecuritySection />}
               {section === 'system' && <SystemConfigSection />}
             </>
