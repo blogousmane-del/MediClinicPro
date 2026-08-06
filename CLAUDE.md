@@ -40,21 +40,12 @@ Despite `README.md` describing SQLite, the backend now runs entirely on **Supaba
 
 **Known gotcha — schema drift.** No session has direct DDL/migration access to the live Supabase database (only the REST API via `SUPABASE_KEY`), so every column/table added to `supabase_schema.sql` during a session is a *proposal* until a human runs the equivalent `ALTER TABLE`/`CREATE TABLE` by hand in the Supabase SQL Editor. This has repeatedly caused routes to 500 with `column "..." does not exist` (Postgres code `42703`) — including `GET /auth/me` itself, since it selects `users.work_schedule`. If you hit that error, check whether `supabase_schema.sql` already declares a column the live DB is missing before assuming a code bug.
 
-**Do not trust a written list of "pending" migrations — check the live DB instead.** This file used to carry such a list; every entry on it had in fact already been applied, and a session acting on it told the user to run migrations that were long done. Verify with a throwaway script (`SELECT` one column per candidate through the REST API; a missing column returns `42703`, a missing table `PGRST205`, and success means it is already there):
+**Do not trust a written list of "pending" migrations — check the live DB instead.** This file used to carry such a list; every entry on it had in fact already been applied, and a session acting on it told the user to run migrations that were long done. It happened twice: `platform_settings` was likewise documented as pending while it already existed, and a `PUT` sent against production on the assumption it would fail with "table missing" instead succeeded and wrote a real setting. **Never send a mutating request at production to prove a failure path** — read the schema first. Verify with a throwaway script (`SELECT` one column per candidate through the REST API; a missing column returns `42703`, a missing table `PGRST205`, and success means it is already there):
 ```js
 const { error } = await supabase.from('subscription_payments').select('amount_usd').limit(1);
 // error === null  -> column exists;  error.code === '42703' -> migration still needed
 ```
-Verified on 2026-08-05: every column and table declared in `supabase_schema.sql` existed on the live database at that date. **One genuine exception since then** — `platform_settings` (added 2026-08-06 for the system configuration inspector) still needs running by hand:
-```sql
-CREATE TABLE platform_settings (
-  key TEXT PRIMARY KEY,
-  value TEXT,
-  updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-Nothing breaks without it: `backend/utils/platformSettings.js` returns the defaults with `tableMissing: true`. Everything below is the historical record of what once needed a manual `ALTER TABLE`, not a to-do:
+Verified on 2026-08-06 against the live database: every column and table declared in `supabase_schema.sql` exists, `platform_settings` included. Nothing on the list below is outstanding — keep it as the historical record of what once needed a manual `ALTER TABLE`, not as a to-do:
 ```sql
 ALTER TABLE users ADD COLUMN IF NOT EXISTS work_schedule JSONB DEFAULT NULL;
 ALTER TABLE medications ADD COLUMN IF NOT EXISTS manufacturer TEXT;
