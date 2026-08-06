@@ -293,6 +293,21 @@ CREATE TABLE notification_reads (
   PRIMARY KEY (user_id, notification_id)
 );
 
+-- 20. Platform Settings Table (Super-Admin-editable platform-wide values,
+-- surfaced in Platform Admin > Config. système). Deliberately narrow: plan
+-- prices and staff limits stay in backend/utils/plans.js, because a typo in a
+-- mutable store would break billing for every clinic at once; and
+-- SUPER_ADMIN_EMAILS stays an environment variable, because it is the auth
+-- boundary of the very console that would edit it.
+-- Known keys: starter_trial_days (integer 1-90), maintenance_message (text).
+-- Missing table degrades to the defaults in backend/utils/platformSettings.js.
+CREATE TABLE platform_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexing for rapid queries
 CREATE INDEX idx_users_clinic ON users(clinic_id);
 CREATE INDEX idx_patients_clinic ON patients(clinic_id);
