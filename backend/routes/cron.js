@@ -71,4 +71,33 @@ router.get('/renewal-reminders', requireCronSecret, async (req, res) => {
   }
 });
 
+// GET /api/cron/purge-login-failures
+// Sans purge, login_failures grossit sans fin. 90 jours couvrent largement
+// toute analyse d'incident rétrospective.
+router.get('/purge-login-failures', requireCronSecret, async (req, res) => {
+  try {
+    const cutoff = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('login_failures')
+      .delete()
+      .lt('created_at', cutoff)
+      .select('id');
+
+    if (error) {
+      // Table absente : rien à purger. Ce n'est pas un échec du cron, et une
+      // tâche planifiée qui alerte en rouge pour une migration non lancée
+      // finit par être ignorée.
+      if (['PGRST205', '42P01'].includes(error.code)) {
+        return res.json({ success: true, deleted: 0, tableMissing: true });
+      }
+      throw error;
+    }
+
+    res.json({ success: true, deleted: (data || []).length });
+  } catch (error) {
+    console.error('[CRON] Purge des échecs de connexion impossible:', error);
+    res.status(500).json({ error: 'Erreur lors de la purge.' });
+  }
+});
+
 module.exports = router;
