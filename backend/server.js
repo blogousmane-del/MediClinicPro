@@ -20,6 +20,7 @@ const webhooksRoutes = require('./routes/webhooks');
 const platformRoutes = require('./routes/platform');
 const platformConfigRoutes = require('./routes/platform-config');
 const platformSecurityRoutes = require('./routes/platform-security');
+const platformReportsRoutes = require('./routes/platform-reports');
 const cronRoutes = require('./routes/cron');
 const notificationsRoutes = require('./routes/notifications');
 
@@ -113,6 +114,7 @@ app.use('/api/platform', platformRoutes);
 // porte sa propre garde auth + superAdminOnly.
 app.use('/api/platform', platformConfigRoutes);
 app.use('/api/platform', platformSecurityRoutes);
+app.use('/api/platform', platformReportsRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/notifications', notificationsRoutes);
 // (webhooksRoutes is mounted earlier, before auth-adjacent middleware)
