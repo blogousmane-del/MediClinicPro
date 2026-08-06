@@ -25,7 +25,7 @@ interface NotificationItem {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
-  const { user, clinic, refreshProfile } = useAuth();
+  const { user, clinic, maintenanceMessage, refreshProfile } = useAuth();
   const { showToast } = useNotifications();
   const [theme, setTheme] = useState<string>('light');
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
@@ -126,6 +126,25 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
   const isExpired = clinic?.subscription_status === 'expired' || (daysRemaining !== null && daysRemaining <= 0);
 
   return (
+    <>
+    {/* Bandeau de maintenance piloté depuis Platform Admin > Config. système.
+        Placé au-dessus du header (qui est sticky et de hauteur fixe) plutôt
+        que dedans : un message peut faire jusqu'à 280 caractères, il ne tient
+        pas dans les pastilles d'abonnement. Rendu en texte brut — jamais en
+        HTML, la valeur vient d'un champ libre. */}
+    {maintenanceMessage && (
+      <div style={{
+        backgroundColor: 'var(--warning-light, hsl(38 92% 92%))',
+        color: 'var(--warning-dark, hsl(30 80% 25%))',
+        padding: '8px 1.25rem',
+        fontSize: '0.82rem',
+        lineHeight: 1.4,
+        textAlign: 'center',
+        borderBottom: '1px solid var(--border)'
+      }}>
+        {maintenanceMessage}
+      </div>
+    )}
     <header className="app-header" style={{
       height: 'var(--header-height)',
       backgroundColor: 'var(--bg-secondary)',
@@ -421,5 +440,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
         </div>
       </div>
     </header>
+    </>
   );
 };

@@ -3,6 +3,7 @@ import { api } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { NotificationsSection } from './NotificationsSection';
+import SystemConfigSection from './sections/SystemConfigSection';
 import {
   LayoutDashboard,
   Building2,
@@ -104,7 +105,7 @@ interface RecentTicket {
   status: string;
 }
 
-type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets' | 'notifications';
+type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets' | 'notifications' | 'system';
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrateur',
@@ -257,16 +258,17 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'subscriptions', label: 'Abonnements', icon: CreditCard },
     { id: 'tickets', label: 'Support', icon: LifeBuoy },
-    { id: 'notifications', label: 'Notifications', icon: Megaphone }
+    { id: 'notifications', label: 'Notifications', icon: Megaphone },
+    { id: 'system', label: 'Config. système', icon: SettingsIcon }
   ];
 
   // Shown in the sidebar to match the full admin-console layout, but not yet
-  // functional — no reporting, security, or system-config backend exists.
-  // Disabled + "Bientôt" rather than silently omitted.
+  // functional — no reporting or security backend exists yet. Disabled +
+  // "Bientôt" rather than silently omitted. See
+  // docs/superpowers/specs/2026-08-06-platform-admin-sections-design.md.
   const comingSoonItems: { label: string; icon: React.ElementType }[] = [
     { label: 'Rapports', icon: BarChart2 },
-    { label: 'Sécurité', icon: Shield },
-    { label: 'Config. système', icon: SettingsIcon }
+    { label: 'Sécurité', icon: Shield }
   ];
 
   const sectionTitles: Record<Section, string> = {
@@ -275,7 +277,8 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     users: 'Utilisateurs de la plateforme',
     subscriptions: 'Abonnements',
     tickets: 'Tickets support',
-    notifications: 'Notifications aux cliniques'
+    notifications: 'Notifications aux cliniques',
+    system: 'Configuration système'
   };
 
   return (
@@ -440,6 +443,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
               {section === 'notifications' && (
                 <NotificationsSection clinics={overview?.clinics.map(c => ({ id: c.id, name: c.name })) || []} onSend={handleSendNotification} />
               )}
+              {section === 'system' && <SystemConfigSection />}
             </>
           )}
         </div>
