@@ -18,6 +18,7 @@ const settingsRoutes = require('./routes/settings');
 const depositsRoutes = require('./routes/deposits');
 const webhooksRoutes = require('./routes/webhooks');
 const platformRoutes = require('./routes/platform');
+const platformConfigRoutes = require('./routes/platform-config');
 const cronRoutes = require('./routes/cron');
 const notificationsRoutes = require('./routes/notifications');
 
@@ -107,6 +108,9 @@ app.use('/api/financials', financialsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/deposits', depositsRoutes);
 app.use('/api/platform', platformRoutes);
+// Monté au même préfixe : Express enchaîne les routeurs, et platform-config.js
+// porte sa propre garde auth + superAdminOnly.
+app.use('/api/platform', platformConfigRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/notifications', notificationsRoutes);
 // (webhooksRoutes is mounted earlier, before auth-adjacent middleware)
