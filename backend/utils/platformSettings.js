@@ -9,11 +9,23 @@
 // une variable d'environnement — c'est la frontière d'authentification du
 // console qui servirait à l'éditer.
 const { supabase } = require('../database');
+const secretBox = require('./secretBox');
 
 const DEFAULTS = {
   starter_trial_days: 7,
-  maintenance_message: ''
+  maintenance_message: '',
+  // Correspondance <plan>_<mois> -> identifiant de produit Chariow, en JSON.
+  // Vide tant que l'exploitant n'a rien configuré ; le checkout renvoie alors
+  // une erreur nommant la combinaison manquante.
+  chariow_products: '',
+  chariow_api_url: 'https://api.chariow.com/v1'
 };
+
+// Clés dont la valeur est chiffrée en base et n'apparaît JAMAIS dans
+// getSettings() — donc jamais dans la réponse de GET /api/platform/config.
+// Elles vivent dans la même table que les réglages ordinaires mais ne
+// partagent ni leur chemin de lecture ni leur chemin d'écriture.
+const SECRET_KEYS = ['chariow_api_key', 'chariow_webhook_secret'];
 
 // PGRST205 = table inconnue du cache de schéma, PGRST204 = colonne inconnue
 // dans le corps d'un write, 42P01/42703 = les équivalents côté Postgres.
@@ -60,7 +72,13 @@ async function setSetting(key, value, userId) {
   if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key)) {
     return { ok: false, tableMissing: false, error: `Réglage inconnu : ${key}` };
   }
+  return writeSetting(key, String(value), userId);
+}
 
+// Écriture brute, sans liste blanche : les deux appelants (setSetting pour les
+// réglages ordinaires, setSecret pour les valeurs chiffrées) valident leur clé
+// selon leur propre liste avant d'arriver ici.
+async function writeSetting(key, value, userId) {
   const { data: existing, error: readError } = await supabase
     .from('platform_settings')
     .select('key')
@@ -85,4 +103,67 @@ async function setSetting(key, value, userId) {
   return { ok: true };
 }
 
-module.exports = { DEFAULTS, isMissingRelation, getSettings, setSetting };
+async function readRaw(key) {
+  const { data, error } = await supabase
+    .from('platform_settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+  if (isMissingRelation(error) || error) return null;
+  return data ? data.value : null;
+}
+
+/**
+ * Valeur déchiffrée d'un secret, ou null s'il est absent ou illisible.
+ * Réservé au code serveur qui doit réellement s'en servir (l'adaptateur
+ * Chariow, la vérification du webhook) — jamais à une réponse HTTP.
+ * @param {string} key
+ * @returns {Promise<string|null>}
+ */
+async function getSecret(key) {
+  if (!SECRET_KEYS.includes(key)) return null;
+  const stored = await readRaw(key);
+  if (!stored) return null;
+  return secretBox.decrypt(stored);
+}
+
+/**
+ * Vrai si un secret est enregistré, sans jamais révéler sa valeur. C'est ce
+ * que la console de configuration affiche.
+ * @param {string} key
+ * @returns {Promise<boolean>}
+ */
+async function hasSecret(key) {
+  if (!SECRET_KEYS.includes(key)) return false;
+  return !!(await readRaw(key));
+}
+
+/**
+ * @returns {Promise<{ok: true} | {ok: false, tableMissing: boolean, error: string}>}
+ */
+async function setSecret(key, value, userId) {
+  if (!SECRET_KEYS.includes(key)) {
+    return { ok: false, tableMissing: false, error: `Secret inconnu : ${key}` };
+  }
+  // Refus net plutôt qu'un repli en clair : un secret stocké lisiblement dans
+  // une table que la console sait afficher serait pire que pas de secret.
+  if (!secretBox.isEncryptionConfigured()) {
+    return {
+      ok: false,
+      tableMissing: false,
+      error: "CONFIG_ENCRYPTION_KEY n'est pas configurée : impossible d'enregistrer un secret sans le chiffrer."
+    };
+  }
+  return writeSetting(key, secretBox.encrypt(String(value)), userId);
+}
+
+module.exports = {
+  DEFAULTS,
+  SECRET_KEYS,
+  isMissingRelation,
+  getSettings,
+  setSetting,
+  getSecret,
+  setSecret,
+  hasSecret
+};
