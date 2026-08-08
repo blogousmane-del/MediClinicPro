@@ -16,7 +16,7 @@ const sections: Section[] = [
   {
     id: '1',
     title: "1. Objet et champ d'application",
-    content: "Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et l'utilisation de la plateforme MediClinic, éditée par [Nom de l'entité légale], [forme juridique] ayant son siège à [adresse du siège]. Toute utilisation de la plateforme implique l'acceptation pleine et entière des présentes conditions."
+    content: "Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et l'utilisation de la plateforme MediClinic, éditée par GSM TECHNOLOGIE CYBER SHOP, [forme juridique] ayant son siège à [adresse du siège]. Toute utilisation de la plateforme implique l'acceptation pleine et entière des présentes conditions."
   },
   {
     id: '2',
@@ -26,7 +26,13 @@ const sections: Section[] = [
   {
     id: '3',
     title: '3. Données de santé et confidentialité',
-    content: "Les données de santé traitées via MediClinic sont des données à caractère sensible. [Nom de l'entité légale] s'engage à ne jamais revendre ni exploiter commercialement les données patients et à mettre en œuvre les mesures techniques et organisationnelles nécessaires à leur protection. [Préciser ici le lieu d'hébergement des données et le cadre réglementaire applicable.] L'abonné reste responsable du traitement de ses propres données patients."
+    // Hébergeur nommé (Supabase), mais NI région NI conformité affirmées : la
+    // région d'un projet Supabase se choisit à sa création et n'est pas lisible
+    // depuis le code, et une déclaration de conformité non vérifiée dans une
+    // clause sur des données de santé est un engagement qu'on ne peut pas
+    // tenir. Même règle que le refus des allégations de résidence des données
+    // fabriquées par Banani (voir CLAUDE.md).
+    content: "Les données de santé traitées via MediClinic sont des données à caractère sensible. GSM TECHNOLOGIE CYBER SHOP s'engage à ne jamais revendre ni exploiter commercialement les données patients et à mettre en œuvre les mesures techniques et organisationnelles nécessaires à leur protection. Les données sont hébergées sur l'infrastructure de Supabase, prestataire technique agissant en qualité de sous-traitant. [Préciser ici la région d'hébergement des données et le cadre réglementaire applicable, notamment les formalités auprès de l'ARTCI au titre de la loi n° 2013-450 du 19 juin 2013 relative à la protection des données à caractère personnel.] L'abonné reste responsable du traitement de ses propres données patients."
   },
   {
     id: '4',
@@ -45,12 +51,12 @@ const sections: Section[] = [
   {
     id: '6',
     title: '6. Propriété intellectuelle',
-    content: "L'ensemble des éléments composant la plateforme MediClinic (interfaces, base de code, marques, logos, contenus) sont la propriété exclusive de [Nom de l'entité légale]. Toute reproduction, distribution ou exploitation sans autorisation préalable est strictement interdite. L'abonné conserve la pleine propriété de ses données patients et des documents générés via la plateforme."
+    content: "L'ensemble des éléments composant la plateforme MediClinic (interfaces, base de code, marques, logos, contenus) sont la propriété exclusive de GSM TECHNOLOGIE CYBER SHOP. Toute reproduction, distribution ou exploitation sans autorisation préalable est strictement interdite. L'abonné conserve la pleine propriété de ses données patients et des documents générés via la plateforme."
   },
   {
     id: '7',
     title: '7. Responsabilité',
-    content: "MediClinic est un outil d'aide à la gestion et ne se substitue en aucun cas au jugement clinique du professionnel de santé. [Nom de l'entité légale] ne saurait être tenu responsable de décisions médicales prises sur la base des informations enregistrées dans la plateforme. [Préciser ici les limites de responsabilité applicables.]"
+    content: "MediClinic est un outil d'aide à la gestion et ne se substitue en aucun cas au jugement clinique du professionnel de santé. GSM TECHNOLOGIE CYBER SHOP ne saurait être tenu responsable de décisions médicales prises sur la base des informations enregistrées dans la plateforme. [Préciser ici les limites de responsabilité applicables.]"
   },
   {
     id: '8',
@@ -60,7 +66,7 @@ const sections: Section[] = [
   {
     id: '9',
     title: '9. Modifications des CGU',
-    content: "[Nom de l'entité légale] se réserve le droit de modifier les présentes CGU à tout moment. L'abonné sera informé par email de toute modification substantielle avant son entrée en vigueur. La poursuite de l'utilisation de la plateforme après cette date vaut acceptation des nouvelles conditions."
+    content: "GSM TECHNOLOGIE CYBER SHOP se réserve le droit de modifier les présentes CGU à tout moment. L'abonné sera informé par email de toute modification substantielle avant son entrée en vigueur. La poursuite de l'utilisation de la plateforme après cette date vaut acceptation des nouvelles conditions."
   },
   {
     id: '10',
