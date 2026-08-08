@@ -126,3 +126,53 @@ test('aucun champ modifiable fourni : refuse', async () => {
   assert.strictEqual(res.status, 400);
   assert.strictEqual(db.platform_settings.length, 0, 'aucune ecriture ne doit avoir lieu');
 });
+
+// ==========================================================================
+// Chariow
+// ==========================================================================
+test('la config annonce Chariow sans livrer le moindre secret', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  const settings = require(path.join(BACKEND, 'utils/platformSettings.js'));
+  await settings.setSecret('chariow_api_key', 'sk_live_TOP_SECRET', 1);
+
+  const res = await getConfig();
+  const raw = await res.text();
+
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(raw.includes('sk_live_TOP_SECRET'), false, 'aucun secret ne doit sortir');
+  const body = JSON.parse(raw);
+  assert.strictEqual(body.chariow.apiKey, 'set');
+  assert.strictEqual(body.chariow.webhookSecret, 'blank');
+  assert.strictEqual(body.chariow.expectedProductKeys.length, 8, 'deux plans payants x quatre durees');
+});
+
+test('la correspondance produits refuse une cle hors des 8 combinaisons', async () => {
+  resetDb();
+  const res = await putConfig({ chariow_products: { hopital_7: 'prod_x' } });
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /hopital_7/);
+  assert.strictEqual(db.platform_settings.length, 0, 'aucune ecriture partielle');
+});
+
+test('la correspondance produits accepte les combinaisons valides', async () => {
+  resetDb();
+  const res = await putConfig({ chariow_products: { hopital_12: 'prod_h12', clinique_1: 'prod_c1' } });
+  assert.strictEqual(res.status, 200);
+  const stored = JSON.parse(db.platform_settings.find((r) => r.key === 'chariow_products').value);
+  assert.strictEqual(stored.hopital_12, 'prod_h12');
+});
+
+test('generer le secret de webhook renvoie l URL complete une seule fois', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+
+  const put = await putConfig({ chariow_webhook_secret: '__generate__' });
+  const putBody = await put.json();
+  assert.strictEqual(put.status, 200);
+  assert.match(putBody.webhookUrl, /^https:\/\/api\.test\/api\/webhooks\/chariow\?secret=.+/);
+
+  const secret = putBody.webhookUrl.split('secret=')[1];
+  const getRaw = await (await getConfig()).text();
+  assert.strictEqual(getRaw.includes(secret), false, 'le GET ne redonne jamais le secret');
+});
