@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
-import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
 import { SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
@@ -44,10 +43,8 @@ export const AccountingPage: React.FC = () => {
   const [invoiceDate, setInvoiceDate] = useState<string>(todayISO);
   const [dueDate, setDueDate] = useState<string>(defaultDueDate.toISOString().split('T')[0]);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
-  const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState<boolean>(false);
-  const [pendingCheckout, setPendingCheckout] = useState<{ checkoutUrl: string; paymentId: number; provider: string; action: 'save' | 'print' } | null>(null);
 
   const [services, setServices] = useState<InvoiceService[]>([
     { id: 1, type: 'Consultation', description: 'Consultation générale', quantity: 1, unitPrice: 25000 },
@@ -135,17 +132,14 @@ export const AccountingPage: React.FC = () => {
     setPatientSearch('');
     setServices([{ id: Date.now(), type: 'Consultation', description: 'Consultation générale', quantity: 1, unitPrice: 10000 }]);
     setNotes('');
-    setReferenceNumber('');
     setPaymentMethod('cash');
     setInvoiceNumber(`#INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
   };
 
-  type SubmitInvoiceResult =
-    | { ok: false }
-    | { ok: true; pending: false }
-    | { ok: true; pending: true; checkoutUrl: string; paymentId: number; provider: string };
-
-  const submitInvoice = async (action: 'save' | 'print'): Promise<SubmitInvoiceResult> => {
+  // Encaissement en espèces uniquement : la facture est réglée au comptoir, donc
+  // le serveur enregistre le paiement immédiatement. Plus aucun état « en
+  // attente » à surveiller, contrairement à l'ancien parcours Mobile Money.
+  const submitInvoice = async (): Promise<{ ok: boolean }> => {
     if (!selectedPatient) {
       showToast('error', 'Patient requis', 'Veuillez sélectionner un patient pour cette facture.');
       return { ok: false };
@@ -154,26 +148,18 @@ export const AccountingPage: React.FC = () => {
       showToast('error', 'Facture vide', 'Ajoutez au moins un service facturé.');
       return { ok: false };
     }
-    if (paymentMethod !== 'cash' && !referenceNumber.trim()) {
-      showToast('error', 'Référence requise', 'Indiquez le numéro de transaction pour ce mode de paiement.');
-      return { ok: false };
-    }
 
     setIsSubmittingInvoice(true);
     try {
-      const data = await api.post('/financials/checkout', {
+      await api.post('/financials/checkout', {
         patientId: selectedPatient.id,
         amountTotal: total,
         paymentMethod,
-        referenceNumber: referenceNumber || `${invoiceNumber}`,
+        referenceNumber: `${invoiceNumber}`,
         items: services.map(s => ({ type: s.type, name: s.description, cost: s.quantity * s.unitPrice }))
       });
 
-      if (data.pending) {
-        setPendingCheckout({ checkoutUrl: data.checkoutUrl, paymentId: data.paymentId, provider: data.provider, action });
-        return { ok: true, pending: true, checkoutUrl: data.checkoutUrl, paymentId: data.paymentId, provider: data.provider };
-      }
-      return { ok: true, pending: false };
+      return { ok: true };
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Échec de l\'enregistrement', err.error || 'Impossible d\'enregistrer la facture.');
@@ -184,8 +170,8 @@ export const AccountingPage: React.FC = () => {
   };
 
   const handleSaveInvoice = async () => {
-    const result = await submitInvoice('save');
-    if (!result.ok || result.pending) return;
+    const result = await submitInvoice();
+    if (!result.ok) return;
     showToast('success', 'Facture enregistrée', `Facture ${invoiceNumber} sauvegardée et encaissée avec succès.`);
     resetInvoiceForm();
     setViewMode('journal');
@@ -259,8 +245,8 @@ export const AccountingPage: React.FC = () => {
   };
 
   const handleSendAndPrint = async () => {
-    const result = await submitInvoice('print');
-    if (!result.ok || result.pending) return;
+    const result = await submitInvoice();
+    if (!result.ok) return;
     printReceipt();
     showToast('success', 'Facture transmise', `Facture ${invoiceNumber} encaissée et prête pour l'impression.`);
     resetInvoiceForm();
@@ -650,28 +636,15 @@ export const AccountingPage: React.FC = () => {
                 </div>
 
                 {/* Mode de paiement */}
+                {/* Espèces uniquement depuis le passage à Chariow : Chariow ne facture que le
+                    prix d'un produit de sa boutique et ne prend aucun montant libre. Le
+                    serveur refuse de toute façon tout autre mode (financials.js, deposits.js). */}
                 <div>
                   <label style={labelStyle}>MODE DE PAIEMENT</label>
                   <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={inputStyle}>
                     <option value="cash">Espèces</option>
-                    <option value="wave">Wave Mobile Money</option>
-                    <option value="orange_money">Orange Money</option>
-                    <option value="mtn_momo">MTN Mobile Money</option>
                   </select>
                 </div>
-
-                {paymentMethod !== 'cash' && (
-                  <div>
-                    <label style={labelStyle}>N° TRANSACTION / RÉFÉRENCE</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: W-8910-..."
-                      value={referenceNumber}
-                      onChange={(e) => setReferenceNumber(e.target.value)}
-                      style={inputStyle}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* RIGHT: Services facturés */}
@@ -981,27 +954,6 @@ export const AccountingPage: React.FC = () => {
         )}
 
       </div>
-
-      {pendingCheckout && (
-        <PaymentCheckoutModal
-          checkoutUrl={pendingCheckout.checkoutUrl}
-          provider={pendingCheckout.provider}
-          amountLabel={`${total.toLocaleString()} FCFA`}
-          pollStatus={() => api.get(`/financials/payments/${pendingCheckout.paymentId}/status`)}
-          onSuccess={() => {
-            if (pendingCheckout.action === 'print') {
-              printReceipt();
-              showToast('success', 'Facture transmise', `Facture ${invoiceNumber} encaissée et prête pour l'impression.`);
-            } else {
-              showToast('success', 'Facture enregistrée', `Facture ${invoiceNumber} sauvegardée et encaissée avec succès.`);
-            }
-            setPendingCheckout(null);
-            resetInvoiceForm();
-            setViewMode('journal');
-          }}
-          onClose={() => setPendingCheckout(null)}
-        />
-      )}
     </>
   );
 };

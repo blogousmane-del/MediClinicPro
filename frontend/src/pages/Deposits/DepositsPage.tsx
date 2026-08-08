@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
 import { SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
@@ -10,7 +9,6 @@ import {
   ShieldCheck,
   AlertTriangle,
   Banknote,
-  CreditCard,
   X,
   Clock
 } from 'lucide-react';
@@ -61,9 +59,7 @@ export const DepositsPage: React.FC = () => {
   const [depositAmount, setDepositAmount] = useState<number>(0);
   const [amountTouched, setAmountTouched] = useState<boolean>(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
-  const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [pendingCheckout, setPendingCheckout] = useState<{ checkoutUrl: string; depositId: number; provider: string; amount: number; patientName: string } | null>(null);
 
   // Registry
   const [allDeposits, setAllDeposits] = useState<any[]>([]);
@@ -148,7 +144,6 @@ export const DepositsPage: React.FC = () => {
     setDepositAmount(0);
     setAmountTouched(false);
     setPaymentMethod('cash');
-    setReferenceNumber('');
   };
 
   const handleSubmit = async () => {
@@ -160,32 +155,17 @@ export const DepositsPage: React.FC = () => {
       showToast('error', 'Montant requis', 'Veuillez saisir un montant de dépôt supérieur à 0.');
       return;
     }
-    if (paymentMethod !== 'cash' && !referenceNumber.trim()) {
-      showToast('error', 'Référence requise', 'Indiquez le numéro de transaction pour ce mode de paiement.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const data = await api.post('/deposits', {
+      // Encaissé au comptoir : le serveur crée le dépôt déjà payé, donc aucun
+      // état « en attente » à surveiller depuis le passage à Chariow.
+      await api.post('/deposits', {
         patientId: selectedPatient.id,
         amount: depositAmount,
         paymentMethod,
-        referenceNumber: referenceNumber || undefined,
         reason: reason || undefined,
         items: items.filter(it => it.description.trim()).map(it => ({ description: it.description, cost: Number(it.cost) || 0 }))
       });
-
-      if (data.pending) {
-        setPendingCheckout({
-          checkoutUrl: data.checkoutUrl,
-          depositId: data.deposit.id,
-          provider: data.provider,
-          amount: depositAmount,
-          patientName: `${selectedPatient.first_name} ${selectedPatient.last_name}`
-        });
-        return;
-      }
 
       showToast('success', 'Dépôt enregistré', `Dépôt de garantie de ${depositAmount.toLocaleString('fr-FR')} FCFA enregistré pour ${selectedPatient.first_name} ${selectedPatient.last_name}.`);
       resetForm();
@@ -542,14 +522,14 @@ export const DepositsPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Espèces uniquement depuis le passage à Chariow : Chariow ne facture que le
+                  prix d'un produit de sa boutique et ne prend aucun montant libre. Le
+                  serveur refuse de toute façon tout autre mode (financials.js, deposits.js). */}
               <div>
                 <label style={labelStyle}>Mode de paiement</label>
                 <div className="dep-payment-grid">
                   {[
-                    { id: 'cash', label: 'Espèces', icon: Banknote },
-                    { id: 'wave', label: 'Wave', icon: CreditCard },
-                    { id: 'orange_money', label: 'Orange Money', icon: CreditCard },
-                    { id: 'mtn_momo', label: 'MTN MoMo', icon: CreditCard }
+                    { id: 'cash', label: 'Espèces', icon: Banknote }
                   ].map(pm => {
                     const Icon = pm.icon;
                     return (
@@ -565,19 +545,6 @@ export const DepositsPage: React.FC = () => {
                   })}
                 </div>
               </div>
-
-              {paymentMethod !== 'cash' && (
-                <div>
-                  <label style={labelStyle}>N° Transaction / Référence</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: W-8910-..."
-                    value={referenceNumber}
-                    onChange={(e) => setReferenceNumber(e.target.value)}
-                    style={inputStyle}
-                  />
-                </div>
-              )}
 
               <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', borderRadius: '10px', padding: '10px 12px' }}>
                 <AlertTriangle size={15} color="#ea580c" style={{ flexShrink: 0, marginTop: '1px' }} />
@@ -670,22 +637,6 @@ export const DepositsPage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {pendingCheckout && (
-        <PaymentCheckoutModal
-          checkoutUrl={pendingCheckout.checkoutUrl}
-          provider={pendingCheckout.provider}
-          amountLabel={`${pendingCheckout.amount.toLocaleString('fr-FR')} FCFA`}
-          pollStatus={() => api.get(`/deposits/${pendingCheckout.depositId}/status`)}
-          onSuccess={() => {
-            showToast('success', 'Dépôt confirmé', `Dépôt de garantie de ${pendingCheckout.amount.toLocaleString('fr-FR')} FCFA confirmé pour ${pendingCheckout.patientName}.`);
-            setPendingCheckout(null);
-            resetForm();
-            setViewMode('registry');
-          }}
-          onClose={() => setPendingCheckout(null)}
-        />
-      )}
     </>
   );
 };

@@ -9,7 +9,6 @@ import {
   Check,
   X,
   Plus,
-  Loader2,
   Star,
   Zap
 } from 'lucide-react';
