@@ -47,7 +47,14 @@ const MIGRATION_SQL = `CREATE TABLE login_failures (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );`;
 
-const formatDate = (iso: string) => new Date(iso).toLocaleString('fr-FR');
+// Une date absente ou illisible affiche un tiret, jamais « Invalid Date » :
+// ce texte a déjà rempli une colonne entière du journal en production sans
+// que rien ne signale d'où il venait.
+const formatDate = (iso: string) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('fr-FR');
+};
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div style={{

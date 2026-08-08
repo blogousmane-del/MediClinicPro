@@ -119,6 +119,10 @@ router.get('/security/audit', async (req, res) => {
         action: row.action,
         details: row.details,
         ip: row.ip_address,
+        // Oubliée à la première écriture : la colonne était bien lue par le
+        // SELECT, le filtre et le tri, mais jamais recopiée ici. Le front
+        // affichait donc « Invalid Date » sur chaque ligne du journal.
+        createdAt: row.created_at,
         // Sur ces lignes, la clinique du user_id et le clinic_id de la ligne
         // divergent volontairement : c'est un Super Admin agissant sur une
         // autre clinique. Sans ce marquage, ça se lit comme si la clinique

@@ -110,6 +110,29 @@ test('le journal d audit marque les actions Super Admin', async () => {
   assert.strictEqual(platformRow.userName, 'Ops');
 });
 
+// Le SELECT lisait created_at, le filtre et le tri s'en servaient, mais la
+// projection de la réponse l'omettait : le journal affichait « Invalid Date »
+// sur chaque ligne en production. Les autres tests passaient tous, aucun ne
+// regardait la date.
+test('le journal d audit renvoie une date exploitable par ligne', async () => {
+  resetDb();
+  db.clinics.push({ id: 1, name: 'Clinique A' });
+  db.activity_logs.push({
+    id: 1, clinic_id: 1, user_id: null, action: 'LOGIN',
+    details: '', ip_address: null, created_at: nowIso(1)
+  });
+
+  const body = await getJson('/api/platform/security/audit');
+
+  assert.strictEqual(body.rows.length, 1);
+  const row = body.rows[0];
+  assert.ok(row.createdAt, 'la ligne doit porter une date');
+  assert.ok(
+    !Number.isNaN(new Date(row.createdAt).getTime()),
+    `la date doit être lisible par new Date(), reçu: ${row.createdAt}`
+  );
+});
+
 test('le journal d audit filtre par action', async () => {
   resetDb();
   db.clinics.push({ id: 1, name: 'Clinique A' });
