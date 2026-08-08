@@ -8,6 +8,7 @@ const { supabase } = require('../database');
 const bictorys = require('../services/payments/bictorys');
 const paytech = require('../services/payments/paytech');
 const paypal = require('../services/payments/paypal');
+const { getSecret } = require('../utils/platformSettings');
 
 // Returns true if this exact webhook body was already processed (dedup via
 // the payment_webhook_events UNIQUE(provider, event_hash) constraint).
@@ -261,6 +262,79 @@ router.post('/paytech', async (req, res) => {
     res.json({ received: true });
   } catch (err) {
     console.error('[WEBHOOKS] Erreur webhook PayTech:', err);
+    res.status(500).json({ error: 'Erreur interne' });
+  }
+});
+
+// Chariow n'expose AUCUNE signature de webhook (voir Chariow.md §7) :
+// l'authentification se réduit à un secret placé dans l'URL. C'est faible,
+// d'où la règle absolue appliquée ci-dessous — le corps ne sert qu'à
+// identifier une vente, jamais à établir qu'elle est payée.
+const CHARIOW_SUCCESS_EVENTS = ['successful.sale', 'settled.sale', 'completed.sale'];
+
+function secretMatches(provided, expected) {
+  const a = Buffer.from(String(provided || ''));
+  const b = Buffer.from(String(expected || ''));
+  // timingSafeEqual exige des longueurs égales : comparer les longueurs
+  // d'abord évite l'exception, et une longueur différente est de toute façon
+  // un secret faux.
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+router.post('/chariow', async (req, res) => {
+  try {
+    const expected = await getSecret('chariow_webhook_secret');
+    if (!expected || !secretMatches(req.query.secret, expected)) {
+      console.error('[WEBHOOKS] Secret Chariow invalide ou absent.');
+      return res.status(401).json({ error: 'Secret invalide.' });
+    }
+
+    const body = req.body || {};
+    const eventName = String(body.event || body.type || '');
+    if (!CHARIOW_SUCCESS_EVENTS.includes(eventName)) {
+      // 200 volontaire : un code d'erreur ferait rejouer Chariow indéfiniment
+      // sur un événement dont nous n'avons rien à faire.
+      return res.json({ received: true, ignored: true });
+    }
+
+    const rawBody = req.rawBody;
+    if (rawBody && (await isDuplicateEvent('chariow', rawBody))) {
+      return res.json({ received: true, deduped: true });
+    }
+
+    // RÈGLE ABSOLUE : on ne lit du corps que de quoi retrouver la ligne. Ni le
+    // statut ni le montant annoncés ne sont pris en compte — la réconciliation
+    // les redemande à Chariow.
+    const data = body.data || {};
+    const metadata = data.custom_metadata || {};
+    let subscriptionPaymentId = parseInt(metadata.subscriptionPaymentId, 10);
+
+    if (!Number.isInteger(subscriptionPaymentId)) {
+      const saleId = data.id || data.sale_id;
+      if (!saleId) return res.json({ received: true, ignored: true });
+
+      const { data: row } = await supabase
+        .from('subscription_payments')
+        .select('id')
+        .eq('provider', 'chariow')
+        .eq('provider_reference', String(saleId))
+        .maybeSingle();
+
+      if (!row) {
+        console.error('[WEBHOOKS] Vente Chariow inconnue de cette installation :', String(saleId));
+        return res.json({ received: true, ignored: true });
+      }
+      subscriptionPaymentId = row.id;
+    }
+
+    // Require paresseux : chariowReconcile requiert ce module pour
+    // creditSubscription. Un require en tête de fichier créerait un cycle.
+    const { reconcileChariowSubscription } = require('../services/payments/chariowReconcile');
+    const result = await reconcileChariowSubscription(subscriptionPaymentId);
+
+    res.json({ received: true, status: result.status });
+  } catch (err) {
+    console.error('[WEBHOOKS] Erreur webhook Chariow:', err);
     res.status(500).json({ error: 'Erreur interne' });
   }
 });
