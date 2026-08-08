@@ -14,7 +14,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
-const express = require('express');
+const { db, resetDb, stubModule, makeSupabaseStub, authStub, startApp, BACKEND } = require('./helpers/harness');
 
 // --------------------------------------------------------------------------
 // 1. Environnement. Ces variables sont lues au CHARGEMENT des modules de
@@ -27,68 +27,10 @@ process.env.PAYPAL_CLIENT_ID = 'test-client-id';
 process.env.PAYPAL_CLIENT_SECRET = 'test-secret';
 process.env.PAYPAL_WEBHOOK_ID = 'test-webhook-id';
 
-const BACKEND = path.join(__dirname, '..');
-
-// Remplace un module du backend dans le cache de require. Tout `require()`
-// ultérieur de ce chemin recevra `exports` au lieu du vrai fichier.
-function stubModule(relativePath, exports) {
-  const file = require.resolve(path.join(BACKEND, relativePath));
-  require.cache[file] = { id: file, filename: file, loaded: true, exports, children: [], paths: [] };
-}
-
 // --------------------------------------------------------------------------
-// 2. Faux Supabase — base de données en mémoire.
-//    Reproduit la partie de l'API PostgREST utilisée par les routes :
-//    .from().select().eq().maybeSingle() / .single() / .insert() / .update(),
-//    le tout « thenable » pour fonctionner avec await.
+// 2. Faux Supabase — base de données en mémoire (voir tests/helpers/harness.js).
 // --------------------------------------------------------------------------
-const db = new Proxy({}, {
-  get(tables, name) {
-    if (typeof name === 'string' && !tables[name]) tables[name] = [];
-    return tables[name];
-  }
-});
-
-function resetDb() {
-  for (const table of Object.keys(db)) db[table].length = 0;
-}
-
-function queryBuilder(table) {
-  const state = { op: 'select', filters: [], payload: null, singleRow: false };
-  const rowMatches = (row) => state.filters.every(([column, value]) => row[column] === value);
-
-  const run = () => {
-    const rows = db[table];
-
-    if (state.op === 'insert') {
-      const row = { id: rows.length + 1, ...state.payload };
-      rows.push(row);
-      return { data: state.singleRow ? row : [row], error: null };
-    }
-
-    const hits = rows.filter(rowMatches);
-
-    if (state.op === 'update') {
-      hits.forEach((row) => Object.assign(row, state.payload));
-      return { data: state.singleRow ? hits[0] || null : hits, error: null };
-    }
-
-    return { data: state.singleRow ? hits[0] || null : hits, error: null };
-  };
-
-  const builder = {
-    select() { return builder; },
-    eq(column, value) { state.filters.push([column, value]); return builder; },
-    insert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
-    update(payload) { state.op = 'update'; state.payload = payload; return builder; },
-    maybeSingle() { state.singleRow = true; return builder; },
-    single() { state.singleRow = true; return builder; },
-    then(onOk, onErr) { return Promise.resolve().then(run).then(onOk, onErr); }
-  };
-  return builder;
-}
-
-stubModule('database.js', { supabase: { from: queryBuilder } });
+stubModule('database.js', { supabase: makeSupabaseStub() });
 
 // --------------------------------------------------------------------------
 // 3. Faux PayPal. On garde les fonctions PURES du vrai module (xofToUsd,
@@ -117,10 +59,7 @@ stubModule('services/payments/paypal.js', {
 // --------------------------------------------------------------------------
 // 4. Auth désactivée (on teste les routes, pas le JWT) et Mobile Money simulé.
 // --------------------------------------------------------------------------
-stubModule('middleware/auth.js', {
-  auth: (req, _res, next) => { req.user = { userId: 1, clinicId: 1, role: 'admin' }; next(); },
-  checkRole: () => (_req, _res, next) => next()
-});
+stubModule('middleware/auth.js', authStub());
 
 stubModule('services/payments/index.js', {
   initiateCheckoutWithFailover: async () => ({
@@ -133,21 +72,17 @@ stubModule('services/payments/index.js', {
 });
 
 // --------------------------------------------------------------------------
-// 5. Application de test. `verify` reproduit server.js : il capture le corps
-//    brut, indispensable à la vérification de signature des webhooks.
+// 5. Application de test (voir tests/helpers/harness.js).
 // --------------------------------------------------------------------------
-const app = express();
-app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
-app.use('/api/webhooks', require(path.join(BACKEND, 'routes/webhooks.js')));
-app.use('/api/financials', require(path.join(BACKEND, 'routes/financials.js')));
-
 let server;
 let baseUrl;
 
 test.before(async () => {
-  server = app.listen(0);
-  await new Promise((resolve) => server.once('listening', resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  server = await startApp([
+    ['/api/webhooks', require(path.join(BACKEND, 'routes/webhooks.js'))],
+    ['/api/financials', require(path.join(BACKEND, 'routes/financials.js'))]
+  ]);
+  baseUrl = server.baseUrl;
 });
 
 test.after(() => server.close());

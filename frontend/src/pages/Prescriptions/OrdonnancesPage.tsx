@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { SkeletonCards } from '../../components/Skeleton';
 import {
   Search,
   FilePlus,
@@ -592,6 +593,8 @@ export const OrdonnancesPage: React.FC = () => {
 
       {/* 4. Prescription Cards List Stack matching Image 1 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {loading && <SkeletonCards count={3} height={168} label="Chargement des ordonnances…" />}
+
         {!loading && filteredItems.length === 0 && (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
             {prescriptions.length === 0 ? 'Aucune ordonnance enregistrée.' : 'Aucune ordonnance ne correspond à ce filtre.'}

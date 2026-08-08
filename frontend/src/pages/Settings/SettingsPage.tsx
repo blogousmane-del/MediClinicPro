@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { SkeletonCards, SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
   Bell,
@@ -334,8 +335,9 @@ export const SettingsPage: React.FC = () => {
       { label: 'Patients & Dossiers illimités', ok: true },
       { label: 'Rendez-vous, Ordonnances & Pharmacie', ok: true },
       { label: 'Laboratoire & Comptabilité', ok: true },
-      { label: 'Paiement Espèces', ok: true },
-      { label: 'Encaissements Mobile Money', ok: !!planData.paymentMethods?.includes('wave') }
+      // « Encaissements Mobile Money » retiré ici comme dans LandingPage.tsx :
+      // l'encaissement patient en ligne disparaît avec le passage à Chariow.
+      { label: 'Paiement Espèces', ok: true }
     ];
   };
 
@@ -619,7 +621,7 @@ export const SettingsPage: React.FC = () => {
                   <Zap size={18} color="#b8860b" style={{ flexShrink: 0 }} />
                   <p style={{ fontWeight: 700, color: '#7a5b12', margin: 0, fontSize: '0.85rem' }}>
                     {trialDaysLeft !== null && `Il vous reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai. `}
-                    Passez au plan Hôpital pour débloquer les utilisateurs illimités et les encaissements Mobile Money.
+                    Passez au plan Hôpital pour débloquer les utilisateurs et les rôles illimités.
                   </p>
                 </div>
                 <button
@@ -630,6 +632,10 @@ export const SettingsPage: React.FC = () => {
                   Passer au plan Hôpital
                 </button>
               </div>
+            )}
+
+            {loading && (
+              <SkeletonCards count={3} height={360} grid minWidth="260px" gap="1.25rem" label="Chargement des plans…" />
             )}
 
             {!loading && plansCatalog && (
@@ -871,6 +877,12 @@ export const SettingsPage: React.FC = () => {
         )}
 
         {/* TAB 2: INFORMATIONS CLINIQUE */}
+        {activeSubTab === 'clinic' && loading && (
+          <div style={{ maxWidth: '650px', width: '100%' }}>
+            <SkeletonCards count={1} height={420} label="Chargement des informations de la clinique…" />
+          </div>
+        )}
+
         {activeSubTab === 'clinic' && !loading && (
           <form onSubmit={handleUpdateClinicSubmit} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: '650px', width: '100%', boxSizing: 'border-box' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border)', paddingBottom: '8px', margin: 0 }}>Détails d'identification</h3>
@@ -942,7 +954,8 @@ export const SettingsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {staff.map(st => (
+                  {loading && <SkeletonTableRows rows={4} cols={5} label="Chargement du personnel…" />}
+                  {!loading && staff.map(st => (
                     <tr key={st.id} style={{ opacity: st.active === 0 ? 0.6 : 1 }}>
                       <td style={{ fontWeight: 600 }}>{st.name}</td>
                       <td>{st.email}</td>
@@ -1032,7 +1045,8 @@ export const SettingsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {tickets.map(t => (
+                  {loading && <SkeletonTableRows rows={3} cols={4} label="Chargement des tickets…" />}
+                  {!loading && tickets.map(t => (
                     <tr key={t.id}>
                       <td style={{ fontWeight: 600 }}>
                         {t.subject}

@@ -92,7 +92,11 @@ async function auth(req, res, next) {
         return res.status(403).json({
           error: "Abonnement MediClinic expiré",
           code: "SUBSCRIPTION_EXPIRED",
-          message: "Veuillez renouveler votre abonnement de 15 000 FCFA/mois via Mobile Money pour réactiver l'écriture des données."
+          // Ni prix ni moyen de paiement en dur ici : ce message annonçait
+          // « 15 000 FCFA/mois », un tarif qui n'existe dans aucun plan
+          // (Clinique 9 000, Hôpital 14 500 — voir utils/plans.js, seule
+          // source de vérité), et un moyen de paiement qui change.
+          message: "Veuillez renouveler votre abonnement depuis Paramètres → Abonnez-vous pour réactiver l'écriture des données."
         });
       }
     }

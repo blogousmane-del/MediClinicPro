@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { SkeletonCards } from '../../components/Skeleton';
 import {
   Search,
   Plus,
@@ -455,6 +456,9 @@ export const PharmacyPage: React.FC = () => {
       </div>
 
       {/* 4. Metrics Summary Cards Grid matching Image 2 */}
+      {loading ? (
+        <SkeletonCards count={4} height={96} grid minWidth="200px" gap="1.25rem" label="Chargement des indicateurs…" />
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
@@ -520,15 +524,18 @@ export const PharmacyPage: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* 5. Medication Cards List matching Image 2 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {filteredItems.length === 0 && (
+        {loading && <SkeletonCards count={4} height={132} label="Chargement du stock…" />}
+
+        {!loading && filteredItems.length === 0 && (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
             Aucun médicament trouvé.
           </div>
         )}
-        {filteredItems.map((med) => {
+        {!loading && filteredItems.map((med) => {
           let statusBadge = null;
           if (med.status === 'Critique') {
             statusBadge = (

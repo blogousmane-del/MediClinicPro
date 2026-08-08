@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
+import { SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
   Plus,
@@ -620,7 +621,7 @@ export const DepositsPage: React.FC = () => {
               </thead>
               <tbody>
                 {loadingRegistry ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Chargement...</td></tr>
+                  <SkeletonTableRows rows={5} cols={8} label="Chargement des dépôts…" />
                 ) : allDeposits.length === 0 ? (
                   <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Aucun dépôt de garantie enregistré.</td></tr>
                 ) : (

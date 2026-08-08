@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { SkeletonCards } from '../../components/Skeleton';
 import { Clock, User, Plus, X, Check, Phone, CalendarCheck, Download, DoorOpen, Stethoscope } from 'lucide-react';
 import { NewAppointmentPage } from './NewAppointmentPage';
 
@@ -368,9 +369,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
       {/* Appointments List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
         {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            Chargement des créneaux...
-          </div>
+          <SkeletonCards count={5} height={92} label="Chargement des créneaux…" />
         ) : visibleAppointments.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             {appointments.length === 0 ? 'Aucun rendez-vous enregistré à cette date.' : 'Aucun rendez-vous ne correspond à ce filtre.'}

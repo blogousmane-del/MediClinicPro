@@ -3,6 +3,10 @@ import { api } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { NotificationsSection } from './NotificationsSection';
+import SystemConfigSection from './sections/SystemConfigSection';
+import SecuritySection from './sections/SecuritySection';
+import ReportsSection from './sections/ReportsSection';
+import { SkeletonCards, SkeletonPage } from '../../components/Skeleton';
 import {
   LayoutDashboard,
   Building2,
@@ -104,7 +108,7 @@ interface RecentTicket {
   status: string;
 }
 
-type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets' | 'notifications';
+type Section = 'overview' | 'clinics' | 'users' | 'subscriptions' | 'tickets' | 'notifications' | 'reports' | 'security' | 'system';
 
 const roleLabels: Record<string, string> = {
   admin: 'Administrateur',
@@ -257,17 +261,19 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'subscriptions', label: 'Abonnements', icon: CreditCard },
     { id: 'tickets', label: 'Support', icon: LifeBuoy },
-    { id: 'notifications', label: 'Notifications', icon: Megaphone }
+    { id: 'notifications', label: 'Notifications', icon: Megaphone },
+    { id: 'reports', label: 'Rapports', icon: BarChart2 },
+    { id: 'security', label: 'Sécurité', icon: Shield },
+    { id: 'system', label: 'Config. système', icon: SettingsIcon }
   ];
 
-  // Shown in the sidebar to match the full admin-console layout, but not yet
-  // functional — no reporting, security, or system-config backend exists.
-  // Disabled + "Bientôt" rather than silently omitted.
-  const comingSoonItems: { label: string; icon: React.ElementType }[] = [
-    { label: 'Rapports', icon: BarChart2 },
-    { label: 'Sécurité', icon: Shield },
-    { label: 'Config. système', icon: SettingsIcon }
-  ];
+  // Plus aucune section « Bientôt » : Rapports, Sécurité et Config. système
+  // sont toutes implémentées (voir
+  // docs/superpowers/specs/2026-08-06-platform-admin-sections-design.md).
+  // Le tableau reste déclaré pour que le bloc de rendu ci-dessous, et son
+  // style de nav désactivée, servent immédiatement à une éventuelle prochaine
+  // section en préparation.
+  const comingSoonItems: { label: string; icon: React.ElementType }[] = [];
 
   const sectionTitles: Record<Section, string> = {
     overview: "Vue d'ensemble",
@@ -275,7 +281,10 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     users: 'Utilisateurs de la plateforme',
     subscriptions: 'Abonnements',
     tickets: 'Tickets support',
-    notifications: 'Notifications aux cliniques'
+    notifications: 'Notifications aux cliniques',
+    reports: 'Rapports',
+    security: 'Sécurité de la plateforme',
+    system: 'Configuration système'
   };
 
   return (
@@ -411,7 +420,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
 
         <div className="platform-admin-main-body" style={{ padding: '1.5rem 2rem', flex: 1 }}>
           {loading && !overview ? (
-            <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>
+            <SkeletonPage cards={3} label="Chargement de la console…" />
           ) : (section === 'overview' || section === 'clinics') && !overview ? (
             <p style={{ color: 'var(--text-secondary)' }}>Aucune donnée disponible.</p>
           ) : (
@@ -440,6 +449,9 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
               {section === 'notifications' && (
                 <NotificationsSection clinics={overview?.clinics.map(c => ({ id: c.id, name: c.name })) || []} onSend={handleSendNotification} />
               )}
+              {section === 'reports' && <ReportsSection />}
+              {section === 'security' && <SecuritySection />}
+              {section === 'system' && <SystemConfigSection />}
             </>
           )}
         </div>
@@ -784,7 +796,7 @@ const UsersSection: React.FC<{
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
-  if (!users) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
+  if (!users) return <SkeletonCards count={5} height={56} label="Chargement des utilisateurs…" />;
 
   const roleOptions = Array.from(new Set(users.map(u => u.role)));
 
@@ -890,7 +902,7 @@ const UsersSection: React.FC<{
 const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ data }) => {
   const [statusFilter, setStatusFilter] = useState<string>('');
 
-  if (!data) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
+  if (!data) return <SkeletonCards count={5} height={56} label="Chargement des abonnements…" />;
 
   const statusLabels: Record<string, string> = { pending: 'En attente', paid: 'Payé', failed: 'Échoué' };
   const statusBadges: Record<string, string> = { pending: 'badge-warning', paid: 'badge-success', failed: 'badge-danger' };
@@ -1010,7 +1022,7 @@ const TicketsSection: React.FC<{
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [noteDraft, setNoteDraft] = useState<string>('');
 
-  if (!tickets) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
+  if (!tickets) return <SkeletonCards count={4} height={72} label="Chargement des tickets…" />;
 
   const filterPills: { value: string; label: string }[] = [
     { value: '', label: 'Tous' },

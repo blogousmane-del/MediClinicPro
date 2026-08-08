@@ -3,6 +3,7 @@ import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
+import { SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
   Bell,
@@ -948,7 +949,9 @@ export const AccountingPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.length === 0 ? (
+                  {loading ? (
+                    <SkeletonTableRows rows={5} cols={7} label="Chargement des transactions…" />
+                  ) : payments.length === 0 ? (
                     <tr>
                       <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                         Aucune transaction enregistrée.

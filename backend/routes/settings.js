@@ -386,6 +386,16 @@ router.put('/clinic', auth, checkRole(['admin', 'manager']), async (req, res) =>
   }
 });
 
+// GET /api/settings/public/plans
+// Catalogue tarifaire seul, SANS authentification : la page d'accueil est vue
+// par des visiteurs déconnectés, qui recopiaient jusqu'ici les prix en dur
+// dans LandingPage.tsx — deux endroits à modifier lors d'une hausse de tarif,
+// donc une divergence garantie à terme. Ne renvoie que PLANS : aucune donnée
+// de clinique, rien qui ne soit déjà affiché sur la page tarifs.
+router.get('/public/plans', (req, res) => {
+  res.json({ plans: PLANS });
+});
+
 // GET /api/settings/plans
 // Plan catalog + this clinic's current plan/usage — powers the "Abonnez-vous"
 // tab's 3-card picker in Settings.

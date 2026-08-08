@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { api } from '../utils/api';
 import {
   ShieldCheck,
   Calendar,
@@ -37,10 +38,12 @@ const featurePills = [
   { icon: BarChart3, label: 'Rapports BI' }
 ];
 
-// Mirrors backend/utils/plans.js's PLANS — this page is logged-out (no
-// GET /settings/plans, which requires auth), so the real values are
-// snapshotted here rather than fetched. Keep in sync with plans.js if
-// pricing/limits change.
+// Repli hors ligne du catalogue. Les vrais chiffres sont chargés au montage
+// depuis GET /settings/public/plans, qui lit backend/utils/plans.js — seule
+// source de vérité des prix. Ces valeurs ne servent que si l'API est
+// injoignable : une page vitrine doit s'afficher même backend éteint, mais
+// elle ne doit jamais être la référence. Seuls badge/ctaLabel/note/highlight
+// sont réellement définis ici, ils n'existent pas côté backend.
 const pricingPlans: {
   id: 'starter' | 'clinique' | 'hopital';
   name: string;
@@ -71,10 +74,11 @@ const pricingPlans: {
   }
 ];
 
-// Same 6-row comparison shape as SettingsPage.tsx's billing tab — derived
-// from real plan data (staffLimit/allowedRoles/paymentMethods), not
-// copy-pasted marketing strings, so the Mobile Money row can't drift from
-// what's actually enforced.
+// Same comparison shape as SettingsPage.tsx's billing tab — derived from real
+// plan data (staffLimit/allowedRoles), not copy-pasted marketing strings, so
+// les lignes ne peuvent pas diverger de ce qui est réellement appliqué.
+// La ligne « Encaissements Mobile Money » a été retirée : elle annonçait un
+// encaissement patient en ligne que le passage à Chariow supprime.
 const buildPricingFeatureRows = (plan: (typeof pricingPlans)[number]): { label: string; ok: boolean }[] => {
   const staffLabel = plan.staffLimit === null
     ? 'Utilisateurs & rôles illimités'
@@ -84,8 +88,7 @@ const buildPricingFeatureRows = (plan: (typeof pricingPlans)[number]): { label: 
     { label: 'Patients & Dossiers illimités', ok: true },
     { label: 'Rendez-vous, Ordonnances & Pharmacie', ok: true },
     { label: 'Laboratoire & Comptabilité', ok: true },
-    { label: 'Paiement Espèces', ok: true },
-    { label: 'Encaissements Mobile Money', ok: plan.paymentMethods.includes('wave') }
+    { label: 'Paiement Espèces', ok: true }
   ];
 };
 
@@ -96,6 +99,36 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Catalogue réel (prix, limites) chargé depuis le backend. Un échec est
+  // silencieux et sans conséquence visible : on garde le repli ci-dessus
+  // plutôt que d'afficher une page tarifs vide ou un message d'erreur à un
+  // visiteur qui découvre le produit.
+  const [catalog, setCatalog] = useState<Record<string, any> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/settings/public/plans')
+      .then(data => { if (!cancelled) setCatalog(data.plans || null); })
+      .catch(() => { /* repli sur les valeurs statiques */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const effectivePlans = pricingPlans.map(plan => {
+    const live = catalog?.[plan.id];
+    if (!live) return plan;
+    return {
+      ...plan,
+      price: typeof live.price === 'number' ? live.price : plan.price,
+      staffLimit: live.staffLimit === null || typeof live.staffLimit === 'number' ? live.staffLimit : plan.staffLimit,
+      allowedRoles: live.allowedRoles === null || Array.isArray(live.allowedRoles) ? live.allowedRoles : plan.allowedRoles,
+      paymentMethods: Array.isArray(live.paymentMethods) ? live.paymentMethods : plan.paymentMethods
+    };
+  });
+
+  // Prix affiché dans la bannière « Un seul abonnement » du hero : celui du
+  // plan le plus complet, jamais une constante recopiée.
+  const fullAccessPrice = effectivePlans.find(p => p.id === 'hopital')?.price ?? 14500;
 
   // Scroll-reveal: fade/slide sections into view once as they enter the viewport
   useEffect(() => {
@@ -433,7 +466,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                   Un seul abonnement
                 </span>
                 <span style={{ fontSize: '0.825rem', fontWeight: 600, color: '#f8fafc', marginTop: '2px', display: 'block', lineHeight: 1.3 }}>
-                  Accès complet à tous les modules, 15 000 FCFA / mois
+                  Accès complet à tous les modules, {fullAccessPrice.toLocaleString('fr-FR')} FCFA / mois
                 </span>
               </div>
             </div>
@@ -516,7 +549,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
 
           <div className="landing-highlight">
             <Receipt size={22} color="#5eead4" style={{ marginBottom: '6px' }} />
-            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Paiement Mobile Money</div>
+            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Abonnement par Mobile Money ou carte</div>
           </div>
 
           <div className="landing-highlight">
@@ -648,7 +681,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
           </p>
 
           <div className="pricing-cards-grid" style={{ maxWidth: '960px', margin: '0 auto' }}>
-            {pricingPlans.map(plan => {
+            {effectivePlans.map(plan => {
               const featureRows = buildPricingFeatureRows(plan);
               return (
                 <div
@@ -753,13 +786,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             <div style={{ flex: 1, borderTop: '1px solid #e2e8f0' }} />
           </div>
 
-          {/* Payment Providers Row */}
+          {/* Payment Providers Row — moyens de paiement de L'ABONNEMENT (ce que
+              la clinique nous règle), pas de ce qu'elle encaisse auprès de ses
+              patients. N'annoncer ici que des opérateurs réellement activés sur
+              la boutique Chariow de l'exploitant : cette liste est une promesse
+              faite au visiteur, pas une décoration. */}
           <div className="landing-reveal" style={{ marginTop: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Accepté en Côte d'Ivoire via Mobile Money :</span>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Abonnement payable par Mobile Money ou carte bancaire :</span>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', fontWeight: 700, fontSize: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
               <span className="landing-payment-badge" style={{ backgroundColor: '#fff7ed', color: '#ea580c', padding: '5px 12px', borderRadius: '20px', border: '1px solid #ffedd5' }}>Orange Money</span>
               <span className="landing-payment-badge" style={{ backgroundColor: '#fefce8', color: '#ca8a04', padding: '5px 12px', borderRadius: '20px', border: '1px solid #fef08a' }}>MTN MoMo</span>
               <span className="landing-payment-badge" style={{ backgroundColor: '#f0f9ff', color: '#0284c7', padding: '5px 12px', borderRadius: '20px', border: '1px solid #e0f2fe' }}>Wave</span>
+              <span className="landing-payment-badge" style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', padding: '5px 12px', borderRadius: '20px', border: '1px solid #ede9fe' }}>Carte bancaire</span>
             </div>
           </div>
         </div>

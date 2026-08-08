@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { SkeletonPage } from '../../components/Skeleton';
 import {
   ArrowLeft,
   User,
@@ -365,8 +366,8 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: 'var(--text-secondary)' }}>
-        Chargement du dossier patient...
+      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <SkeletonPage cards={3} label="Chargement du dossier patient…" />
       </div>
     );
   }

@@ -9,6 +9,8 @@ const { JWT_SECRET, auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { computeEffectiveAvailability } = require('../utils/schedule');
 const { getPlan, isRoleAllowedForPlan, isStaffLimitReached } = require('../utils/plans');
+const { getSettings } = require('../utils/platformSettings');
+const { recordLoginFailure, REASONS } = require('../utils/loginFailures');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
@@ -43,9 +45,13 @@ router.post('/register', async (req, res) => {
     }
 
     // Create Clinic
+    // La durée d'essai est pilotable depuis Platform Admin > Config. système ;
+    // repli sur plans.js si la table platform_settings n'existe pas encore.
     const starterPlan = getPlan('starter');
+    const { values: platformValues } = await getSettings();
+    const trialDays = platformValues.starter_trial_days || starterPlan.trialDays;
     const trialExpiry = new Date();
-    trialExpiry.setDate(trialExpiry.getDate() + starterPlan.trialDays);
+    trialExpiry.setDate(trialExpiry.getDate() + trialDays);
 
     const { data: clinicData, error: clinicError } = await supabase
       .from('clinics')
@@ -147,11 +153,18 @@ router.post('/login', async (req, res) => {
 
     if (userError) throw userError;
     if (!user) {
+      // Motif enregistré côté serveur UNIQUEMENT — le message client reste
+      // identique dans tous les cas, sinon la route devient un oracle
+      // indiquant quels emails existent.
+      await recordLoginFailure({ email, reason: REASONS.UNKNOWN_OR_INACTIVE, ip: req.ip });
       return res.status(400).json({ error: "Identifiants invalides." });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
+      await recordLoginFailure({
+        email, clinicId: user.clinic_id, reason: REASONS.BAD_PASSWORD, ip: req.ip
+      });
       return res.status(400).json({ error: "Identifiants invalides." });
     }
 
@@ -263,9 +276,12 @@ router.post('/google', async (req, res) => {
       // by the existing onboarding flow (triggered whenever clinic.address is empty).
       isNewAccount = true;
 
+      // Même réglage pilotable qu'à l'inscription classique, même repli.
       const starterPlan = getPlan('starter');
+      const { values: platformValues } = await getSettings();
+      const trialDays = platformValues.starter_trial_days || starterPlan.trialDays;
       const trialExpiry = new Date();
-      trialExpiry.setDate(trialExpiry.getDate() + starterPlan.trialDays);
+      trialExpiry.setDate(trialExpiry.getDate() + trialDays);
 
       const { data: clinicData, error: clinicError } = await supabase
         .from('clinics')
@@ -355,6 +371,20 @@ router.get('/me', auth, async (req, res) => {
 
     if (clinicError) throw clinicError;
 
+    // Bandeau de maintenance piloté depuis Platform Admin > Config. système.
+    // Sort ici plutôt que sur une route dédiée : /auth/me est déjà appelée au
+    // montage par AuthContext, donc aucun appel réseau ni sondage en plus.
+    // Texte brut — jamais rendu en HTML côté client.
+    let maintenanceMessage = '';
+    try {
+      const { values: platformValues } = await getSettings();
+      maintenanceMessage = platformValues.maintenance_message || '';
+    } catch (settingsError) {
+      // Un réglage illisible ne doit jamais empêcher un utilisateur de charger
+      // son profil : sans bandeau, l'app fonctionne normalement.
+      console.error('[AUTH] Lecture des réglages plateforme impossible:', settingsError);
+    }
+
     res.json({
       user: {
         id: user.id,
@@ -365,7 +395,8 @@ router.get('/me', auth, async (req, res) => {
         passwordSet: user.password_set,
         availabilityStatus: computeEffectiveAvailability(user)
       },
-      clinic
+      clinic,
+      maintenanceMessage
     });
   } catch (error) {
     console.error("Get Me Error:", error);

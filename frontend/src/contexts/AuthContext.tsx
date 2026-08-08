@@ -25,6 +25,8 @@ export interface Clinic {
 interface AuthContextType {
   user: User | null;
   clinic: Clinic | null;
+  /** Bandeau piloté depuis Platform Admin > Config. système. Vide = aucun bandeau. */
+  maintenanceMessage: string;
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -49,6 +51,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
 
   const refreshProfile = async () => {
@@ -64,11 +67,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await api.get('/auth/me');
       setUser(data.user);
       setClinic(data.clinic);
+      setMaintenanceMessage(data.maintenanceMessage || '');
     } catch (error) {
       console.error("Token verification failed. Logging out.", error);
       localStorage.removeItem('mediclinic_token');
       setUser(null);
       setClinic(null);
+      setMaintenanceMessage('');
     } finally {
       setLoading(false);
     }
@@ -186,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         clinic,
+        maintenanceMessage,
         isAuthenticated: !!user,
         loading,
         login,

@@ -47,12 +47,19 @@ const PLANS = {
     allowedRoles: null,
     paymentMethods: ['cash', 'wave', 'orange_money', 'mtn_momo'],
     tagline: 'La solution complète, sans limites',
+    // « Encaissements Mobile Money » a été retiré de cette liste : cet argument
+    // décrivait ce que la clinique encaisse auprès de ses patients, capacité
+    // supprimée par le passage à Chariow (voir
+    // docs/superpowers/specs/2026-08-08-chariow-integration-design.md).
+    // paymentMethods ci-dessus n'est volontairement pas encore modifié — le
+    // retrait fonctionnel est une tâche distincte ; seule la promesse
+    // commerciale disparaît, en avance, pour ne rien vendre qui va cesser
+    // d'exister.
     features: [
       'Utilisateurs & rôles illimités',
       'Patients & Dossiers illimités',
       'Rendez-vous, Ordonnances & Pharmacie',
-      'Laboratoire & Comptabilité',
-      'Encaissements Mobile Money (Wave, Orange Money, MTN)'
+      'Laboratoire & Comptabilité'
     ]
   }
 };
