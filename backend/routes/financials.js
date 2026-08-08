@@ -3,8 +3,7 @@ const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
-const { initiateCheckoutWithFailover } = require('../services/payments');
-const paypal = require('../services/payments/paypal');
+const chariow = require('../services/payments/chariow');
 const { getPlan, isPaymentMethodAllowed } = require('../utils/plans');
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
@@ -300,15 +299,16 @@ router.get('/stats', auth, async (req, res) => {
 });
 
 // POST /api/financials/subscription/checkout
-// Real Mobile Money / card subscription renewal. Creates a pending
-// subscription_payments row and returns a hosted checkout URL — the clinic's
-// subscription is only extended once the provider's webhook confirms payment.
+// Renouvellement d'abonnement via Chariow — seul canal depuis le retrait de
+// Bictorys/PayTech/PayPal de l'initiation (leurs webhooks restent montés pour
+// les paiements déjà en vol). Crée une ligne subscription_payments 'pending'
+// et renvoie l'URL de la page hébergée : le plan de la clinique n'est basculé
+// qu'à la confirmation, par services/payments/chariowReconcile.js.
 router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, res) => {
   try {
-    const { months, phoneNumber, planId, provider } = req.body;
-    // PayPal est une alternative explicite, pas un maillon de la chaîne de
-    // failover Bictorys->PayTech : l'admin choisit, aucun repli automatique.
-    const useProvider = provider === 'paypal' ? 'paypal' : 'mobile_money';
+    // Les trois champs téléphone arrivent ensemble et non nettoyés : c'est
+    // l'adaptateur qui normalise (Chariow refuse un E.164 brut).
+    const { months, planId, phone, phoneCountry, phoneLocal } = req.body;
     const qtyMonths = parseInt(months, 10);
 
     if (![1, 3, 6, 12].includes(qtyMonths)) {
@@ -322,8 +322,8 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       .single();
     if (clinicError) throw clinicError;
 
-    // Defaults to a renewal of the clinic's current plan; starter (free) never
-    // goes through paid checkout — use PUT /settings/plan instead.
+    // Par défaut, renouvellement du plan courant. Starter est gratuit et ne
+    // passe jamais par un paiement.
     const targetPlanId = planId || clinic.plan;
     if (targetPlanId === 'starter') {
       return res.status(400).json({ error: "Le plan Starter est gratuit — activez-le depuis Abonnez-vous, sans paiement." });
@@ -332,8 +332,9 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       return res.status(400).json({ error: "Plan d'abonnement invalide." });
     }
 
-    // Switching tier (not just renewing the same one) — make sure the clinic's
-    // current staff actually fits the target plan before taking payment.
+    // Changement de palier : on vérifie que l'effectif actuel tient dans le
+    // plan visé AVANT d'encaisser, pour ne pas facturer un basculement qui
+    // laisserait la clinique hors limites.
     if (targetPlanId !== clinic.plan) {
       const targetPlan = getPlan(targetPlanId);
       if (targetPlan.staffLimit !== null) {
@@ -350,17 +351,19 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       }
     }
 
-    // Le numéro ne sert qu'au Mobile Money (pré-remplissage de la page hébergée
-    // Bictorys/PayTech). Le front envoie le même champ quel que soit le bouton
-    // cliqué : sans cette exclusion, un numéro mal saisi faisait échouer un
-    // paiement PayPal qui n'en fait aucun usage.
-    let normalizedPhone;
-    if (phoneNumber && useProvider !== 'paypal') {
-      const phoneCheck = validateAndNormalizePhone(phoneNumber);
-      if (!phoneCheck.valid) {
-        return res.status(400).json({ error: phoneCheck.error });
-      }
-      normalizedPhone = phoneCheck.e164;
+    if (!(await chariow.isConfigured())) {
+      return res.status(502).json({ error: "Le paiement en ligne n'est pas configuré pour cette installation. Contactez le support MediClinic." });
+    }
+
+    const config = await chariow.loadConfig();
+    const productId = chariow.productIdFor(config.products, targetPlanId, qtyMonths);
+    if (!productId) {
+      // Message nommant la combinaison manquante : c'est celui qu'un
+      // exploitant lira à 2 h du matin, « paiement indisponible » ne
+      // l'aiderait pas.
+      return res.status(502).json({
+        error: `Aucun produit Chariow n'est associé à la combinaison ${targetPlanId}_${qtyMonths}. Configurez-la dans Administration plateforme → Config. système → Chariow.`
+      });
     }
 
     const { data: adminUser } = await supabase
@@ -379,104 +382,90 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
         plan: targetPlanId,
         months: qtyMonths,
         amount,
-        provider: 'pending',
+        provider: 'chariow',
         status: 'pending'
       })
       .select()
       .single();
     if (insertError) throw insertError;
 
-    const checkoutDescription = `Abonnement MediClinic ${getPlan(targetPlanId).name} — ${clinic.name} (${qtyMonths} mois)`;
+    // Chariow exige un prénom ET un nom. Un nom unique est dédoublé plutôt
+    // qu'accompagné d'une chaîne vide, que l'API refuse.
+    const [firstName, ...restName] = String(adminUser?.name || clinic.name || 'Clinique').trim().split(/\s+/);
 
-    let checkout;
-    if (useProvider === 'paypal') {
-      if (!paypal.isConfigured()) {
-        await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
-        // 502 et non 400 : un fournisseur non configuré est une indisponibilité
-        // côté serveur, pas une erreur de saisie du client — même code que la
-        // branche Mobile Money ci-dessous.
-        return res.status(502).json({ error: "Le paiement PayPal n'est pas configuré pour cette installation. Utilisez le Mobile Money ou contactez le support MediClinic." });
-      }
-      checkout = await paypal.initiateCheckout({
-        amount,
-        description: checkoutDescription,
-        reference: `sub-${subPayment.id}`,
-        // Le retour pointe vers l'API, pas vers le front : cette URL déclenche
-        // la capture côté serveur avant de renvoyer le navigateur dans l'app.
-        returnUrl: `${API_PUBLIC_URL}/api/webhooks/paypal/return`,
-        cancelUrl: `${APP_URL}/`,
-        customerEmail: adminUser?.email
-      });
-    } else {
-      checkout = await initiateCheckoutWithFailover(
-        {
-          amount,
-          currency: 'XOF',
-          description: checkoutDescription,
-          reference: `sub-${subPayment.id}`,
-          returnUrl: `${APP_URL}/`,
-          cancelUrl: `${APP_URL}/`,
-          customerName: adminUser?.name || clinic.name,
-          customerEmail: adminUser?.email,
-          customerPhone: normalizedPhone
-        },
-        { itemName: 'Abonnement MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
-      );
-    }
+    const checkout = await chariow.createCheckout({
+      productId,
+      email: adminUser?.email,
+      firstName: firstName || 'Clinique',
+      lastName: restName.join(' ') || firstName || 'MediClinic',
+      phone: chariow.resolveChariowPhone({ phone, phoneCountry, phoneLocal }),
+      redirectUrl: `${APP_URL}/?checkout=chariow&sub=${subPayment.id}`,
+      metadata: { clinicId: req.user.clinicId, subscriptionPaymentId: subPayment.id }
+    });
 
     if (!checkout.ok) {
       await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
       return res.status(502).json({ error: checkout.error });
     }
 
-    const checkoutUpdate = {
-      provider: checkout.provider,
-      provider_reference: checkout.providerReference,
-      checkout_url: checkout.checkoutUrl
-    };
-    if (checkout.provider === 'paypal') {
-      // Montant USD réellement proposé à PayPal, figé ici : la vérification du
-      // webhook s'appuiera dessus au lieu de reconvertir au XOF_TO_USD_RATE en
-      // vigueur à la réception, qui peut avoir changé entre-temps.
-      checkoutUpdate.amount_usd = paypal.xofToUsd(amount);
+    // Contrôle du prix RÉELLEMENT débité. Chariow facture le prix de son
+    // produit, jamais un montant que nous lui transmettons : un produit mal
+    // rattaché vendrait douze mois au prix d'un sans qu'aucun signal ne se
+    // déclenche. On refuse plutôt que d'encaisser le mauvais montant.
+    if (checkout.amount.currency !== 'XOF') {
+      await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
+      return res.status(502).json({ error: `Le produit Chariow est libellé en ${checkout.amount.currency} : seul le XOF est accepté.` });
+    }
+    if (!Number.isFinite(checkout.amount.value) || Math.abs(checkout.amount.value - amount) > amount * 0.02) {
+      await supabase.from('subscription_payments').update({ status: 'failed' }).eq('id', subPayment.id);
+      return res.status(502).json({
+        error: `Le montant du produit Chariow (${checkout.amount.value} FCFA) ne correspond pas au prix attendu (${amount} FCFA) pour ${targetPlanId}_${qtyMonths}. Corrigez le produit dans la boutique avant d'encaisser.`
+      });
     }
 
-    const { error: checkoutUpdateError } = await supabase
+    await supabase
       .from('subscription_payments')
-      .update(checkoutUpdate)
+      .update({ provider_reference: checkout.saleId, checkout_url: checkout.checkoutUrl })
       .eq('id', subPayment.id);
-
-    if (checkoutUpdateError) {
-      // Colonne inexistante. amount_usd est une migration encore en attente
-      // d'exécution manuelle sur la base live (voir la section « schema drift »
-      // de CLAUDE.md) : on rejoue sans elle plutôt que de faire échouer un
-      // paiement déjà initié chez PayPal. La vérification webhook retombera sur
-      // la reconversion au taux courant.
-      // Deux codes, pas un : PostgREST refuse une colonne inconnue présente dans
-      // le CORPS d'un UPDATE avec PGRST204 (cache de schéma), avant que Postgres
-      // ne voie la requête. 42703 n'apparaît que pour un SELECT/filtre.
-      if (['42703', 'PGRST204'].includes(checkoutUpdateError.code) && checkoutUpdate.amount_usd !== undefined) {
-        console.error("[FINANCIALS] Colonne subscription_payments.amount_usd absente (migration à exécuter) — enregistrement sans le montant USD.");
-        delete checkoutUpdate.amount_usd;
-        const { error: retryError } = await supabase
-          .from('subscription_payments')
-          .update(checkoutUpdate)
-          .eq('id', subPayment.id);
-        if (retryError) console.error('[FINANCIALS] Échec de mise à jour du paiement d\'abonnement:', retryError);
-      } else {
-        console.error('[FINANCIALS] Échec de mise à jour du paiement d\'abonnement:', checkoutUpdateError);
-      }
-    }
 
     res.status(201).json({
       success: true,
       subscriptionPaymentId: subPayment.id,
       checkoutUrl: checkout.checkoutUrl,
-      provider: checkout.provider
+      provider: 'chariow'
     });
   } catch (error) {
     console.error("Subscription checkout error:", error);
     res.status(500).json({ error: "Erreur lors de l'initialisation du paiement d'abonnement." });
+  }
+});
+
+// POST /api/financials/subscription/verify
+// Interrogée par la page d'abonnement au retour de Chariow. Elle ne décide
+// rien : elle relaie vers la réconciliation, seule habilitée à créditer, qui
+// redemande elle-même le statut au fournisseur.
+router.post('/subscription/verify', auth, checkRole(['admin']), async (req, res) => {
+  try {
+    const id = parseInt(req.body.subscriptionPaymentId, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Identifiant de paiement invalide.' });
+
+    // Périmètre clinique vérifié AVANT tout appel sortant : cette route ne
+    // doit pas permettre de sonder les paiements d'une autre clinique, ni de
+    // déclencher un appel vers Chariow pour une ligne qui ne nous regarde pas.
+    const { data: row } = await supabase
+      .from('subscription_payments')
+      .select('id, clinic_id')
+      .eq('id', id)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+    if (!row) return res.status(404).json({ error: 'Paiement introuvable.' });
+
+    const { reconcileChariowSubscription } = require('../services/payments/chariowReconcile');
+    const result = await reconcileChariowSubscription(id);
+    res.json({ status: result.status });
+  } catch (error) {
+    console.error("[FINANCIALS] Erreur de vérification d'abonnement:", error);
+    res.status(500).json({ error: 'Erreur lors de la vérification du paiement.' });
   }
 });
 

@@ -209,34 +209,29 @@ test('devise autre que USD : refusée', async () => {
 // ==========================================================================
 // Checkout d'abonnement (POST /api/financials/subscription/checkout)
 // ==========================================================================
-test('checkout PayPal : un téléphone invalide ne bloque pas le paiement', async () => {
-  // Le formulaire envoie le même champ téléphone quel que soit le bouton
-  // cliqué, mais PayPal n'en fait aucun usage.
+// Les deux tests qui vivaient ici couvraient la branche `provider` du checkout
+// d'abonnement (PayPal contre Mobile Money). Cette branche a été retirée :
+// l'abonnement passe désormais exclusivement par Chariow
+// (docs/superpowers/specs/2026-08-08-chariow-integration-design.md). Le reste
+// de ce fichier — vérification de montant du webhook, contrôle de propriété de
+// la commande sur /webhooks/paypal/return — reste valide et doit le rester :
+// un paiement PayPal lancé avant la bascule doit encore pouvoir se créditer.
+test("le checkout d'abonnement ne repart jamais vers PayPal, même si on le demande", async () => {
   resetDb();
   db.clinics.push({ id: 1, name: 'Clinique Test', plan: 'hopital' });
   db.users.push({ id: 1, clinic_id: 1, name: 'Admin Test', email: 'admin@test.ci' });
 
   const res = await postJson('/api/financials/subscription/checkout', {
     months: 1,
-    provider: 'paypal',
-    phoneNumber: 'pas-un-numero'
-  });
-
-  assert.strictEqual(res.status, 201, await res.text());
-});
-
-test('checkout Mobile Money : un téléphone invalide est refusé', async () => {
-  resetDb();
-  db.clinics.push({ id: 1, name: 'Clinique Test', plan: 'hopital' });
-  db.users.push({ id: 1, clinic_id: 1, name: 'Admin Test', email: 'admin@test.ci' });
-
-  const res = await postJson('/api/financials/subscription/checkout', {
-    months: 1,
-    provider: 'mobile_money',
-    phoneNumber: 'pas-un-numero'
+    provider: 'paypal'
   });
   const body = await res.text();
 
-  assert.strictEqual(res.status, 400);
-  assert.match(body, /num(é|e)ro|t(é|e)l(é|e)phone/i, 'le motif du refus doit bien être le téléphone');
+  assert.notStrictEqual(res.status, 201, 'aucun checkout PayPal ne doit plus être créé');
+  assert.strictEqual(body.includes('paypal.com'), false, "aucune URL d'approbation PayPal ne doit sortir");
+  assert.strictEqual(
+    db.subscription_payments.length,
+    0,
+    "aucune ligne de paiement ne doit être créée tant que Chariow n'est pas configuré"
+  );
 });
