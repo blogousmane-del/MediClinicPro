@@ -78,22 +78,44 @@ async function fulfillSubscriptionEvent(provider, id, event) {
     return;
   }
 
+  const paidAt = new Date().toISOString();
+
   const { data: updated } = await supabase
     .from('subscription_payments')
-    .update({ status: 'paid', paid_at: new Date().toISOString(), provider })
+    .update({ status: 'paid', paid_at: paidAt, provider })
     .eq('id', id)
     .eq('status', 'pending')
     .select()
     .maybeSingle();
   if (!updated) return; // already fulfilled by a concurrent/duplicate webhook
 
+  await creditSubscription(row, { provider, paidAt });
+}
+
+/**
+ * Crédite un abonnement dont le paiement est DÉJÀ prouvé et dont la ligne est
+ * déjà passée à 'paid' : prolonge l'échéance, bascule le plan, journalise.
+ * Cette fonction ne décide rien — l'appelant a fait la vérification.
+ *
+ * `paidAt` est un paramètre et non `new Date()` en dur : la réconciliation
+ * Chariow rattrape des paiements plusieurs jours après leur règlement et doit
+ * pouvoir passer la date du fournisseur, sinon la recette est datée du jour du
+ * rattrapage. Les webhooks Bictorys/PayTech/PayPal, eux, arrivent en direct et
+ * continuent de passer l'heure courante.
+ *
+ * @param {object} row - ligne subscription_payments
+ * @param {{provider: string, paidAt: string}} context - date ISO du règlement
+ */
+async function creditSubscription(row, { provider, paidAt }) {
   const { data: clinic } = await supabase
     .from('clinics')
     .select('subscription_expires_at, subscription_status')
     .eq('id', row.clinic_id)
     .single();
 
-  let baseDate = new Date();
+  // L'échéance repart de la date d'expiration en cours si elle est future :
+  // un renouvellement anticipé ne doit pas effacer les jours restants.
+  let baseDate = new Date(paidAt);
   if (clinic?.subscription_status === 'active' && clinic.subscription_expires_at) {
     const currentExpiry = new Date(clinic.subscription_expires_at);
     if (currentExpiry > baseDate) baseDate = currentExpiry;
@@ -389,3 +411,6 @@ router.post('/paypal', async (req, res) => {
 });
 
 module.exports = router;
+// Exporté pour services/payments/chariowReconcile.js, seul autre endroit
+// autorisé à créditer un abonnement.
+module.exports.creditSubscription = creditSubscription;
