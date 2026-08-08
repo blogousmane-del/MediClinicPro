@@ -17,6 +17,15 @@ process.env.UPSTASH_REDIS_REST_TOKEN = '';
 
 stubModule('database.js', { supabase: makeSupabaseStub() });
 stubModule('middleware/auth.js', authStub());
+
+// Le stub enregistre la cle qu'on lui presente : c'est ce qui permet de
+// verifier que la validation se fait AVANT l'ecriture en base.
+let probeResponse = { ok: true, products: [] };
+const probedKeys = [];
+stubModule('services/payments/chariow.js', {
+  listProducts: async ({ apiKey } = {}) => { probedKeys.push(apiKey); return probeResponse; },
+  clearConfigCache: () => {}
+});
 stubModule('middleware/superAdmin.js', {
   superAdminOnly: (_req, _res, next) => next(),
   SUPER_ADMIN_EMAILS: ['ops@test.ci']
@@ -161,6 +170,52 @@ test('la correspondance produits accepte les combinaisons valides', async () => 
   assert.strictEqual(res.status, 200);
   const stored = JSON.parse(db.platform_settings.find((r) => r.key === 'chariow_products').value);
   assert.strictEqual(stored.hopital_12, 'prod_h12');
+});
+
+test('une cle refusee par Chariow n est PAS enregistree', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  probedKeys.length = 0;
+  probeResponse = { ok: false, error: 'Chariow a refusé la requête (401) : Unauthorized' };
+
+  const res = await putConfig({ chariow_api_key: 'sk_fausse' });
+
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /rien n'a été enregistré/i);
+  assert.deepStrictEqual(probedKeys, ['sk_fausse'], 'la cle candidate est testee telle quelle');
+  // Le coeur du correctif : sans ca, GET /config annoncerait « configurée »
+  // pour une cle que Chariow rejette, et l'exploitant chercherait la panne
+  // partout sauf la ou elle est.
+  assert.strictEqual(
+    db.platform_settings.some((r) => r.key === 'chariow_api_key'),
+    false,
+    'aucune ligne ne doit subsister pour une cle refusee'
+  );
+});
+
+test('une boutique dans une autre devise que le XOF est refusee sans ecriture', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  probeResponse = { ok: true, products: [{ id: 'prd_1', name: 'Abo', price: 9000, currency: 'USD' }] };
+
+  const res = await putConfig({ chariow_api_key: 'sk_usd' });
+
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /USD/);
+  assert.strictEqual(db.platform_settings.some((r) => r.key === 'chariow_api_key'), false);
+});
+
+test('une cle acceptee est enregistree chiffree', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  probeResponse = { ok: true, products: [{ id: 'prd_1', name: 'Abo', price: 9000, currency: 'XOF' }] };
+
+  const res = await putConfig({ chariow_api_key: 'sk_valide' });
+
+  assert.strictEqual(res.status, 200);
+  const row = db.platform_settings.find((r) => r.key === 'chariow_api_key');
+  assert.ok(row, 'la cle valide est bien enregistree');
+  assert.strictEqual(row.value.includes('sk_valide'), false, 'jamais en clair');
 });
 
 test('une adresse de produit collee entiere est ramenee a son identifiant', async () => {

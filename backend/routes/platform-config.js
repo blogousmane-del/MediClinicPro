@@ -222,25 +222,27 @@ router.put('/config', async (req, res) => {
       const apiKey = String(req.body.chariow_api_key).trim();
       if (!apiKey) return res.status(400).json({ error: 'La clé API Chariow est vide.' });
 
+      // Validation en conditions réelles AVANT toute écriture. L'ordre inverse
+      // laissait en base une clé que Chariow venait de refuser, et l'écran
+      // l'annonçait « configurée » puisque GET /config ne fait que constater la
+      // présence d'une ligne — un état qui ment est pire qu'une absence d'état.
+      // Le même appel sert à vérifier que la boutique règle bien en XOF.
+      const probe = await chariow.listProducts({ apiKey });
+      if (!probe.ok) {
+        return res.status(400).json({ error: `Clé refusée par Chariow, rien n'a été enregistré : ${probe.error}` });
+      }
+      const foreign = probe.products.find((p) => p.currency && p.currency !== 'XOF');
+      if (foreign) {
+        return res.status(400).json({
+          error: `La boutique Chariow règle en ${foreign.currency}. Cette intégration n'accepte que le XOF : MediClinic facture en FCFA et ne peut pas vérifier un montant dans une autre devise. Rien n'a été enregistré.`
+        });
+      }
+
       const written = await setSecret('chariow_api_key', apiKey, req.user.userId);
       if (!written.ok) {
         return res.status(written.tableMissing ? 503 : 400).json({ error: written.error });
       }
       chariow.clearConfigCache();
-
-      // Validation en conditions réelles : une clé fausse doit être rejetée
-      // maintenant, pas au premier client qui tente de payer. Le même appel
-      // sert à vérifier que la boutique règle bien en XOF.
-      const probe = await chariow.listProducts();
-      if (!probe.ok) {
-        return res.status(400).json({ error: `Clé enregistrée mais refusée par Chariow : ${probe.error}` });
-      }
-      const foreign = probe.products.find((p) => p.currency && p.currency !== 'XOF');
-      if (foreign) {
-        return res.status(400).json({
-          error: `La boutique Chariow règle en ${foreign.currency}. Cette intégration n'accepte que le XOF : MediClinic facture en FCFA et ne peut pas vérifier un montant dans une autre devise.`
-        });
-      }
 
       await supabase.from('activity_logs').insert({
         clinic_id: req.user.clinicId,

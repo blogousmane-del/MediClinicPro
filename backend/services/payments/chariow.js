@@ -132,13 +132,18 @@ async function chariowFetch(pathname, init, apiKey, apiUrl) {
   }
 }
 
-async function callChariow(pathname, init) {
+// `overrides.apiKey` sert à tester une clé AVANT de l'enregistrer : la console
+// de configuration doit pouvoir rejeter une clé fausse sans l'avoir d'abord
+// écrite en base, sinon l'écran l'annonce « configurée » alors que Chariow la
+// refuse.
+async function callChariow(pathname, init, overrides = {}) {
   const config = await loadConfig();
-  if (!config.apiKey) return { ok: false, error: "La clé API Chariow n'est pas configurée." };
+  const apiKey = overrides.apiKey || config.apiKey;
+  if (!apiKey) return { ok: false, error: "La clé API Chariow n'est pas configurée." };
 
   let res;
   try {
-    res = await chariowFetch(pathname, init, config.apiKey, config.apiUrl);
+    res = await chariowFetch(pathname, init, apiKey, config.apiUrl);
   } catch (err) {
     return { ok: false, error: `Erreur réseau vers Chariow : ${err.message}` };
   }
@@ -222,8 +227,8 @@ async function getSale(saleId) {
  * l'enregistrement et à peupler la liste de l'écran de configuration.
  * @returns {Promise<{ok: true, products: {id: string, name: string, price: number, currency: string}[]} | {ok: false, error: string}>}
  */
-async function listProducts() {
-  const call = await callChariow('/products', { method: 'GET' });
+async function listProducts(overrides = {}) {
+  const call = await callChariow('/products', { method: 'GET' }, overrides);
   if (!call.ok) return call;
   const rows = Array.isArray(call.data) ? call.data : call.data.products || [];
   return {
