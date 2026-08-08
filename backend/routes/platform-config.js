@@ -41,9 +41,16 @@ const CHARIOW_PRODUCT_KEYS = PLAN_IDS
 function normalizeProductId(raw) {
   let value = String(raw || '').trim();
   if (!value) return '';
-  if (/^https?:\/\//i.test(value)) {
+
+  // Le préfixe est ajouté quand il manque : copier depuis la barre d'adresse
+  // rend souvent « boutique.mychariow.co/prd_x » sans schéma, et sans ce
+  // rattrapage la valeur partirait entière comme product_id. La condition
+  // reste étroite — un identifiant nu ne contient ni point ni barre oblique.
+  const looksLikeUrl = /^https?:\/\//i.test(value) || (value.includes('/') && value.includes('.'));
+  if (looksLikeUrl) {
     try {
-      const segments = new URL(value).pathname.split('/').filter(Boolean);
+      const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+      const segments = new URL(withScheme).pathname.split('/').filter(Boolean);
       value = segments.length ? segments[segments.length - 1] : '';
     } catch {
       return '';
@@ -162,6 +169,7 @@ router.put('/config', async (req, res) => {
     }
 
     let webhookUrl; // renvoyé UNE SEULE FOIS, à la génération du secret
+    const warnings = []; // signalements qui n'empêchent pas l'enregistrement
 
     if (req.body.chariow_api_url !== undefined) {
       const url = String(req.body.chariow_api_url).trim();
@@ -231,11 +239,25 @@ router.put('/config', async (req, res) => {
       if (!probe.ok) {
         return res.status(400).json({ error: `Clé refusée par Chariow, rien n'a été enregistré : ${probe.error}` });
       }
-      const foreign = probe.products.find((p) => p.currency && p.currency !== 'XOF');
-      if (foreign) {
+      // Contrôle de devise volontairement souple. Une boutique Chariow peut
+      // vendre autre chose que MediClinic : refuser la clé parce qu'un produit
+      // sans rapport est en euros bloquerait un exploitant parfaitement en
+      // règle. Seuls les 8 produits rattachés doivent être en XOF, et c'est le
+      // checkout qui l'impose, en relisant le prix réellement facturé.
+      // Un catalogue non vide où AUCUN produit n'est en XOF reste refusé : là,
+      // la boutique n'est manifestement pas configurée pour ce marché.
+      const withCurrency = probe.products.filter((p) => p.currency);
+      const xof = withCurrency.filter((p) => p.currency === 'XOF');
+      if (withCurrency.length && !xof.length) {
         return res.status(400).json({
-          error: `La boutique Chariow règle en ${foreign.currency}. Cette intégration n'accepte que le XOF : MediClinic facture en FCFA et ne peut pas vérifier un montant dans une autre devise. Rien n'a été enregistré.`
+          error: `Aucun produit de cette boutique Chariow n'est libellé en XOF (vu : ${[...new Set(withCurrency.map((p) => p.currency))].join(', ')}). MediClinic facture en FCFA. Rien n'a été enregistré.`
         });
+      }
+      const foreign = withCurrency.filter((p) => p.currency !== 'XOF');
+      if (foreign.length) {
+        warnings.push(
+          `${foreign.length} produit(s) de la boutique ne sont pas en XOF. Ils sont sans effet tant qu'ils ne sont pas rattachés à un plan, mais un rattachement par erreur ferait refuser le paiement.`
+        );
       }
 
       const written = await setSecret('chariow_api_key', apiKey, req.user.userId);
@@ -282,7 +304,12 @@ router.put('/config', async (req, res) => {
 
     const settings = await getSettings();
     chariow.clearConfigCache();
-    res.json({ success: true, values: settings.values, ...(webhookUrl ? { webhookUrl } : {}) });
+    res.json({
+      success: true,
+      values: settings.values,
+      ...(webhookUrl ? { webhookUrl } : {}),
+      ...(warnings.length ? { warnings } : {})
+    });
   } catch (error) {
     console.error('[PLATFORM-CONFIG] Erreur de mise à jour:', error);
     res.status(500).json({ error: 'Erreur lors de la mise à jour de la configuration.' });

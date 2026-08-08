@@ -193,7 +193,7 @@ test('une cle refusee par Chariow n est PAS enregistree', async () => {
   );
 });
 
-test('une boutique dans une autre devise que le XOF est refusee sans ecriture', async () => {
+test('une boutique sans aucun produit en XOF est refusee sans ecriture', async () => {
   process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
   resetDb();
   probeResponse = { ok: true, products: [{ id: 'prd_1', name: 'Abo', price: 9000, currency: 'USD' }] };
@@ -203,6 +203,43 @@ test('une boutique dans une autre devise que le XOF est refusee sans ecriture', 
   assert.strictEqual(res.status, 400);
   assert.match((await res.json()).error, /USD/);
   assert.strictEqual(db.platform_settings.some((r) => r.key === 'chariow_api_key'), false);
+});
+
+test('une boutique mixte est acceptee, avec un avertissement', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  // Une boutique Chariow peut vendre autre chose que MediClinic. Refuser la
+  // cle parce qu'un produit sans rapport est en euros bloquerait un exploitant
+  // parfaitement en regle : seuls les 8 produits rattaches doivent etre en XOF,
+  // et c'est le checkout qui l'impose.
+  probeResponse = {
+    ok: true,
+    products: [
+      { id: 'prd_1', name: 'Abo Clinique', price: 9000, currency: 'XOF' },
+      { id: 'prd_2', name: 'Ebook sans rapport', price: 12, currency: 'EUR' }
+    ]
+  };
+
+  const res = await putConfig({ chariow_api_key: 'sk_mixte' });
+  const body = await res.json();
+
+  assert.strictEqual(res.status, 200);
+  assert.ok(db.platform_settings.some((r) => r.key === 'chariow_api_key'), 'la cle est enregistree');
+  assert.strictEqual(body.warnings.length, 1);
+  assert.match(body.warnings[0], /pas en XOF/);
+});
+
+test('un catalogue vide n empeche pas d enregistrer la cle', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  // Cas normal de premiere configuration : la cle est saisie avant que les
+  // produits n'existent.
+  probeResponse = { ok: true, products: [] };
+
+  const res = await putConfig({ chariow_api_key: 'sk_vide' });
+
+  assert.strictEqual(res.status, 200);
+  assert.ok(db.platform_settings.some((r) => r.key === 'chariow_api_key'));
 });
 
 test('une cle acceptee est enregistree chiffree', async () => {
@@ -226,6 +263,8 @@ test('une adresse de produit collee entiere est ramenee a son identifiant', asyn
   const res = await putConfig({
     chariow_products: {
       clinique_1: 'https://vwtjlajd.mychariow.co/prd_tn4e8e01',
+      // Copier depuis la barre d'adresse rend souvent l'URL sans son schema.
+      clinique_3: 'vwtjlajd.mychariow.co/prd_sansschema',
       hopital_12: '  prd_h12  '
     }
   });
@@ -233,7 +272,22 @@ test('une adresse de produit collee entiere est ramenee a son identifiant', asyn
   assert.strictEqual(res.status, 200);
   const stored = JSON.parse(db.platform_settings.find((r) => r.key === 'chariow_products').value);
   assert.strictEqual(stored.clinique_1, 'prd_tn4e8e01');
+  assert.strictEqual(stored.clinique_3, 'prd_sansschema');
   assert.strictEqual(stored.hopital_12, 'prd_h12', 'les espaces autour sont retires');
+});
+
+test('un identifiant nu n est jamais confondu avec une adresse', async () => {
+  resetDb();
+  // Le rattrapage sans schema ne doit pas mordre sur un identifiant legitime :
+  // il exige un point ET une barre oblique, qu'un identifiant n'a pas.
+  const res = await putConfig({
+    chariow_products: { clinique_1: 'prd_1.2', hopital_1: 'prd_ABC-123' }
+  });
+
+  assert.strictEqual(res.status, 200);
+  const stored = JSON.parse(db.platform_settings.find((r) => r.key === 'chariow_products').value);
+  assert.strictEqual(stored.clinique_1, 'prd_1.2', 'un point seul ne fait pas une adresse');
+  assert.strictEqual(stored.hopital_1, 'prd_ABC-123');
 });
 
 test('une adresse sans segment de produit est refusee', async () => {

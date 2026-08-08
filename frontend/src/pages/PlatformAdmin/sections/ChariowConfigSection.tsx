@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../../../utils/api';
 import { useNotifications } from '../../../contexts/NotificationContext';
 
@@ -38,12 +38,26 @@ export const ChariowConfigSection: React.FC<Props> = ({ config, onSaved }) => {
 
   const missing = config.expectedProductKeys.filter((key) => !(products[key] || '').trim());
 
+  // Le serveur normalise ce qu'il reçoit (une adresse collée devient un
+  // identifiant). Sans cette resynchronisation, les champs continueraient
+  // d'afficher la saisie d'origine et l'exploitant n'aurait aucun moyen de
+  // vérifier ce qui est réellement enregistré.
+  useEffect(() => {
+    setProducts(config.products || {});
+  }, [config.products]);
+
   const save = async (payload: Record<string, unknown>) => {
     setSaving(true);
     try {
       const data = await api.put('/platform/config', payload);
       if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
       showToast('success', 'Configuration enregistrée', 'Chariow a été mis à jour.');
+      // Un avertissement n'empêche pas l'enregistrement mais mérite d'être lu :
+      // il signale ce qui marchera aujourd'hui et cassera à la première erreur
+      // de rattachement.
+      for (const warning of (data.warnings || []) as string[]) {
+        showToast('info', 'À vérifier', warning);
+      }
       onSaved();
     } catch (err: any) {
       showToast('error', 'Enregistrement refusé', err.error || 'Erreur inconnue.');
