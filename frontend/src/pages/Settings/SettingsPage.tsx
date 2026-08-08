@@ -92,6 +92,8 @@ export const SettingsPage: React.FC = () => {
   const [renewMonths, setRenewMonths] = useState<number>(1);
   const [isRenewing, setIsRenewing] = useState<boolean>(false);
   const [activeCheckout, setActiveCheckout] = useState<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string } | null>(null);
+  // État du retour depuis la page Chariow (voir l'effet plus bas).
+  const [returnState, setReturnState] = useState<'idle' | 'checking' | 'paid' | 'failed' | 'slow'>('idle');
   const [plansCatalog, setPlansCatalog] = useState<Record<string, any> | null>(null);
   // null (not a guessed default like 'hopital') until the real value loads —
   // a fake default here previously let the renewal form render with a
@@ -265,12 +267,12 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleRenewSubmit = async (provider: 'mobile_money' | 'paypal') => {
+  const handleRenewSubmit = async () => {
     if (!renewalTargetPlanId) return;
 
     setIsRenewing(true);
     try {
-      const result = await renewSubscription(paymentPhone || undefined, renewMonths, renewalTargetPlanId, provider);
+      const result = await renewSubscription(paymentPhone || undefined, renewMonths, renewalTargetPlanId);
       setActiveCheckout(result);
     } catch (err: any) {
       console.error(err);
@@ -279,6 +281,55 @@ export const SettingsPage: React.FC = () => {
       setIsRenewing(false);
     }
   };
+
+  // Retour depuis la page Chariow : ?checkout=chariow&sub=<id>. Le paramètre
+  // d'URL n'est JAMAIS une preuve de paiement — il ne sert qu'à savoir quelle
+  // ligne faire vérifier par le serveur, seul juge. Utile quand l'acheteur a
+  // fermé l'onglet de la fenêtre de suivi : sans ce rattrapage, il attendrait
+  // le cron du lendemain.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') !== 'chariow') return;
+    const subId = parseInt(params.get('sub') || '', 10);
+    if (!Number.isInteger(subId)) return;
+
+    // L'URL est nettoyée tout de suite : un rechargement ne doit pas relancer
+    // une vérification déjà faite.
+    window.history.replaceState({}, '', window.location.pathname);
+
+    let cancelled = false;
+    let attempts = 0;
+    setReturnState('checking');
+
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const { status } = await pollSubscriptionStatus(subId);
+        if (cancelled) return;
+        if (status === 'paid') {
+          setReturnState('paid');
+          showToast('success', 'Abonnement activé', 'Votre paiement a été confirmé.');
+          fetchPlansData();
+          return;
+        }
+        if (status === 'failed') {
+          setReturnState('failed');
+          return;
+        }
+      } catch {
+        // Une erreur réseau ne prouve pas un échec de paiement : on retente.
+      }
+      if (attempts >= 15) { // ~45 s
+        if (!cancelled) setReturnState('slow');
+        return;
+      }
+      if (!cancelled) setTimeout(poll, 3000);
+    };
+
+    poll();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleActivateFree = async () => {
     setIsActivatingFree(true);
@@ -790,9 +841,21 @@ export const SettingsPage: React.FC = () => {
               </div>
             )}
 
+            {returnState !== 'idle' && (
+              <div className="card" style={{ maxWidth: '900px', margin: '0 auto', width: '100%', padding: '1rem' }}>
+                {returnState === 'checking' && 'Vérification du paiement en cours...'}
+                {returnState === 'paid' && 'Paiement confirmé, votre abonnement est activé.'}
+                {returnState === 'failed' && "Le paiement n'a pas abouti. Aucun montant n'a été prélevé par MediClinic."}
+                {/* Ni succès ni échec annoncé : le paiement peut très bien être
+                    réglé et la confirmation en retard. Le cron quotidien
+                    finalisera, il ne faut surtout pas faire repayer. */}
+                {returnState === 'slow' && "Paiement en cours de validation. Votre abonnement sera activé automatiquement dès confirmation — inutile de payer à nouveau."}
+              </div>
+            )}
+
             {/* Étape de paiement — apparaît une fois un plan payant sélectionné.
-                Mobile Money et PayPal sont deux choix explicites : PayPal n'est
-                pas un repli automatique du Mobile Money. */}
+                Un seul canal depuis le passage à Chariow : sa page hébergée
+                propose elle-même Mobile Money et carte bancaire. */}
             {!loading && renewalTargetPlanId && (
               <div className="card" style={{ maxWidth: '900px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
@@ -819,6 +882,8 @@ export const SettingsPage: React.FC = () => {
 
                   <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Téléphone Mobile Money (optionnel)</span>
+                    {/* PhoneInput rend un E.164 ; AuthContext en dérive le pays
+                        et le numéro national, que Chariow exige séparément. */}
                     <PhoneInput value={paymentPhone} onChange={setPaymentPhone} />
                   </label>
 
@@ -835,24 +900,15 @@ export const SettingsPage: React.FC = () => {
                     type="button"
                     className="btn btn-primary"
                     disabled={isRenewing}
-                    onClick={() => handleRenewSubmit('mobile_money')}
+                    onClick={handleRenewSubmit}
                   >
-                    {isRenewing ? 'Initialisation...' : 'Payer par Mobile Money'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={isRenewing}
-                    onClick={() => handleRenewSubmit('paypal')}
-                    style={{ border: '1px solid var(--border)' }}
-                  >
-                    {isRenewing ? 'Initialisation...' : 'Payer par PayPal'}
+                    {isRenewing ? 'Initialisation...' : 'Payer par Mobile Money ou carte'}
                   </button>
                 </div>
 
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>
-                  PayPal ne règle pas en FCFA : le montant est converti en dollars américains au taux
-                  appliqué par MediClinic. Le montant débité peut donc différer légèrement du total ci-dessus.
+                  Le paiement se fait sur une page sécurisée où vous choisissez Mobile Money
+                  (Orange Money, Wave, MTN) ou carte bancaire. Le montant est débité en FCFA.
                 </p>
               </div>
             )}
@@ -865,7 +921,14 @@ export const SettingsPage: React.FC = () => {
             checkoutUrl={activeCheckout.checkoutUrl}
             provider={activeCheckout.provider}
             amountLabel={`${(renewMonths * pricePerMonth).toLocaleString()} FCFA`}
-            pollStatus={() => pollSubscriptionStatus(activeCheckout.subscriptionPaymentId)}
+            // 'unknown' (montant suspect, fournisseur injoignable) est traité
+            // comme 'pending' : ce n'est pas un échec prouvé, et afficher un
+            // échec ferait repayer un client dont l'argent est peut-être déjà
+            // parti. La fenêtre continue d'attendre, le cron finalisera.
+            pollStatus={async () => {
+              const { status } = await pollSubscriptionStatus(activeCheckout.subscriptionPaymentId);
+              return { status: status === 'unknown' ? 'pending' : status };
+            }}
             onSuccess={() => {
               showToast('success', 'Abonnement activé', `Votre plan a été activé/renouvelé pour ${renewMonths} mois.`);
               setActiveCheckout(null);

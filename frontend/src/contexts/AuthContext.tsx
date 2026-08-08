@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { parsePhoneNumber } from 'libphonenumber-js';
 import { api } from '../utils/api';
 
 export interface User {
@@ -37,10 +38,9 @@ interface AuthContextType {
   renewSubscription: (
     phone: string | undefined,
     months: number,
-    planId?: 'clinique' | 'hopital',
-    provider?: 'mobile_money' | 'paypal'
+    planId?: 'clinique' | 'hopital'
   ) => Promise<{ checkoutUrl: string; subscriptionPaymentId: number; provider: string }>;
-  pollSubscriptionStatus: (subscriptionPaymentId: number) => Promise<{ status: 'pending' | 'paid' | 'failed'; clinic?: Clinic }>;
+  pollSubscriptionStatus: (subscriptionPaymentId: number) => Promise<{ status: 'pending' | 'paid' | 'failed' | 'unknown' }>;
   activateFreePlan: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   setPassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -157,14 +157,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const renewSubscription = async (
     phone: string | undefined,
     months: number,
-    planId?: 'clinique' | 'hopital',
-    provider: 'mobile_money' | 'paypal' = 'mobile_money'
+    planId?: 'clinique' | 'hopital'
   ) => {
+    // Les trois champs téléphone partent ensemble et sans pré-nettoyage :
+    // Chariow exige un numéro national + un ISO2, jamais un E.164 brut, et
+    // c'est le serveur qui normalise. Le repli serveur ne sait déduire le pays
+    // que des indicatifs africains, d'où l'envoi systématique de phoneCountry.
+    const parsed = phone ? parsePhoneNumber(phone) : null;
     const data = await api.post('/financials/subscription/checkout', {
-      phoneNumber: phone,
       months,
       planId,
-      provider
+      phone: phone || undefined,
+      phoneCountry: parsed?.country,
+      phoneLocal: parsed?.nationalNumber
     });
     return {
       checkoutUrl: data.checkoutUrl,
@@ -178,12 +183,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await refreshProfile();
   };
 
+  // Interroge la vérification côté serveur, qui redemande elle-même son statut
+  // à Chariow avant de créditer. Volontairement PAS la lecture simple de la
+  // ligne (/subscription/status) : celle-ci se contenterait d'observer un
+  // 'pending' indéfiniment si le webhook ne parvient jamais.
   const pollSubscriptionStatus = async (subscriptionPaymentId: number) => {
-    const data = await api.get(`/financials/subscription/status/${subscriptionPaymentId}`);
-    if (data.status === 'paid' && data.clinic) {
-      setClinic(data.clinic);
+    const data = await api.post('/financials/subscription/verify', { subscriptionPaymentId });
+    if (data.status === 'paid') {
+      await refreshProfile();
     }
-    return { status: data.status, clinic: data.clinic };
+    return { status: data.status };
   };
 
   return (
