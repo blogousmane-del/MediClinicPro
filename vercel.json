@@ -12,6 +12,7 @@
   ],
   "crons": [
     { "path": "/api/cron/renewal-reminders", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/purge-login-failures", "schedule": "30 3 * * *" }
+    { "path": "/api/cron/purge-login-failures", "schedule": "30 3 * * *" },
+    { "path": "/api/cron/reconcile-chariow", "schedule": "0 5 * * *" }
   ]
 }

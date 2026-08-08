@@ -100,4 +100,39 @@ router.get('/purge-login-failures', requireCronSecret, async (req, res) => {
   }
 });
 
+// GET /api/cron/reconcile-chariow
+// Filet quotidien : rattrape les paiements Chariow dont ni le retour navigateur
+// ni le webhook n'ont abouti. Les crons Vercel du plan Hobby ne descendent pas
+// sous la journée, ce qui est acceptable ici — les deux autres chemins
+// créditent en secondes, celui-ci n'existe que pour ce qui leur a échappé.
+router.get('/reconcile-chariow', requireCronSecret, async (req, res) => {
+  try {
+    const { data: rows, error } = await supabase
+      .from('subscription_payments')
+      .select('id, provider, status, created_at')
+      .eq('provider', 'chariow');
+    if (error) throw error;
+
+    const { reconcileChariowSubscription, selectReconcilable } = require('../services/payments/chariowReconcile');
+    const candidates = selectReconcilable(rows);
+
+    let credited = 0;
+    for (const row of candidates) {
+      // Une ligne qui échoue ne doit pas interrompre la boucle : le paiement
+      // suivant n'a rien à voir avec celui qui pose problème.
+      try {
+        const result = await reconcileChariowSubscription(row.id);
+        if (result.status === 'paid') credited += 1;
+      } catch (rowError) {
+        console.error(`[CRON] Réconciliation impossible pour le paiement #${row.id}:`, rowError);
+      }
+    }
+
+    res.json({ checked: candidates.length, credited });
+  } catch (error) {
+    console.error('[CRON] Réconciliation Chariow impossible:', error);
+    res.status(500).json({ error: 'Erreur lors de la réconciliation Chariow.' });
+  }
+});
+
 module.exports = router;
