@@ -2,13 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
-const { initiateCheckoutWithFailover } = require('../services/payments');
-const { getPlan, isPaymentMethodAllowed } = require('../utils/plans');
-
+// Plus aucun fournisseur de paiement ici : les dépôts de garantie sont
+// encaissés en espèces uniquement depuis le passage à Chariow. Les constantes
+// d'URL et la liste des modes en ligne sont parties avec le code qui les
+// utilisait, pour ne pas laisser croire qu'un chemin en ligne existe encore.
 const DEPOSIT_ROLES = ['admin', 'secretary', 'manager'];
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
-const API_PUBLIC_URL = process.env.API_PUBLIC_URL || 'http://localhost:5000';
-const ONLINE_METHODS = ['wave', 'orange_money', 'mtn_momo'];
 
 // GET /api/deposits
 // List deposits for the clinic, optionally scoped to one patient
@@ -57,6 +55,17 @@ router.post('/', auth, checkRole(DEPOSIT_ROLES), async (req, res) => {
       return res.status(400).json({ error: "Le montant du dépôt doit être supérieur à 0." });
     }
 
+    // ESPÈCES UNIQUEMENT depuis le passage à Chariow : un dépôt de garantie
+    // est un montant libre, que Chariow ne sait pas encaisser (il ne facture
+    // que le prix d'un produit de sa boutique). Refus indépendant du plan.
+    // Les dépôts 'pending' créés avant la bascule restent réglables par les
+    // webhooks Bictorys/PayTech, toujours montés.
+    if (paymentMethod !== 'cash') {
+      return res.status(400).json({
+        error: "Les dépôts de garantie se font en espèces uniquement. Le paiement en ligne n'est plus proposé pour les dépôts."
+      });
+    }
+
     // Verify patient belongs to the user's clinic (prevent IDOR)
     const { data: patient, error: patientError } = await supabase
       .from('patients')
@@ -72,22 +81,6 @@ router.post('/', auth, checkRole(DEPOSIT_ROLES), async (req, res) => {
 
     const safeItems = Array.isArray(items) ? items : [];
     const estimatedTotal = safeItems.reduce((sum, item) => sum + (Number(item.cost) || 0), 0);
-    const isOnline = ONLINE_METHODS.includes(paymentMethod);
-
-    if (isOnline) {
-      const { data: clinicPlan, error: clinicPlanError } = await supabase
-        .from('clinics')
-        .select('plan')
-        .eq('id', req.user.clinicId)
-        .single();
-      if (clinicPlanError) throw clinicPlanError;
-
-      if (!isPaymentMethodAllowed(clinicPlan.plan, paymentMethod)) {
-        const plan = getPlan(clinicPlan.plan);
-        return res.status(403).json({ error: `Le plan ${plan.name} ne permet pas les encaissements Mobile Money. Passez au plan Hôpital dans Abonnez-vous, ou encaissez en espèces.` });
-      }
-    }
-
     const { data: depositResult, error: insertError } = await supabase
       .from('deposits')
       .insert({
@@ -101,59 +94,24 @@ router.post('/', auth, checkRole(DEPOSIT_ROLES), async (req, res) => {
         items: safeItems,
         estimated_total: estimatedTotal,
         status: 'held',
-        payment_status: isOnline ? 'pending' : 'paid',
-        provider: isOnline ? null : 'manual'
+        // Encaissé au comptoir : le dépôt est réglé d'emblée, donc
+        // immédiatement remboursable ou déductible.
+        payment_status: 'paid',
+        provider: 'manual'
       })
       .select()
       .single();
 
     if (insertError) throw insertError;
 
-    if (!isOnline) {
-      await supabase.from('activity_logs').insert({
-        clinic_id: req.user.clinicId,
-        user_id: req.user.userId,
-        action: 'DEPOSIT_CREATE',
-        details: `Dépôt de garantie de ${amount} FCFA enregistré pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`
-      });
-
-      return res.status(201).json({ success: true, deposit: depositResult });
-    }
-
-    const checkout = await initiateCheckoutWithFailover(
-      {
-        amount,
-        currency: 'XOF',
-        description: `Dépôt de garantie — ${patient.first_name} ${patient.last_name}`,
-        reference: `dep-${depositResult.id}`,
-        returnUrl: `${APP_URL}/`,
-        cancelUrl: `${APP_URL}/`,
-        customerName: `${patient.first_name} ${patient.last_name}`
-      },
-      { itemName: 'Dépôt de garantie MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
-    );
-
-    if (!checkout.ok) {
-      await supabase.from('deposits').update({ payment_status: 'failed' }).eq('id', depositResult.id);
-      return res.status(502).json({ error: checkout.error });
-    }
-
-    await supabase
-      .from('deposits')
-      .update({
-        provider: checkout.provider,
-        provider_reference: checkout.providerReference,
-        checkout_url: checkout.checkoutUrl
-      })
-      .eq('id', depositResult.id);
-
-    res.status(201).json({
-      success: true,
-      pending: true,
-      deposit: depositResult,
-      checkoutUrl: checkout.checkoutUrl,
-      provider: checkout.provider
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'DEPOSIT_CREATE',
+      details: `Dépôt de garantie de ${amount} FCFA enregistré pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`
     });
+
+    res.status(201).json({ success: true, deposit: depositResult });
   } catch (error) {
     console.error("Create Deposit Error:", error);
     res.status(500).json({ error: "Erreur lors de l'enregistrement du dépôt de garantie." });

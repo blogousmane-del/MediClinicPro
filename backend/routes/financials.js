@@ -4,11 +4,13 @@ const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const chariow = require('../services/payments/chariow');
-const { getPlan, isPaymentMethodAllowed } = require('../utils/plans');
+const { getPlan } = require('../utils/plans');
 
+// isPaymentMethodAllowed, ONLINE_METHODS et API_PUBLIC_URL ont disparu d'ici
+// avec l'encaissement patient en ligne : le mode de paiement n'est plus filtré
+// par le plan mais refusé net s'il n'est pas 'cash'. La fonction reste dans
+// utils/plans.js, qui décrit honnêtement ce que chaque palier autorisait.
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
-const API_PUBLIC_URL = process.env.API_PUBLIC_URL || 'http://localhost:5000';
-const ONLINE_METHODS = ['wave', 'orange_money', 'mtn_momo'];
 
 // GET /api/financials/payments
 // List payments / receipts
@@ -54,16 +56,26 @@ router.get('/payments', auth, async (req, res) => {
 });
 
 // POST /api/financials/checkout
-// Process a patient billing payment. Cash is recorded immediately (paid at the
-// counter). Mobile Money methods create a pending row and return a hosted
-// checkout URL — the payment is only marked 'paid' once the provider's
-// webhook confirms it (see routes/webhooks.js).
+// Encaissement d'une facture patient. ESPÈCES UNIQUEMENT depuis le passage à
+// Chariow : Chariow ne facture que le prix d'un produit de sa boutique et ne
+// sait pas prendre un montant libre, or le caissier saisit ici la somme de son
+// choix (voir docs/superpowers/specs/2026-08-08-chariow-integration-design.md).
+// Les lignes 'pending' créées avant la bascule restent créditables par les
+// webhooks Bictorys/PayTech, qui n'ont pas été démontés.
 router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), async (req, res) => {
   try {
     const { patientId, amountTotal, paymentMethod, referenceNumber, items } = req.body;
 
     if (!patientId || !amountTotal || !paymentMethod || !items || !Array.isArray(items)) {
       return res.status(400).json({ error: "Les informations de facturation essentielles sont requises." });
+    }
+
+    // Refus avant toute autre vérification, et indépendamment du plan : la
+    // restriction ne vient plus du palier d'abonnement mais du fournisseur.
+    if (paymentMethod !== 'cash') {
+      return res.status(400).json({
+        error: "Les encaissements patients se font en espèces uniquement. Le paiement en ligne n'est plus proposé pour les factures patients."
+      });
     }
 
     // Verify patient belongs to the user's clinic (prevent IDOR)
@@ -79,22 +91,6 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
       return res.status(404).json({ error: "Patient non trouvé dans cette clinique." });
     }
 
-    const isOnline = ONLINE_METHODS.includes(paymentMethod);
-
-    if (isOnline) {
-      const { data: clinicPlan, error: clinicPlanError } = await supabase
-        .from('clinics')
-        .select('plan')
-        .eq('id', req.user.clinicId)
-        .single();
-      if (clinicPlanError) throw clinicPlanError;
-
-      if (!isPaymentMethodAllowed(clinicPlan.plan, paymentMethod)) {
-        const plan = getPlan(clinicPlan.plan);
-        return res.status(403).json({ error: `Le plan ${plan.name} ne permet pas les encaissements Mobile Money. Passez au plan Hôpital dans Abonnez-vous, ou encaissez en espèces.` });
-      }
-    }
-
     const { data: paymentResult, error: insertError } = await supabase
       .from('payments')
       .insert({
@@ -104,8 +100,10 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
         amount_total: amountTotal,
         payment_method: paymentMethod,
         reference_number: referenceNumber || `REF-${Date.now()}`,
-        status: isOnline ? 'pending' : 'paid',
-        provider: isOnline ? null : 'manual',
+        // Encaissé au comptoir : réglé d'emblée, aucune confirmation à
+        // attendre d'un fournisseur.
+        status: 'paid',
+        provider: 'manual',
         items
       })
       .select()
@@ -113,54 +111,17 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
 
     if (insertError) throw insertError;
 
-    if (!isOnline) {
-      await supabase.from('activity_logs').insert({
-        clinic_id: req.user.clinicId,
-        user_id: req.user.userId,
-        action: 'PAYMENT_RECORD',
-        details: `Encaissement de ${amountTotal} FCFA pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`
-      });
-
-      return res.status(201).json({
-        success: true,
-        paymentId: paymentResult.id,
-        message: "Paiement enregistré avec succès."
-      });
-    }
-
-    const checkout = await initiateCheckoutWithFailover(
-      {
-        amount: amountTotal,
-        currency: 'XOF',
-        description: `Facture patient ${patient.first_name} ${patient.last_name}`,
-        reference: `pay-${paymentResult.id}`,
-        returnUrl: `${APP_URL}/`,
-        cancelUrl: `${APP_URL}/`,
-        customerName: `${patient.first_name} ${patient.last_name}`
-      },
-      { itemName: 'Facture MediClinic', ipnUrl: `${API_PUBLIC_URL}/api/webhooks/paytech` }
-    );
-
-    if (!checkout.ok) {
-      await supabase.from('payments').update({ status: 'failed' }).eq('id', paymentResult.id);
-      return res.status(502).json({ error: checkout.error });
-    }
-
-    await supabase
-      .from('payments')
-      .update({
-        provider: checkout.provider,
-        provider_reference: checkout.providerReference,
-        checkout_url: checkout.checkoutUrl
-      })
-      .eq('id', paymentResult.id);
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PAYMENT_RECORD',
+      details: `Encaissement de ${amountTotal} FCFA pour ${patient.first_name} ${patient.last_name} (${paymentMethod})`
+    });
 
     res.status(201).json({
       success: true,
-      pending: true,
       paymentId: paymentResult.id,
-      checkoutUrl: checkout.checkoutUrl,
-      provider: checkout.provider
+      message: "Paiement enregistré avec succès."
     });
   } catch (error) {
     console.error("Checkout Payment Error:", error);
