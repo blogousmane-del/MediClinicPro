@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../../utils/api';
 import { useNotifications } from '../../../contexts/NotificationContext';
+import { SkeletonCards } from '../../../components/Skeleton';
 
 type Tab = 'logins' | 'audit' | 'posture';
 
@@ -117,7 +118,7 @@ export const SecuritySection: React.FC = () => {
     }
   };
 
-  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Chargement des données de sécurité...</p>;
+  if (loading) return <SkeletonCards count={5} height={88} label="Chargement des données de sécurité…" />;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'logins', label: 'Connexions' },

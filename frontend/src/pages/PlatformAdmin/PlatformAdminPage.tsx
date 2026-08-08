@@ -6,6 +6,7 @@ import { NotificationsSection } from './NotificationsSection';
 import SystemConfigSection from './sections/SystemConfigSection';
 import SecuritySection from './sections/SecuritySection';
 import ReportsSection from './sections/ReportsSection';
+import { SkeletonCards, SkeletonPage } from '../../components/Skeleton';
 import {
   LayoutDashboard,
   Building2,
@@ -419,7 +420,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
 
         <div className="platform-admin-main-body" style={{ padding: '1.5rem 2rem', flex: 1 }}>
           {loading && !overview ? (
-            <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>
+            <SkeletonPage cards={3} label="Chargement de la console…" />
           ) : (section === 'overview' || section === 'clinics') && !overview ? (
             <p style={{ color: 'var(--text-secondary)' }}>Aucune donnée disponible.</p>
           ) : (
@@ -795,7 +796,7 @@ const UsersSection: React.FC<{
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
-  if (!users) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
+  if (!users) return <SkeletonCards count={5} height={56} label="Chargement des utilisateurs…" />;
 
   const roleOptions = Array.from(new Set(users.map(u => u.role)));
 
@@ -901,7 +902,7 @@ const UsersSection: React.FC<{
 const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ data }) => {
   const [statusFilter, setStatusFilter] = useState<string>('');
 
-  if (!data) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
+  if (!data) return <SkeletonCards count={5} height={56} label="Chargement des abonnements…" />;
 
   const statusLabels: Record<string, string> = { pending: 'En attente', paid: 'Payé', failed: 'Échoué' };
   const statusBadges: Record<string, string> = { pending: 'badge-warning', paid: 'badge-success', failed: 'badge-danger' };
@@ -1021,7 +1022,7 @@ const TicketsSection: React.FC<{
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [noteDraft, setNoteDraft] = useState<string>('');
 
-  if (!tickets) return <p style={{ color: 'var(--text-secondary)' }}>Chargement...</p>;
+  if (!tickets) return <SkeletonCards count={4} height={72} label="Chargement des tickets…" />;
 
   const filterPills: { value: string; label: string }[] = [
     { value: '', label: 'Tous' },

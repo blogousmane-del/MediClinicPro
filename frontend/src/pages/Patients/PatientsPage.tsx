@@ -3,6 +3,7 @@ import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { PhoneInput } from '../../components/PhoneInput';
+import { SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
   UserPlus,
@@ -756,7 +757,19 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
             </thead>
 
             <tbody>
-              {patientRowsToRender.map((pat, idx) => {
+              {loading && <SkeletonTableRows rows={6} cols={8} label="Chargement des patients…" />}
+
+              {!loading && patientRowsToRender.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                    {/* la recherche est faite côté serveur : une liste vide
+                        avec une requête en cours veut dire « aucun résultat » */}
+                    {search.trim() ? 'Aucun patient ne correspond à cette recherche.' : 'Aucun patient enregistré.'}
+                  </td>
+                </tr>
+              )}
+
+              {!loading && patientRowsToRender.map((pat, idx) => {
                 const isAllergyNone = !pat.allergy || pat.allergy.toLowerCase() === 'aucune' || pat.allergy.toLowerCase() === 'aucun';
 
                 return (

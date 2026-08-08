@@ -3,6 +3,7 @@ import { api } from '../utils/api';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { SkeletonPage } from '../components/Skeleton';
 import {
   Users,
   Calendar as CalendarIcon,
@@ -106,8 +107,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: 'var(--text-secondary)' }}>
-        Chargement du tableau de bord...
+      <div className="dashboard-container">
+        <SkeletonPage cards={3} label="Chargement du tableau de bord…" />
       </div>
     );
   }

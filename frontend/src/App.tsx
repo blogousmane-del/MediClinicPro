@@ -5,6 +5,7 @@ import { OfflineProvider } from './contexts/OfflineContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { MobileQuickActionsBar } from './components/MobileQuickActionsBar';
+import { SkeletonPage } from './components/Skeleton';
 import { initRippleEffect } from './utils/ripple';
 
 // Logged-out entry pages: kept eager (small, must render instantly on first paint).
@@ -28,8 +29,12 @@ const SettingsPage = lazy(() => import('./pages/Settings/SettingsPage').then(m =
 const PlatformAdminPage = lazy(() => import('./pages/PlatformAdmin/PlatformAdminPage').then(m => ({ default: m.PlatformAdminPage })));
 const ProfilePage = lazy(() => import('./pages/Profile/ProfilePage').then(m => ({ default: m.ProfilePage })));
 
+// Affiché pendant le téléchargement du chunk d'un onglet (lazy imports
+// ci-dessus) : la silhouette de la page arrive avant son code.
 const TabFallback: React.FC = () => (
-  <div style={{ padding: '3rem', textAlign: 'center', opacity: 0.6 }}>Chargement...</div>
+  <div className="app-page">
+    <SkeletonPage cards={3} label="Chargement de la page…" />
+  </div>
 );
 
 const MainAppContent: React.FC = () => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { SkeletonPage } from '../../components/Skeleton';
 import {
   Search,
   Bell,
@@ -121,8 +122,8 @@ export const LaboratoryPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: 'var(--text-secondary)' }}>
-        Chargement des analyses...
+      <div className="app-page">
+        <SkeletonPage cards={4} label="Chargement des analyses…" />
       </div>
     );
   }

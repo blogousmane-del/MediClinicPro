@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../../utils/api';
 import { useNotifications } from '../../../contexts/NotificationContext';
+import { SkeletonCards } from '../../../components/Skeleton';
 
 interface ConfigResponse {
   payments: { bictorys: boolean; paytech: boolean; paypal: boolean };
@@ -93,7 +94,7 @@ export const SystemConfigSection: React.FC = () => {
     }
   };
 
-  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Chargement de la configuration...</p>;
+  if (loading) return <SkeletonCards count={5} height={88} label="Chargement de la configuration…" />;
   if (!config) return <p style={{ color: 'var(--text-secondary)' }}>Configuration indisponible.</p>;
 
   return (

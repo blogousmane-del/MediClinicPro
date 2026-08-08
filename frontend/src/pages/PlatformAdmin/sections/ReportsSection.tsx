@@ -3,6 +3,7 @@ import { api } from '../../../utils/api';
 import { useNotifications } from '../../../contexts/NotificationContext';
 import BarChart from '../components/BarChart';
 import DonutChart from '../components/DonutChart';
+import { SkeletonCards } from '../../../components/Skeleton';
 
 type Tab = 'revenus' | 'adoption';
 type SortKey = 'patients' | 'consultations' | 'lastActivityAt';
@@ -98,7 +99,7 @@ export const ReportsSection: React.FC = () => {
     });
   }, [adoption, sortKey]);
 
-  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Chargement des rapports...</p>;
+  if (loading) return <SkeletonCards count={4} height={140} label="Chargement des rapports…" />;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'revenus', label: 'Revenus' },
