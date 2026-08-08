@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../../utils/api';
 import { useNotifications } from '../../../contexts/NotificationContext';
 import { SkeletonCards } from '../../../components/Skeleton';
+import ChariowConfigSection, { type ChariowConfig } from './ChariowConfigSection';
 
 interface ConfigResponse {
   payments: { bictorys: boolean; paytech: boolean; paypal: boolean };
@@ -11,6 +12,7 @@ interface ConfigResponse {
   google: { configured: boolean };
   cron: { configured: boolean };
   urls: { apiPublicUrl: string; appUrl: string };
+  chariow?: ChariowConfig;
   database: { connected: boolean };
   plans: { id: string; name: string; price: number; staffLimit: number | null }[];
   settings: {
@@ -99,10 +101,14 @@ export const SystemConfigSection: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {config.chariow && <ChariowConfigSection config={config.chariow} onSaved={load} />}
+
       <div className="card">
-        <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>Paiements</h3>
+        <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>Anciens fournisseurs de paiement</h3>
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 8px' }}>
-          Un fournisseur non configuré désactive proprement son bouton — les paiements en espèces ne sont jamais affectés.
+          Plus aucun paiement n'est lancé par ces trois fournisseurs : l'abonnement passe par Chariow, les
+          encaissements patients et les dépôts de garantie se font en espèces. Leur configuration reste lisible
+          ici parce que leurs webhooks restent montés, pour créditer les paiements engagés avant la bascule.
         </p>
         <Row label="Bictorys (Mobile Money principal)"><Status ok={config.payments.bictorys} /></Row>
         <Row label="PayTech (Mobile Money secours)"><Status ok={config.payments.paytech} /></Row>
