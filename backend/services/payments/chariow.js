@@ -132,6 +132,28 @@ async function chariowFetch(pathname, init, apiKey, apiUrl) {
   }
 }
 
+function excerpt(text) {
+  const flat = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!flat) return 'corps vide';
+  return flat.length > 200 ? `${flat.slice(0, 200)}…` : flat;
+}
+
+/**
+ * Extrait un motif d'erreur lisible. Chariow n'a pas un format unique — selon
+ * l'endpoint et la version on voit `message`, `error`, `errors[]` ou `detail`.
+ * Ne lire que `message` renvoyait « raison inconnue » alors que la réponse
+ * portait l'explication, ce qui envoie chercher la panne au mauvais endroit.
+ */
+function describeError(body, raw) {
+  if (!body || typeof body !== 'object') return excerpt(raw);
+  const direct = body.message || body.error || body.detail || body.error_description;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  if (direct && typeof direct === 'object') return excerpt(JSON.stringify(direct));
+  if (Array.isArray(body.errors) && body.errors.length) return excerpt(JSON.stringify(body.errors));
+  if (body.errors && typeof body.errors === 'object') return excerpt(JSON.stringify(body.errors));
+  return excerpt(raw);
+}
+
 // `overrides.apiKey` sert à tester une clé AVANT de l'enregistrer : la console
 // de configuration doit pouvoir rejeter une clé fausse sans l'avoir d'abord
 // écrite en base, sinon l'écran l'annonce « configurée » alors que Chariow la
@@ -148,15 +170,19 @@ async function callChariow(pathname, init, overrides = {}) {
     return { ok: false, error: `Erreur réseau vers Chariow : ${err.message}` };
   }
 
+  // Le corps est lu en texte d'abord : une passerelle ou un WAF répond en HTML,
+  // et « réponse non JSON » sans le moindre extrait ne dit pas si le problème
+  // vient de la clé, de l'URL ou du réseau.
+  const raw = await res.text();
   let body;
   try {
-    body = await res.json();
+    body = JSON.parse(raw);
   } catch {
-    return { ok: false, error: `Chariow a répondu ${res.status} (réponse non JSON).` };
+    return { ok: false, error: `Chariow a répondu ${res.status} (réponse non JSON) : ${excerpt(raw)}` };
   }
 
   if (!res.ok) {
-    return { ok: false, error: `Chariow a refusé la requête (${res.status}) : ${body.message || 'raison inconnue'}` };
+    return { ok: false, error: `Chariow a refusé la requête (${res.status}) : ${describeError(body, raw)}` };
   }
   return { ok: true, data: body.data || body };
 }
@@ -244,6 +270,7 @@ async function listProducts(overrides = {}) {
 
 module.exports = {
   mapChariowStatus,
+  describeError,
   resolveChariowPhone,
   productIdFor,
   loadConfig,

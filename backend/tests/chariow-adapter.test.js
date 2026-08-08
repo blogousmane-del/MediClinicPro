@@ -12,6 +12,24 @@ test('unpaid est en attente, pas paye', () => {
   assert.strictEqual(chariow.mapChariowStatus('UNPAID'), 'pending');
 });
 
+test('le motif de refus est lu quel que soit le champ utilise par Chariow', () => {
+  // Ne lire que `message` rendait « raison inconnue » alors que la reponse
+  // portait l'explication — l'exploitant cherchait alors la panne ailleurs.
+  assert.strictEqual(chariow.describeError({ message: 'Unauthorized' }, ''), 'Unauthorized');
+  assert.strictEqual(chariow.describeError({ error: 'Invalid API key' }, ''), 'Invalid API key');
+  assert.strictEqual(chariow.describeError({ detail: 'Token expired' }, ''), 'Token expired');
+  assert.strictEqual(chariow.describeError({ error_description: 'bad token' }, ''), 'bad token');
+  assert.match(chariow.describeError({ errors: ['product_id manquant'] }, ''), /product_id manquant/);
+});
+
+test('sans champ reconnu, le corps brut est rendu tronque', () => {
+  // Mieux vaut un extrait brut qu'un « raison inconnue » qui perd l'information.
+  assert.match(chariow.describeError({ zzz: 1 }, '{"zzz":1}'), /zzz/);
+  assert.strictEqual(chariow.describeError(null, ''), 'corps vide');
+  const long = 'x'.repeat(500);
+  assert.ok(chariow.describeError(null, long).length < 250, 'un corps long est tronque');
+});
+
 test('settled vaut paye', () => {
   assert.strictEqual(chariow.mapChariowStatus('settled'), 'succeeded');
   assert.strictEqual(chariow.mapChariowStatus('completed'), 'succeeded');
