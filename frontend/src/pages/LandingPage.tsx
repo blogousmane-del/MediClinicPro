@@ -71,10 +71,11 @@ const pricingPlans: {
   }
 ];
 
-// Same 6-row comparison shape as SettingsPage.tsx's billing tab — derived
-// from real plan data (staffLimit/allowedRoles/paymentMethods), not
-// copy-pasted marketing strings, so the Mobile Money row can't drift from
-// what's actually enforced.
+// Same comparison shape as SettingsPage.tsx's billing tab — derived from real
+// plan data (staffLimit/allowedRoles), not copy-pasted marketing strings, so
+// les lignes ne peuvent pas diverger de ce qui est réellement appliqué.
+// La ligne « Encaissements Mobile Money » a été retirée : elle annonçait un
+// encaissement patient en ligne que le passage à Chariow supprime.
 const buildPricingFeatureRows = (plan: (typeof pricingPlans)[number]): { label: string; ok: boolean }[] => {
   const staffLabel = plan.staffLimit === null
     ? 'Utilisateurs & rôles illimités'
@@ -84,8 +85,7 @@ const buildPricingFeatureRows = (plan: (typeof pricingPlans)[number]): { label: 
     { label: 'Patients & Dossiers illimités', ok: true },
     { label: 'Rendez-vous, Ordonnances & Pharmacie', ok: true },
     { label: 'Laboratoire & Comptabilité', ok: true },
-    { label: 'Paiement Espèces', ok: true },
-    { label: 'Encaissements Mobile Money', ok: plan.paymentMethods.includes('wave') }
+    { label: 'Paiement Espèces', ok: true }
   ];
 };
 
@@ -516,7 +516,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
 
           <div className="landing-highlight">
             <Receipt size={22} color="#5eead4" style={{ marginBottom: '6px' }} />
-            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Paiement Mobile Money</div>
+            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Abonnement par Mobile Money ou carte</div>
           </div>
 
           <div className="landing-highlight">
@@ -753,13 +753,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             <div style={{ flex: 1, borderTop: '1px solid #e2e8f0' }} />
           </div>
 
-          {/* Payment Providers Row */}
+          {/* Payment Providers Row — moyens de paiement de L'ABONNEMENT (ce que
+              la clinique nous règle), pas de ce qu'elle encaisse auprès de ses
+              patients. N'annoncer ici que des opérateurs réellement activés sur
+              la boutique Chariow de l'exploitant : cette liste est une promesse
+              faite au visiteur, pas une décoration. */}
           <div className="landing-reveal" style={{ marginTop: '3rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Accepté en Côte d'Ivoire via Mobile Money :</span>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>Abonnement payable par Mobile Money ou carte bancaire :</span>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', fontWeight: 700, fontSize: '0.85rem', flexWrap: 'wrap', justifyContent: 'center' }}>
               <span className="landing-payment-badge" style={{ backgroundColor: '#fff7ed', color: '#ea580c', padding: '5px 12px', borderRadius: '20px', border: '1px solid #ffedd5' }}>Orange Money</span>
               <span className="landing-payment-badge" style={{ backgroundColor: '#fefce8', color: '#ca8a04', padding: '5px 12px', borderRadius: '20px', border: '1px solid #fef08a' }}>MTN MoMo</span>
               <span className="landing-payment-badge" style={{ backgroundColor: '#f0f9ff', color: '#0284c7', padding: '5px 12px', borderRadius: '20px', border: '1px solid #e0f2fe' }}>Wave</span>
+              <span className="landing-payment-badge" style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', padding: '5px 12px', borderRadius: '20px', border: '1px solid #ede9fe' }}>Carte bancaire</span>
             </div>
           </div>
         </div>
