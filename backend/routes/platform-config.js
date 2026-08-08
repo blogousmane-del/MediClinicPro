@@ -33,6 +33,25 @@ const CHARIOW_PRODUCT_KEYS = PLAN_IDS
   .filter((id) => id !== 'starter')
   .flatMap((id) => CHARIOW_MONTHS.map((m) => `${id}_${m}`));
 
+// Chariow affiche l'adresse publique du produit
+// (https://<boutique>.mychariow.co/prd_xxxx), pas son identifiant nu : copier
+// l'adresse entière est le geste naturel, et la stocker telle quelle envoie une
+// URL là où l'API attend un product_id — checkout refusé, sans indice pour
+// l'exploitant. On garde donc le dernier segment de chemin.
+function normalizeProductId(raw) {
+  let value = String(raw || '').trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const segments = new URL(value).pathname.split('/').filter(Boolean);
+      value = segments.length ? segments[segments.length - 1] : '';
+    } catch {
+      return '';
+    }
+  }
+  return value.trim();
+}
+
 function parseStoredProducts(raw) {
   try {
     return JSON.parse(raw || '{}');
@@ -159,6 +178,7 @@ router.put('/config', async (req, res) => {
       }
       // Validation complète AVANT toute écriture : une correspondance à moitié
       // enregistrée vendrait certaines durées et pas d'autres.
+      const normalized = {};
       for (const [key, value] of Object.entries(products)) {
         if (!CHARIOW_PRODUCT_KEYS.includes(key)) {
           return res.status(400).json({ error: `Combinaison plan/durée inconnue : ${key}. Attendu parmi ${CHARIOW_PRODUCT_KEYS.join(', ')}.` });
@@ -166,8 +186,13 @@ router.put('/config', async (req, res) => {
         if (typeof value !== 'string' || !value.trim()) {
           return res.status(400).json({ error: `Identifiant de produit vide pour ${key}.` });
         }
+        const id = normalizeProductId(value);
+        if (!id) {
+          return res.status(400).json({ error: `Identifiant de produit illisible pour ${key}.` });
+        }
+        normalized[key] = id;
       }
-      updates.push(['chariow_products', JSON.stringify(products)]);
+      updates.push(['chariow_products', JSON.stringify(normalized)]);
     }
 
     const touchesSecret = req.body.chariow_api_key !== undefined || req.body.chariow_webhook_secret !== undefined;

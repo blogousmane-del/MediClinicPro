@@ -99,7 +99,8 @@ export const ChariowConfigSection: React.FC<Props> = ({ config, onSaved }) => {
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 10px' }}>
           Chariow débite le prix du produit, pas un montant transmis par MediClinic. Le prix de
           chaque produit doit correspondre exactement au plan multiplié par la durée, sinon le
-          paiement est refusé au moment du checkout.
+          paiement est refusé au moment du checkout. Colle l'identifiant du produit
+          (<code>prd_…</code>) ou son adresse complète — seul l'identifiant est conservé.
         </p>
 
         {missing.length > 0 && (
@@ -126,7 +127,7 @@ export const ChariowConfigSection: React.FC<Props> = ({ config, onSaved }) => {
             <input
               className="input-control"
               value={products[key] || ''}
-              placeholder="prod_…"
+              placeholder="prd_… (ou colle l'adresse du produit)"
               onChange={(e) => setProducts({ ...products, [key]: e.target.value })}
             />
           </label>

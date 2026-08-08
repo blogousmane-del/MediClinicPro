@@ -163,6 +163,31 @@ test('la correspondance produits accepte les combinaisons valides', async () => 
   assert.strictEqual(stored.hopital_12, 'prod_h12');
 });
 
+test('une adresse de produit collee entiere est ramenee a son identifiant', async () => {
+  resetDb();
+  // Chariow n'affiche pas l'identifiant nu mais l'adresse publique du produit :
+  // la coller entiere est le geste naturel, et la stocker telle quelle enverrait
+  // une URL la ou l'API attend un product_id.
+  const res = await putConfig({
+    chariow_products: {
+      clinique_1: 'https://vwtjlajd.mychariow.co/prd_tn4e8e01',
+      hopital_12: '  prd_h12  '
+    }
+  });
+
+  assert.strictEqual(res.status, 200);
+  const stored = JSON.parse(db.platform_settings.find((r) => r.key === 'chariow_products').value);
+  assert.strictEqual(stored.clinique_1, 'prd_tn4e8e01');
+  assert.strictEqual(stored.hopital_12, 'prd_h12', 'les espaces autour sont retires');
+});
+
+test('une adresse sans segment de produit est refusee', async () => {
+  resetDb();
+  const res = await putConfig({ chariow_products: { clinique_1: 'https://vwtjlajd.mychariow.co/' } });
+  assert.strictEqual(res.status, 400);
+  assert.strictEqual(db.platform_settings.length, 0, 'aucune ecriture partielle');
+});
+
 test('generer le secret de webhook renvoie l URL complete une seule fois', async () => {
   process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
   resetDb();
