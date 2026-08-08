@@ -8,7 +8,12 @@
     <meta name="theme-color" content="#1e4d40" />
 
     <title>MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire</title>
-    <meta name="description" content="MediClinic est le logiciel de gestion pour petites et moyennes cliniques en Côte d'Ivoire : rendez-vous, dossiers patients, pharmacie, laboratoire et facturation, à partir de 15 000 FCFA/mois." />
+    <!-- Prix : 9 000 FCFA = plan Clinique, le moins cher des plans payants
+         (backend/utils/plans.js). Ces métadonnées annonçaient « à partir de
+         15 000 FCFA/mois », un tarif qui n'existe dans aucun plan. Toute
+         évolution tarifaire doit être répercutée ici à la main : un fichier
+         HTML statique ne peut pas lire plans.js. -->
+    <meta name="description" content="MediClinic est le logiciel de gestion pour petites et moyennes cliniques en Côte d'Ivoire : rendez-vous, dossiers patients, pharmacie, laboratoire et facturation. Essai gratuit 7 jours, puis à partir de 9 000 FCFA/mois." />
     <!-- TODO: replace https://mediclinicpro.example with the real production domain once deployed -->
     <link rel="canonical" href="https://mediclinicpro.example/" />
 
@@ -18,13 +23,13 @@
     <meta property="og:site_name" content="MediClinic" />
     <meta property="og:url" content="https://mediclinicpro.example/" />
     <meta property="og:title" content="MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire" />
-    <meta property="og:description" content="Rendez-vous, dossiers patients, pharmacie, laboratoire et facturation pour les cliniques ivoiriennes, à partir de 15 000 FCFA/mois." />
+    <meta property="og:description" content="Rendez-vous, dossiers patients, pharmacie, laboratoire et facturation pour les cliniques ivoiriennes. Essai gratuit 7 jours, puis à partir de 9 000 FCFA/mois." />
     <meta property="og:image" content="https://mediclinicpro.example/clinic_hero.png" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire" />
-    <meta name="twitter:description" content="Rendez-vous, dossiers patients, pharmacie, laboratoire et facturation pour les cliniques ivoiriennes, à partir de 15 000 FCFA/mois." />
+    <meta name="twitter:description" content="Rendez-vous, dossiers patients, pharmacie, laboratoire et facturation pour les cliniques ivoiriennes. Essai gratuit 7 jours, puis à partir de 9 000 FCFA/mois." />
     <meta name="twitter:image" content="https://mediclinicpro.example/clinic_hero.png" />
 
     <script type="application/ld+json">
@@ -39,7 +44,7 @@
       "inLanguage": "fr",
       "offers": {
         "@type": "Offer",
-        "price": "15000",
+        "price": "9000",
         "priceCurrency": "XOF",
         "priceValidUntil": "2027-12-31",
         "unitText": "mois"

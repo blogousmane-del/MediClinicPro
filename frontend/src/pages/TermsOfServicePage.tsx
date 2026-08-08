@@ -31,7 +31,11 @@ const sections: Section[] = [
   {
     id: '4',
     title: '4. Abonnement et facturation',
-    content: "MediClinic est proposé pour 15 000 FCFA par mois. [Préciser ici les modalités de renouvellement, de résiliation et de remboursement applicables.]"
+    // Le tarif annoncé ici était « 15 000 FCFA par mois », un prix qui
+    // n'existe dans aucun plan — dans un document contractuel. Remplacé par la
+    // grille réelle de backend/utils/plans.js. Les crochets restants sont des
+    // mentions à faire rédiger, pas des textes à inventer.
+    content: "MediClinic propose trois formules : Starter, gratuite et limitée à 7 jours d'utilisation ; Clinique, à 9 000 FCFA par mois ; et Hôpital, à 14 500 FCFA par mois. Le détail des limites de chaque formule figure sur la page tarifs. [Préciser ici les modalités de renouvellement, de résiliation et de remboursement applicables.]"
   },
   {
     id: '5',

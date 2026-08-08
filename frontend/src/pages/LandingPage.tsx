@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { api } from '../utils/api';
 import {
   ShieldCheck,
   Calendar,
@@ -37,10 +38,12 @@ const featurePills = [
   { icon: BarChart3, label: 'Rapports BI' }
 ];
 
-// Mirrors backend/utils/plans.js's PLANS — this page is logged-out (no
-// GET /settings/plans, which requires auth), so the real values are
-// snapshotted here rather than fetched. Keep in sync with plans.js if
-// pricing/limits change.
+// Repli hors ligne du catalogue. Les vrais chiffres sont chargés au montage
+// depuis GET /settings/public/plans, qui lit backend/utils/plans.js — seule
+// source de vérité des prix. Ces valeurs ne servent que si l'API est
+// injoignable : une page vitrine doit s'afficher même backend éteint, mais
+// elle ne doit jamais être la référence. Seuls badge/ctaLabel/note/highlight
+// sont réellement définis ici, ils n'existent pas côté backend.
 const pricingPlans: {
   id: 'starter' | 'clinique' | 'hopital';
   name: string;
@@ -96,6 +99,36 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Catalogue réel (prix, limites) chargé depuis le backend. Un échec est
+  // silencieux et sans conséquence visible : on garde le repli ci-dessus
+  // plutôt que d'afficher une page tarifs vide ou un message d'erreur à un
+  // visiteur qui découvre le produit.
+  const [catalog, setCatalog] = useState<Record<string, any> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/settings/public/plans')
+      .then(data => { if (!cancelled) setCatalog(data.plans || null); })
+      .catch(() => { /* repli sur les valeurs statiques */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const effectivePlans = pricingPlans.map(plan => {
+    const live = catalog?.[plan.id];
+    if (!live) return plan;
+    return {
+      ...plan,
+      price: typeof live.price === 'number' ? live.price : plan.price,
+      staffLimit: live.staffLimit === null || typeof live.staffLimit === 'number' ? live.staffLimit : plan.staffLimit,
+      allowedRoles: live.allowedRoles === null || Array.isArray(live.allowedRoles) ? live.allowedRoles : plan.allowedRoles,
+      paymentMethods: Array.isArray(live.paymentMethods) ? live.paymentMethods : plan.paymentMethods
+    };
+  });
+
+  // Prix affiché dans la bannière « Un seul abonnement » du hero : celui du
+  // plan le plus complet, jamais une constante recopiée.
+  const fullAccessPrice = effectivePlans.find(p => p.id === 'hopital')?.price ?? 14500;
 
   // Scroll-reveal: fade/slide sections into view once as they enter the viewport
   useEffect(() => {
@@ -433,7 +466,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                   Un seul abonnement
                 </span>
                 <span style={{ fontSize: '0.825rem', fontWeight: 600, color: '#f8fafc', marginTop: '2px', display: 'block', lineHeight: 1.3 }}>
-                  Accès complet à tous les modules, 15 000 FCFA / mois
+                  Accès complet à tous les modules, {fullAccessPrice.toLocaleString('fr-FR')} FCFA / mois
                 </span>
               </div>
             </div>
@@ -648,7 +681,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
           </p>
 
           <div className="pricing-cards-grid" style={{ maxWidth: '960px', margin: '0 auto' }}>
-            {pricingPlans.map(plan => {
+            {effectivePlans.map(plan => {
               const featureRows = buildPricingFeatureRows(plan);
               return (
                 <div
