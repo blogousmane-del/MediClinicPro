@@ -123,10 +123,14 @@ async function creditSubscription(row, { provider, paidAt }) {
   }
   baseDate.setMonth(baseDate.getMonth() + row.months);
 
-  await supabase
+  // Erreur remontée, pas avalée : l'appelant remet la ligne de paiement en
+  // attente pour rejouer. Une clinique dont l'échéance n'a pas bougé alors que
+  // le paiement est marqué réglé ne se voit sur aucun écran.
+  const { error: clinicError } = await supabase
     .from('clinics')
     .update({ subscription_status: 'active', subscription_expires_at: baseDate.toISOString(), plan: row.plan || undefined })
     .eq('id', row.clinic_id);
+  if (clinicError) throw clinicError;
 
   await supabase.from('activity_logs').insert({
     clinic_id: row.clinic_id,
@@ -297,35 +301,54 @@ router.post('/chariow', async (req, res) => {
       return res.json({ received: true, ignored: true });
     }
 
-    const rawBody = req.rawBody;
-    if (rawBody && (await isDuplicateEvent('chariow', rawBody))) {
-      return res.json({ received: true, deduped: true });
-    }
+    // PAS de déduplication ici, contrairement à Bictorys/PayTech. Pour eux le
+    // corps EST la preuve du paiement, donc le rejouer deux fois créditerait
+    // deux fois et la dédup protège. Ici le corps ne prouve rien : la
+    // réconciliation redemande le statut et écrit sous condition, elle est donc
+    // idempotente par construction. Enregistrer l'événement comme traité avant
+    // de savoir si la réconciliation a abouti ne ferait qu'une chose — jeter le
+    // rejeu légitime de Chariow après un incident réseau de notre côté.
 
     // RÈGLE ABSOLUE : on ne lit du corps que de quoi retrouver la ligne. Ni le
     // statut ni le montant annoncés ne sont pris en compte — la réconciliation
     // les redemande à Chariow.
     const data = body.data || {};
     const metadata = data.custom_metadata || {};
-    let subscriptionPaymentId = parseInt(metadata.subscriptionPaymentId, 10);
+    const saleId = data.id || data.sale_id ? String(data.id || data.sale_id) : null;
+    const metadataId = parseInt(metadata.subscriptionPaymentId, 10);
 
-    if (!Number.isInteger(subscriptionPaymentId)) {
-      const saleId = data.id || data.sale_id;
-      if (!saleId) return res.json({ received: true, ignored: true });
+    // La ligne est relue dans les deux cas, y compris quand les métadonnées
+    // portent l'identifiant : un identifiant venu du corps d'une requête non
+    // signée ne vaut que ce que la base en confirme.
+    const base = () => supabase.from('subscription_payments').select('id, provider_reference').eq('provider', 'chariow');
+    const lookup = Number.isInteger(metadataId)
+      ? base().eq('id', metadataId)
+      : saleId
+        ? base().eq('provider_reference', saleId)
+        : null;
 
-      const { data: row } = await supabase
-        .from('subscription_payments')
-        .select('id')
-        .eq('provider', 'chariow')
-        .eq('provider_reference', String(saleId))
-        .maybeSingle();
+    if (!lookup) return res.json({ received: true, ignored: true });
 
-      if (!row) {
-        console.error('[WEBHOOKS] Vente Chariow inconnue de cette installation :', String(saleId));
-        return res.json({ received: true, ignored: true });
-      }
-      subscriptionPaymentId = row.id;
+    const { data: row } = await lookup.maybeSingle();
+    if (!row) {
+      console.error('[WEBHOOKS] Vente Chariow inconnue de cette installation :', saleId || metadataId);
+      return res.json({ received: true, ignored: true });
     }
+
+    // Rattrapage de provider_reference : le checkout l'écrit juste APRÈS avoir
+    // obtenu la vente de Chariow, et une interruption entre les deux laisserait
+    // une ligne que plus rien ne pourrait créditer — la réconciliation refuse
+    // de travailler sans référence, cron compris. Le webhook, lui, a
+    // l'identifiant sous la main.
+    if (!row.provider_reference && saleId) {
+      await supabase
+        .from('subscription_payments')
+        .update({ provider_reference: saleId })
+        .eq('id', row.id);
+      console.error(`[WEBHOOKS] provider_reference manquante sur le paiement #${row.id}, complétée depuis le webhook : ${saleId}`);
+    }
+
+    const subscriptionPaymentId = row.id;
 
     // Require paresseux : chariowReconcile requiert ce module pour
     // creditSubscription. Un require en tête de fichier créerait un cycle.

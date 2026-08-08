@@ -37,16 +37,26 @@ const TabFallback: React.FC = () => (
   </div>
 );
 
+// Chariow renvoie l'acheteur sur `/?checkout=chariow&sub=<id>`, et c'est
+// SettingsPage qui lit ce paramètre pour faire vérifier le paiement. Atterrir
+// sur le tableau de bord ne monterait jamais cet onglet (voir visitedTabsRef
+// plus bas) : le client paierait sans voir la moindre confirmation, et le
+// crédit attendrait le webhook, sinon le cron du lendemain.
+const initialTab = () => {
+  if (typeof window === 'undefined') return 'dashboard';
+  return new URLSearchParams(window.location.search).get('checkout') === 'chariow' ? 'settings' : 'dashboard';
+};
+
 const MainAppContent: React.FC = () => {
   const { user, clinic, loading } = useAuth();
-  
+
   // Navigation tabs
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [currentTab, setCurrentTab] = useState<string>(initialTab);
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
 
   // Tabs stay mounted (hidden via CSS) once visited instead of unmounting on
   // switch, so their data fetches aren't repeated every time the user comes back.
-  const visitedTabsRef = useRef<Set<string>>(new Set(['dashboard']));
+  const visitedTabsRef = useRef<Set<string>>(new Set(['dashboard', initialTab()]));
   visitedTabsRef.current.add(currentTab);
 
   // Auth pages switching states (when not logged in)

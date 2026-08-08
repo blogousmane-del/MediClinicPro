@@ -100,7 +100,23 @@ async function reconcileChariowSubscription(subscriptionPaymentId) {
   // nous de le créditer une seconde fois.
   if (!updated) return { status: 'paid' };
 
-  await creditSubscription(row, { provider: 'chariow', paidAt });
+  // La ligne est déjà 'paid' : si le crédit échoue maintenant, plus aucun
+  // chemin ne rejouera (les trois sortent sur status === 'paid') et la clinique
+  // resterait payante sans échéance prolongée, sans le moindre signal. On
+  // remet donc la ligne en 'pending' pour que le webhook, le retour navigateur
+  // ou le cron reprennent le travail.
+  try {
+    await creditSubscription(row, { provider: 'chariow', paidAt });
+  } catch (err) {
+    console.error(`[CHARIOW] Crédit de l'abonnement #${row.id} impossible, ligne remise en attente :`, err);
+    await supabase
+      .from('subscription_payments')
+      .update({ status: 'pending', paid_at: null })
+      .eq('id', row.id)
+      .eq('status', 'paid');
+    return { status: 'pending', reason: 'crédit à rejouer' };
+  }
+
   return { status: 'paid' };
 }
 

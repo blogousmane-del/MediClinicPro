@@ -72,12 +72,60 @@ test('le corps ne sert qu a trouver la vente, jamais a crediter', async () => {
 test('les metadonnees portent l identifiant quand elles sont presentes', async () => {
   resetDb();
   reconciled.length = 0;
+  db.subscription_payments.push({ id: 7, provider: 'chariow', provider_reference: 'sale_9', status: 'pending' });
+
   const res = await post('?secret=le-bon-secret', {
     event: 'successful.sale',
     data: { id: 'sale_9', custom_metadata: { subscriptionPaymentId: 7 } }
   });
   assert.strictEqual(res.status, 200);
   assert.deepStrictEqual(reconciled, [7]);
+});
+
+test('un identifiant de metadonnees inconnu de la base est ignore', async () => {
+  resetDb();
+  reconciled.length = 0;
+  // Le corps n'est pas signe : un identifiant qu'il annonce ne vaut que ce que
+  // la base en confirme.
+  const res = await post('?secret=le-bon-secret', {
+    event: 'successful.sale',
+    data: { id: 'sale_9', custom_metadata: { subscriptionPaymentId: 999 } }
+  });
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(reconciled, []);
+});
+
+test('une reference de vente manquante est completee depuis le webhook', async () => {
+  resetDb();
+  reconciled.length = 0;
+  // Cas reel : le checkout est interrompu entre la creation de la vente chez
+  // Chariow et l'ecriture de provider_reference. Sans rattrapage, la
+  // reconciliation refuse de travailler et la ligne n'est JAMAIS creditable.
+  db.subscription_payments.push({ id: 12, provider: 'chariow', provider_reference: null, status: 'pending' });
+
+  const res = await post('?secret=le-bon-secret', {
+    event: 'settled.sale',
+    data: { id: 'sale_perdue', custom_metadata: { subscriptionPaymentId: 12 } }
+  });
+
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(db.subscription_payments[0].provider_reference, 'sale_perdue');
+  assert.deepStrictEqual(reconciled, [12]);
+});
+
+test('deux livraisons du meme evenement reconcilient toutes les deux', async () => {
+  resetDb();
+  reconciled.length = 0;
+  // Pas de deduplication pour Chariow, contrairement a Bictorys/PayTech : le
+  // corps ne prouve rien, la reconciliation est idempotente, et jeter un rejeu
+  // ferait perdre le rattrapage apres un incident reseau de notre cote.
+  db.subscription_payments.push({ id: 5, provider: 'chariow', provider_reference: 'sale_2', status: 'pending' });
+  const body = { event: 'settled.sale', data: { id: 'sale_2' } };
+
+  await post('?secret=le-bon-secret', body);
+  await post('?secret=le-bon-secret', body);
+
+  assert.deepStrictEqual(reconciled, [5, 5]);
 });
 
 test('une vente inconnue de cette installation est ignoree sans erreur', async () => {
