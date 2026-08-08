@@ -28,7 +28,9 @@ function stubModule(relativePath, exports) {
 // le tout « thenable » pour fonctionner avec await.
 function queryBuilder(table) {
   const state = { op: 'select', filters: [], payload: null, singleRow: false };
-  const rowMatches = (row) => state.filters.every(([column, value]) => row[column] === value);
+  const rowMatches = (row) => state.filters.every(([column, value, op]) => (
+    op === 'in' ? value.includes(row[column]) : row[column] === value
+  ));
 
   const run = () => {
     const rows = db[table];
@@ -52,6 +54,7 @@ function queryBuilder(table) {
   const builder = {
     select() { return builder; },
     eq(column, value) { state.filters.push([column, value]); return builder; },
+    in(column, values) { state.filters.push([column, values, 'in']); return builder; },
     limit() { return builder; },
     order() { return builder; },
     // Filtres de plage ignorés : les tests posent des dates explicites et
