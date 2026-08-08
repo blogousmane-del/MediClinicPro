@@ -235,9 +235,17 @@ router.put('/config', async (req, res) => {
       // l'annonçait « configurée » puisque GET /config ne fait que constater la
       // présence d'une ligne — un état qui ment est pire qu'une absence d'état.
       // Le même appel sert à vérifier que la boutique règle bien en XOF.
+      // Seuls 401 et 403 prouvent que la CLÉ est en cause. Un 404 (endpoint
+      // absent de ce compte), un 5xx passager ou une coupure réseau ne disent
+      // rien d'elle : refuser dans ces cas bloquerait un exploitant sur une
+      // panne qui n'est pas la sienne. On enregistre alors en le signalant —
+      // une clé fausse se manifestera au premier checkout, avec son motif.
       const probe = await chariow.listProducts({ apiKey });
-      if (!probe.ok) {
+      if (!probe.ok && (probe.status === 401 || probe.status === 403)) {
         return res.status(400).json({ error: `Clé refusée par Chariow, rien n'a été enregistré : ${probe.error}` });
+      }
+      if (!probe.ok) {
+        warnings.push(`Clé enregistrée sans avoir pu être vérifiée auprès de Chariow : ${probe.error}`);
       }
       // Contrôle de devise volontairement souple. Une boutique Chariow peut
       // vendre autre chose que MediClinic : refuser la clé parce qu'un produit
@@ -246,7 +254,7 @@ router.put('/config', async (req, res) => {
       // checkout qui l'impose, en relisant le prix réellement facturé.
       // Un catalogue non vide où AUCUN produit n'est en XOF reste refusé : là,
       // la boutique n'est manifestement pas configurée pour ce marché.
-      const withCurrency = probe.products.filter((p) => p.currency);
+      const withCurrency = (probe.products || []).filter((p) => p.currency);
       const xof = withCurrency.filter((p) => p.currency === 'XOF');
       if (withCurrency.length && !xof.length) {
         return res.status(400).json({

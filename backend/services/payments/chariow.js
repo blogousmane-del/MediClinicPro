@@ -167,6 +167,9 @@ async function callChariow(pathname, init, overrides = {}) {
   try {
     res = await chariowFetch(pathname, init, apiKey, config.apiUrl);
   } catch (err) {
+    // `status` absent = on n'a jamais eu de réponse. L'appelant s'en sert pour
+    // distinguer « clé refusée » de « on ne sait pas », deux situations qui ne
+    // se traitent pas pareil.
     return { ok: false, error: `Erreur réseau vers Chariow : ${err.message}` };
   }
 
@@ -178,11 +181,11 @@ async function callChariow(pathname, init, overrides = {}) {
   try {
     body = JSON.parse(raw);
   } catch {
-    return { ok: false, error: `Chariow a répondu ${res.status} (réponse non JSON) : ${excerpt(raw)}` };
+    return { ok: false, status: res.status, error: `Chariow a répondu ${res.status} (réponse non JSON) : ${excerpt(raw)}` };
   }
 
   if (!res.ok) {
-    return { ok: false, error: `Chariow a refusé la requête (${res.status}) : ${describeError(body, raw)}` };
+    return { ok: false, status: res.status, error: `Chariow a refusé la requête (${res.status}) : ${describeError(body, raw)}` };
   }
   return { ok: true, data: body.data || body };
 }

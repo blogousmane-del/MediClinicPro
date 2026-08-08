@@ -176,7 +176,7 @@ test('une cle refusee par Chariow n est PAS enregistree', async () => {
   process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
   resetDb();
   probedKeys.length = 0;
-  probeResponse = { ok: false, error: 'Chariow a refusé la requête (401) : Unauthorized' };
+  probeResponse = { ok: false, status: 401, error: 'Chariow a refusé la requête (401) : Unauthorized' };
 
   const res = await putConfig({ chariow_api_key: 'sk_fausse' });
 
@@ -203,6 +203,33 @@ test('une boutique sans aucun produit en XOF est refusee sans ecriture', async (
   assert.strictEqual(res.status, 400);
   assert.match((await res.json()).error, /USD/);
   assert.strictEqual(db.platform_settings.some((r) => r.key === 'chariow_api_key'), false);
+});
+
+test('un 404 sur le catalogue n empeche pas d enregistrer la cle', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  // Un endpoint absent de ce compte ne dit RIEN de la validite de la cle.
+  // Refuser ici bloquerait l'exploitant sur une panne qui n'est pas la sienne.
+  probeResponse = { ok: false, status: 404, error: 'Chariow a refusé la requête (404) : Not Found' };
+
+  const res = await putConfig({ chariow_api_key: 'sk_peut_etre_bonne' });
+  const body = await res.json();
+
+  assert.strictEqual(res.status, 200);
+  assert.ok(db.platform_settings.some((r) => r.key === 'chariow_api_key'));
+  assert.match(body.warnings[0], /sans avoir pu être vérifiée/);
+});
+
+test('une coupure reseau n empeche pas d enregistrer la cle', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  resetDb();
+  // Pas de `status` : on n'a jamais eu de reponse.
+  probeResponse = { ok: false, error: 'Erreur réseau vers Chariow : fetch failed' };
+
+  const res = await putConfig({ chariow_api_key: 'sk_reseau' });
+
+  assert.strictEqual(res.status, 200);
+  assert.ok(db.platform_settings.some((r) => r.key === 'chariow_api_key'));
 });
 
 test('une boutique mixte est acceptee, avec un avertissement', async () => {
