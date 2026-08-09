@@ -145,8 +145,18 @@ export const SystemConfigSection: React.FC = () => {
         <Row label="Base de données">
           <Status ok={config.database.connected} okLabel="Connectée" koLabel="Injoignable" />
         </Row>
-        <Row label="API_PUBLIC_URL">{config.urls.apiPublicUrl || <em>non défini</em>}</Row>
-        <Row label="APP_URL">{config.urls.appUrl || <em>non défini</em>}</Row>
+        {/* Ces deux adresses étaient affichées en italique discret quand elles
+            manquaient, à côté de badges rouges — donc lues comme une simple
+            information. Or une APP_URL absente renvoie un acheteur qui vient de
+            payer vers localhost, et une API_PUBLIC_URL absente rend l'URL de
+            webhook inutilisable. Ce sont des pannes, elles se signalent comme
+            telles. */}
+        <Row label="API_PUBLIC_URL">
+          {config.urls.apiPublicUrl || <Status ok={false} koLabel="Manquant — URL de webhook incomplète" />}
+        </Row>
+        <Row label="APP_URL">
+          {config.urls.appUrl || <Status ok={false} koLabel="Manquant — paiement d'abonnement suspendu" />}
+        </Row>
       </div>
 
       <div className="card">

@@ -49,6 +49,31 @@ function seedClinic(plan = 'hopital') {
   db.clinics.push({ id: 1, name: 'Clinique A', plan });
 }
 
+test('sans APP_URL en production, le checkout est refuse avant toute creation', async () => {
+  resetDb();
+  seedClinic();
+  const savedAppUrl = process.env.APP_URL;
+  const savedVercel = process.env.VERCEL;
+  process.env.APP_URL = '';
+  process.env.VERCEL = '1';
+  lastCheckoutArgs = null;
+
+  try {
+    const res = await checkout({ months: 1 });
+
+    assert.strictEqual(res.status, 502);
+    assert.match((await res.json()).error, /APP_URL/);
+    // Le point essentiel : ni ligne en base, ni vente chez Chariow. Un retour
+    // vers localhost ferait payer un acheteur qui n'aurait aucun moyen de
+    // revenir, et nous laisserait une vente sans contrepartie.
+    assert.strictEqual(db.subscription_payments.length, 0, 'aucune ligne creee');
+    assert.strictEqual(lastCheckoutArgs, null, 'aucun appel a Chariow');
+  } finally {
+    process.env.APP_URL = savedAppUrl;
+    if (savedVercel === undefined) delete process.env.VERCEL; else process.env.VERCEL = savedVercel;
+  }
+});
+
 test('un checkout nominal enregistre la vente et renvoie l URL', async () => {
   resetDb();
   seedClinic();

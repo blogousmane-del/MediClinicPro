@@ -6,11 +6,16 @@ const { validateAndNormalizePhone } = require('../utils/phone');
 const chariow = require('../services/payments/chariow');
 const { getPlan } = require('../utils/plans');
 
+const { getAppUrl } = require('../utils/publicUrls');
+
 // isPaymentMethodAllowed, ONLINE_METHODS et API_PUBLIC_URL ont disparu d'ici
 // avec l'encaissement patient en ligne : le mode de paiement n'est plus filtré
 // par le plan mais refusé net s'il n'est pas 'cash'. La fonction reste dans
 // utils/plans.js, qui décrit honnêtement ce que chaque palier autorisait.
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+//
+// APP_URL est lu à chaque requête, pas figé au chargement du module : une
+// constante de module gèle la valeur au démarrage de la fonction serverless et
+// survit à un changement de configuration jusqu'au prochain déploiement.
 
 // GET /api/financials/payments
 // List payments / receipts
@@ -316,6 +321,18 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       return res.status(502).json({ error: "Le paiement en ligne n'est pas configuré pour cette installation. Contactez le support MediClinic." });
     }
 
+    // Refus AVANT de créer quoi que ce soit. Sans APP_URL, l'adresse de retour
+    // pointerait vers localhost : l'acheteur paierait puis atterrirait sur sa
+    // propre machine, la vente existerait chez Chariow et nulle part chez nous.
+    // Mieux vaut un paiement impossible qu'un paiement perdu.
+    const appUrl = getAppUrl();
+    if (!appUrl) {
+      console.error("[FINANCIALS] APP_URL absent : checkout Chariow refusé (l'adresse de retour serait invalide).");
+      return res.status(502).json({
+        error: "L'adresse publique de l'application n'est pas configurée (APP_URL). Le paiement est suspendu pour éviter une transaction sans retour. Contactez le support MediClinic."
+      });
+    }
+
     const config = await chariow.loadConfig();
     const productId = chariow.productIdFor(config.products, targetPlanId, qtyMonths);
     if (!productId) {
@@ -360,7 +377,7 @@ router.post('/subscription/checkout', auth, checkRole(['admin']), async (req, re
       firstName: firstName || 'Clinique',
       lastName: restName.join(' ') || firstName || 'MediClinic',
       phone: chariow.resolveChariowPhone({ phone, phoneCountry, phoneLocal }),
-      redirectUrl: `${APP_URL}/?checkout=chariow&sub=${subPayment.id}`,
+      redirectUrl: `${appUrl}/?checkout=chariow&sub=${subPayment.id}`,
       metadata: { clinicId: req.user.clinicId, subscriptionPaymentId: subPayment.id }
     });
 
