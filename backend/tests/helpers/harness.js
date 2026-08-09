@@ -28,9 +28,19 @@ function stubModule(relativePath, exports) {
 // le tout « thenable » pour fonctionner avec await.
 function queryBuilder(table) {
   const state = { op: 'select', filters: [], payload: null, singleRow: false, count: false, head: false };
-  const rowMatches = (row) => state.filters.every(([column, value, op]) => (
-    op === 'in' ? value.includes(row[column]) : row[column] === value
-  ));
+  const rowMatches = (row) => state.filters.every(([column, value, op]) => {
+    switch (op) {
+      case 'in': return value.includes(row[column]);
+      // Comparaisons de plage : les dates circulent en ISO 8601 UTC, dont
+      // l'ordre lexicographique est l'ordre chronologique, donc `<` suffit et
+      // se comporte comme la comparaison PostgREST.
+      case 'gte': return row[column] != null && row[column] >= value;
+      case 'gt': return row[column] != null && row[column] > value;
+      case 'lte': return row[column] != null && row[column] <= value;
+      case 'lt': return row[column] != null && row[column] < value;
+      default: return row[column] === value;
+    }
+  });
 
   const run = () => {
     const rows = db[table];
@@ -71,10 +81,17 @@ function queryBuilder(table) {
     in(column, values) { state.filters.push([column, values, 'in']); return builder; },
     limit() { return builder; },
     order() { return builder; },
-    // Filtres de plage ignorés : les tests posent des dates explicites et
-    // vérifient le calcul applicatif, pas le filtrage PostgREST.
-    gte() { return builder; },
-    lt() { return builder; },
+    // Les filtres de plage étaient ignorés ici, au motif que les tests
+    // vérifiaient le calcul applicatif et non le filtrage PostgREST. Mais dès
+    // qu'une route découpe ses données PAR la requête — le revenu du mois
+    // courant contre celui du mois précédent, tous deux lus dans la même table
+    // avec des bornes différentes — les ignorer rend les deux lectures
+    // identiques, et un test écrit là-dessus valide une séparation qui n'existe
+    // pas. Même leçon que le `count` juste au-dessus.
+    gte(column, value) { state.filters.push([column, value, 'gte']); return builder; },
+    gt(column, value) { state.filters.push([column, value, 'gt']); return builder; },
+    lte(column, value) { state.filters.push([column, value, 'lte']); return builder; },
+    lt(column, value) { state.filters.push([column, value, 'lt']); return builder; },
     insert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
     update(payload) { state.op = 'update'; state.payload = payload; return builder; },
     upsert(payload) { state.op = 'insert'; state.payload = payload; return builder; },

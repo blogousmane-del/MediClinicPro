@@ -26,16 +26,6 @@ import {
   X
 } from 'lucide-react';
 
-// Date du jour en toutes lettres, comme le sous-titre de la maquette. Calculée
-// à chaque rendu du module plutôt que figée : la console reste ouverte des
-// heures, mais jamais au point de traverser deux jours sans rechargement.
-const todayLabel = new Date().toLocaleDateString('fr-FR', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric'
-});
-
 interface NewClinicPayload {
   clinicName: string;
   adminName: string;
@@ -221,16 +211,29 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
   };
 
   const handleCreateClinic = async (payload: NewClinicPayload) => {
+    // Seule cette ligne peut échouer d'une façon que le formulaire doit
+    // afficher : c'est elle qui porte les refus de validation.
     await api.post('/platform/clinics', payload);
     showToast('success', 'Clinique créée', `« ${payload.clinicName} » a été enregistrée avec son administrateur.`);
     setShowNewClinic(false);
-    // La nouvelle clinique doit apparaître immédiatement dans la liste, et les
-    // compteurs de la vue d'ensemble s'en trouvent changés : on relit la source
-    // plutôt que d'insérer la ligne à la main dans l'état local.
-    const result = await api.get('/platform/overview');
-    setOverview(result);
-    setPlatformUsers(null);
     setSection('clinics');
+
+    // Relecture séparée, et dans son propre try : la clinique est déjà créée à
+    // ce stade. Laisser une erreur de rechargement remonter au formulaire lui
+    // faisait afficher « La clinique n'a pas pu être créée » — sur un composant
+    // déjà démonté, donc invisible. L'opérateur voyait le succès, une liste
+    // périmée, et son second essai échouait sur « email déjà enregistré ».
+    try {
+      const result = await api.get('/platform/overview');
+      setOverview(result);
+      setPlatformUsers(null);
+    } catch {
+      showToast(
+        'error',
+        'Liste non actualisée',
+        "La clinique est bien créée, mais la liste n'a pas pu être rechargée. Rafraîchissez la page."
+      );
+    }
   };
 
   const handleToggleClinicOverride = async (clinicId: number, unlimited: boolean) => {
@@ -314,6 +317,18 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
   // style de nav désactivée, servent immédiatement à une éventuelle prochaine
   // section en préparation.
   const comingSoonItems: { label: string; icon: React.ElementType }[] = [];
+
+  // Date du jour en toutes lettres, comme le sous-titre de la maquette.
+  // Recalculée à chaque rendu, et surtout PAS au niveau du module : une
+  // constante de module est évaluée une fois au chargement du bundle, et cette
+  // console reste ouverte des heures — après minuit elle affichait la veille.
+  // Un useMemo serait pire encore, il figerait la valeur exprès.
+  const todayLabel = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
 
   const sectionTitles: Record<Section, string> = {
     overview: "Vue d'ensemble",
@@ -652,13 +667,21 @@ const SystemHealthPanel: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const emailLabels: Record<HealthConfig['email']['channel'], HealthLine> = {
+  const emailLabels: Record<string, HealthLine> = {
     resend: { label: 'E-mail', status: 'Opérationnel — Resend', ok: true },
     smtp: { label: 'E-mail', status: 'Opérationnel — SMTP', ok: true },
     // Aucun email ne part réellement dans ce mode : il est écrit dans les
     // journaux du serveur. C'est exactement l'état « Dégradé » de la maquette.
     console: { label: 'E-mail', status: 'Dégradé — journal console', ok: false }
   };
+
+  // Le canal vient du serveur : c'est une chaîne, pas une garantie. Un
+  // quatrième fournisseur ajouté un jour à platform-config.js rendrait cette
+  // recherche indéfinie, et `line.label` lèverait en plein rendu — sans
+  // périmètre d'erreur au-dessus, toute la console plateforme deviendrait
+  // blanche pour une ligne d'état.
+  const emailLine = (channel: string): HealthLine =>
+    emailLabels[channel] || { label: 'E-mail', status: `Canal inconnu — ${channel}`, ok: false };
 
   const lines: HealthLine[] = config
     ? [
@@ -669,7 +692,7 @@ const SystemHealthPanel: React.FC = () => {
           status: config.database.connected ? 'Opérationnel' : 'Injoignable',
           ok: config.database.connected
         },
-        emailLabels[config.email.channel],
+        emailLine(config.email.channel),
         {
           label: 'Limitation de débit',
           status: config.rateLimit.backend === 'redis'
