@@ -369,15 +369,21 @@ INSERT INTO clinics (id, name, address, phone, plan, subscription_status, subscr
 -- Leurs mots de passe sont publics (documentés dans CLAUDE.md) et devinables.
 -- Ils ne doivent JAMAIS rester actifs dans une base de production : un audit
 -- du 2026-08-09 les y a trouvés vivants, aux côtés de vraies cliniques.
--- Correctif : backend/scripts/disable-demo-accounts.sql.
+-- Fermés à la main le 2026-08-09 (backend/scripts/disable-demo-accounts.sql).
+--
+-- Ils sont donc semés `active = 0`. Rejouer ce schéma contre la production ne
+-- rouvre plus la porte que l'audit a fermée — c'était le cas tant que la
+-- dernière colonne valait 1. Pour s'en servir en local, les activer
+-- explicitement, jamais en remettant 1 ici :
+--   UPDATE users SET active = 1 WHERE email LIKE '%@mediclinic.com';
 INSERT INTO users (id, clinic_id, name, email, password_hash, role, active) VALUES
-(1, 1, 'Administrateur', 'admin@mediclinic.com', '$2a$10$.xGSl.knQiHJcilqpOtTHe4MGzHSyZlM3GofsduMrbYs9PRv4eJ/S', 'admin', 1),
-(2, 1, 'Dr. Aminata Koné', 'aminata@mediclinic.com', '$2a$10$pzFlMyOI2De.LWBD.s96Guj/Sb6QiNJSjh6XBp5le1iaEy4k.6GLe', 'doctor', 1),
-(3, 1, 'Dr. Ibrahim Traoré', 'ibrahim@mediclinic.com', '$2a$10$pzFlMyOI2De.LWBD.s96Guj/Sb6QiNJSjh6XBp5le1iaEy4k.6GLe', 'doctor', 1),
-(4, 1, 'Koffi Bernard', 'bernard@mediclinic.com', '$2a$10$pqpzshRqNERXn6SxqO.OJOFQoq4tqqH/02igbXW47ZY/KoAH9.p36', 'secretary', 1),
-(5, 1, 'Moussa Pharmacien', 'moussa@mediclinic.com', '$2a$10$N57s2TbUloU2fSjKxdh/7.w/GUjweOTtC0teKrNg7NxO1fivUlmZG', 'pharmacist', 1),
-(6, 1, 'Fatou Laborantine', 'fatou@mediclinic.com', '$2a$10$ztStKuicP1UrLU57MIzIo.uqvxAyjKYYkbEsJ4MOH1g1Sn4xo/EKS', 'lab_tech', 1),
-(7, 1, 'Kouassi Gestionnaire', 'kouassi@mediclinic.com', '$2a$10$1kZ1iuBuOROPMFY26C3SHONfVFCsuXHQJnJ9NRGfGW.UWEJDwA/72', 'manager', 1);
+(1, 1, 'Administrateur', 'admin@mediclinic.com', '$2a$10$.xGSl.knQiHJcilqpOtTHe4MGzHSyZlM3GofsduMrbYs9PRv4eJ/S', 'admin', 0),
+(2, 1, 'Dr. Aminata Koné', 'aminata@mediclinic.com', '$2a$10$pzFlMyOI2De.LWBD.s96Guj/Sb6QiNJSjh6XBp5le1iaEy4k.6GLe', 'doctor', 0),
+(3, 1, 'Dr. Ibrahim Traoré', 'ibrahim@mediclinic.com', '$2a$10$pzFlMyOI2De.LWBD.s96Guj/Sb6QiNJSjh6XBp5le1iaEy4k.6GLe', 'doctor', 0),
+(4, 1, 'Koffi Bernard', 'bernard@mediclinic.com', '$2a$10$pqpzshRqNERXn6SxqO.OJOFQoq4tqqH/02igbXW47ZY/KoAH9.p36', 'secretary', 0),
+(5, 1, 'Moussa Pharmacien', 'moussa@mediclinic.com', '$2a$10$N57s2TbUloU2fSjKxdh/7.w/GUjweOTtC0teKrNg7NxO1fivUlmZG', 'pharmacist', 0),
+(6, 1, 'Fatou Laborantine', 'fatou@mediclinic.com', '$2a$10$ztStKuicP1UrLU57MIzIo.uqvxAyjKYYkbEsJ4MOH1g1Sn4xo/EKS', 'lab_tech', 0),
+(7, 1, 'Kouassi Gestionnaire', 'kouassi@mediclinic.com', '$2a$10$1kZ1iuBuOROPMFY26C3SHONfVFCsuXHQJnJ9NRGfGW.UWEJDwA/72', 'manager', 0);
 
 -- Seed medications catalog
 INSERT INTO medications (id, clinic_id, name, form, dosage, stock_quantity, min_stock_threshold, price_purchase, price_sale, expiry_date, batch_number, supplier) VALUES

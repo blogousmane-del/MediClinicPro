@@ -3,6 +3,14 @@
 -- login always failed for admin@mediclinic.com, aminata@mediclinic.com, etc.
 -- Run this once in the Supabase SQL editor against your existing database.
 -- Safe to re-run; only touches these known demo emails, no other data.
+--
+-- ⚠️  BASE DE DÉVELOPPEMENT UNIQUEMENT. Ce script rend les mots de passe de
+-- démonstration fonctionnels — c'est exactement ce qu'on ne veut pas en
+-- production, où ces comptes ont été fermés le 2026-08-09
+-- (backend/scripts/disable-demo-accounts.sql). Il ne touche pas `active`, donc
+-- le rejouer ne rouvre aucune session tant que les comptes restent `active =
+-- 0` : la requête de login filtre sur `active = 1`. Ne pas « compléter » ce
+-- script par un UPDATE sur `active` sans savoir contre quelle base il tourne.
 
 UPDATE users SET password_hash = '$2a$10$.xGSl.knQiHJcilqpOtTHe4MGzHSyZlM3GofsduMrbYs9PRv4eJ/S' WHERE email = 'admin@mediclinic.com';
 UPDATE users SET password_hash = '$2a$10$pzFlMyOI2De.LWBD.s96Guj/Sb6QiNJSjh6XBp5le1iaEy4k.6GLe' WHERE email = 'aminata@mediclinic.com';

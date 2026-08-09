@@ -80,7 +80,20 @@ npm run dev
 
 ## 🔑 Comptes de Test (Pré-configurés)
 
-Vous pouvez vous connecter instantanément en utilisant les comptes d'exemple suivants :
+> ⚠️ **Développement local uniquement.** Ces mots de passe sont publics, et
+> `adminpassword` est devinable sans même lire cette page. Un audit du
+> 2026-08-09 a retrouvé ces sept comptes actifs dans la base de *production* :
+> un admin de la clinique 1 y lit et écrit tous les dossiers de cette clinique.
+> Ils sont désormais semés `active = 0` et n'ouvrent aucune session tant qu'on
+> ne les active pas à la main. Ne jamais les activer sur une base qui porte de
+> vraies données ; voir `backend/scripts/disable-demo-accounts.sql`.
+
+Sur une base de développement, vous pouvez vous connecter avec les comptes
+d'exemple suivants — après les avoir activés :
+
+```sql
+UPDATE users SET active = 1 WHERE email LIKE '%@mediclinic.com';
+```
 
 | Rôle | Adresse Email | Mot de passe |
 |---|---|---|
