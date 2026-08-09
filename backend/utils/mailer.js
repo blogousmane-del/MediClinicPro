@@ -1,9 +1,21 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+const { getAppUrl } = require('./publicUrls');
 
-const buildConfirmationEmail = (adminName, clinicName) => {
+// Appelé à chaque envoi, jamais figé au chargement du module : une constante
+// gèlerait la valeur au démarrage de la fonction serverless et survivrait à un
+// changement de configuration. Chaîne vide plutôt que localhost en production
+// non configurée — un lien vide est visiblement cassé, un lien vers localhost
+// se fait passer pour une destination valable.
+const appUrl = () => getAppUrl() || '';
+
+// `trialDays` est un paramètre et non le 7 codé en dur d'origine : la durée
+// d'essai est réglable de 1 à 90 jours depuis Platform Admin, et l'email
+// promettait « 7 jours » quelle que soit la valeur réellement appliquée au
+// compte. Repli sur 7, la valeur par défaut de starter_trial_days.
+const buildConfirmationEmail = (adminName, clinicName, trialDays = 7) => {
+  const trialLabel = `${trialDays} jour${trialDays > 1 ? 's' : ''} d'essai gratuit`;
   const html = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1a202c;">
       <div style="text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 20px; margin-bottom: 20px;">
@@ -16,7 +28,7 @@ const buildConfirmationEmail = (adminName, clinicName) => {
 
         <p>Nous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement <strong>"${clinicName}"</strong>.</p>
 
-        <p>Votre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de <strong>7 jours d'essai gratuit</strong> avec accès complet à toutes les fonctionnalités (Dossier patient, Agenda, Pharmacie, Labo et Comptabilité).</p>
+        <p>Votre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de <strong>${trialLabel}</strong> avec accès complet à toutes les fonctionnalités (Dossier patient, Agenda, Pharmacie, Labo et Comptabilité).</p>
 
         <div style="background-color: #f7fafc; border-left: 4px solid #0d9488; padding: 15px; border-radius: 6px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #2d3748; font-size: 16px;">Vos prochaines étapes :</h3>
@@ -28,7 +40,7 @@ const buildConfirmationEmail = (adminName, clinicName) => {
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${APP_URL}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder à mon espace clinique</a>
+          <a href="${appUrl()}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder à mon espace clinique</a>
         </div>
 
         <p>Si vous avez des questions, notre support est à votre disposition par WhatsApp au <strong>+225 07 07 07 07 07</strong>.</p>
@@ -40,7 +52,7 @@ const buildConfirmationEmail = (adminName, clinicName) => {
     </div>
   `;
 
-  const text = `Bonjour ${adminName},\n\nNous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement "${clinicName}".\n\nVotre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de 7 jours d'essai gratuit.\n\nAccédez à votre espace clinique à l'adresse : ${APP_URL}\n\nCordialement,\nL'équipe MediClinic Pro`;
+  const text = `Bonjour ${adminName},\n\nNous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement "${clinicName}".\n\nVotre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de ${trialLabel}.\n\nAccédez à votre espace clinique à l'adresse : ${appUrl()}\n\nCordialement,\nL'équipe MediClinic Pro`;
 
   return { html, text };
 };
@@ -54,9 +66,9 @@ const buildConfirmationEmail = (adminName, clinicName) => {
  * @param {string} adminName
  * @param {string} clinicName
  */
-const sendConfirmationEmail = async (toEmail, adminName, clinicName) => {
+const sendConfirmationEmail = async (toEmail, adminName, clinicName, trialDays) => {
   const subject = 'Bienvenue sur MediClinic Pro ! 🏥 Confirmation de création de compte';
-  const { html, text } = buildConfirmationEmail(adminName, clinicName);
+  const { html, text } = buildConfirmationEmail(adminName, clinicName, trialDays);
 
   const resendApiKey = process.env.RESEND_API_KEY || '';
   const resendFrom = process.env.RESEND_FROM_EMAIL || 'MediClinic Pro <no-reply@mediclinicpro.com>';
@@ -146,7 +158,7 @@ const buildRenewalReminderEmail = (adminName, clinicName, daysLeft, planName, pr
         <p>Passé ce délai, l'écriture de nouvelles données (patients, rendez-vous, ordonnances...) sera automatiquement bloquée jusqu'au renouvellement.</p>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${APP_URL}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Renouveler mon abonnement</a>
+          <a href="${appUrl()}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Renouveler mon abonnement</a>
         </div>
 
         <p style="margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; font-size: 12px; color: #a0aec0; text-align: center;">
@@ -156,7 +168,7 @@ const buildRenewalReminderEmail = (adminName, clinicName, daysLeft, planName, pr
     </div>
   `;
 
-  const text = `Bonjour ${adminName},\n\nPour l'établissement "${clinicName}", ${actionText}.\n\nPassé ce délai, l'écriture de nouvelles données sera automatiquement bloquée jusqu'au renouvellement.\n\nRenouvelez depuis : ${APP_URL}\n\nCordialement,\nL'équipe MediClinic Pro`;
+  const text = `Bonjour ${adminName},\n\nPour l'établissement "${clinicName}", ${actionText}.\n\nPassé ce délai, l'écriture de nouvelles données sera automatiquement bloquée jusqu'au renouvellement.\n\nRenouvelez depuis : ${appUrl()}\n\nCordialement,\nL'équipe MediClinic Pro`;
 
   return { html, text };
 };
@@ -226,7 +238,7 @@ const buildTicketStatusEmail = (adminName, clinicName, subject, status, resoluti
         <p>Votre ticket <strong>"${subject}"</strong> pour l'établissement <strong>"${clinicName}"</strong> est maintenant : <strong>${statusLabel}</strong>.</p>
         ${resolutionNote ? `<div style="background-color: #f7fafc; border-left: 4px solid #0d9488; padding: 15px; border-radius: 6px; margin: 20px 0;"><p style="margin:0;">${resolutionNote}</p></div>` : ''}
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${APP_URL}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir mes tickets</a>
+          <a href="${appUrl()}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir mes tickets</a>
         </div>
         <p style="margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; font-size: 12px; color: #a0aec0; text-align: center;">
           Cet email est généré automatiquement, merci de ne pas y répondre directement.
@@ -234,7 +246,7 @@ const buildTicketStatusEmail = (adminName, clinicName, subject, status, resoluti
       </div>
     </div>
   `;
-  const text = `Bonjour ${adminName},\n\nVotre ticket "${subject}" pour l'établissement "${clinicName}" est maintenant : ${statusLabel}.\n${resolutionNote ? `\nNote : ${resolutionNote}\n` : ''}\nVoir vos tickets : ${APP_URL}\n\nCordialement,\nL'équipe MediClinic Pro`;
+  const text = `Bonjour ${adminName},\n\nVotre ticket "${subject}" pour l'établissement "${clinicName}" est maintenant : ${statusLabel}.\n${resolutionNote ? `\nNote : ${resolutionNote}\n` : ''}\nVoir vos tickets : ${appUrl()}\n\nCordialement,\nL'équipe MediClinic Pro`;
   return { html, text };
 };
 

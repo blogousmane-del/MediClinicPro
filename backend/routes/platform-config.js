@@ -20,6 +20,7 @@ const paytech = require('../services/payments/paytech');
 const paypal = require('../services/payments/paypal');
 const chariow = require('../services/payments/chariow');
 const secretBox = require('../utils/secretBox');
+const { getApiPublicUrl } = require('../utils/publicUrls');
 const { getSettings, setSetting, setSecret, hasSecret } = require('../utils/platformSettings');
 
 router.use(auth, superAdminOnly);
@@ -291,6 +292,17 @@ router.put('/config', async (req, res) => {
         return res.status(400).json({ error: 'Le secret de webhook doit faire au moins 16 caractères.' });
       }
 
+      // Contrôle AVANT écriture. Sans API_PUBLIC_URL, l'URL construite serait
+      // relative (« /api/webhooks/chariow?secret=… ») : l'exploitant la
+      // collerait dans Chariow, aucun webhook n'arriverait jamais, et comme
+      // l'URL n'est montrée qu'une fois, le secret serait brûlé pour rien.
+      const base = getApiPublicUrl();
+      if (!base) {
+        return res.status(502).json({
+          error: "L'adresse publique de cette API n'est pas configurée (API_PUBLIC_URL). L'URL de webhook serait inutilisable : le secret n'a pas été généré."
+        });
+      }
+
       const written = await setSecret('chariow_webhook_secret', secret, req.user.userId);
       if (!written.ok) {
         return res.status(written.tableMissing ? 503 : 400).json({ error: written.error });
@@ -299,7 +311,6 @@ router.put('/config', async (req, res) => {
 
       // Seule occasion où ce secret sort du serveur : l'exploitant doit coller
       // cette URL dans Chariow. GET /config ne la redonnera jamais.
-      const base = (process.env.API_PUBLIC_URL || '').replace(/\/+$/, '');
       webhookUrl = `${base}/api/webhooks/chariow?secret=${encodeURIComponent(secret)}`;
 
       await supabase.from('activity_logs').insert({

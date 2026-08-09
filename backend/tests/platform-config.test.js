@@ -324,6 +324,28 @@ test('une adresse sans segment de produit est refusee', async () => {
   assert.strictEqual(db.platform_settings.length, 0, 'aucune ecriture partielle');
 });
 
+test('sans API_PUBLIC_URL, le secret de webhook n est PAS genere', async () => {
+  process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
+  const saved = process.env.API_PUBLIC_URL;
+  process.env.API_PUBLIC_URL = '';
+  resetDb();
+
+  try {
+    const res = await putConfig({ chariow_webhook_secret: '__generate__' });
+
+    assert.strictEqual(res.status, 502);
+    // L'URL n'est montree qu'une fois : generer un secret pour livrer une
+    // adresse relative brulerait ce secret sans que rien ne fonctionne.
+    assert.strictEqual(
+      db.platform_settings.some((r) => r.key === 'chariow_webhook_secret'),
+      false,
+      'aucun secret ne doit etre ecrit'
+    );
+  } finally {
+    process.env.API_PUBLIC_URL = saved;
+  }
+});
+
 test('generer le secret de webhook renvoie l URL complete une seule fois', async () => {
   process.env.CONFIG_ENCRYPTION_KEY = 'c'.repeat(64);
   resetDb();

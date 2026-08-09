@@ -99,7 +99,10 @@ router.post('/register', async (req, res) => {
 
     // Send confirmation email asynchronously (non-blocking)
     const { sendConfirmationEmail } = require('../utils/mailer');
-    sendConfirmationEmail(email, adminName, clinicName).catch(err => {
+    // `trialDays` est la durée RÉELLEMENT appliquée au compte ci-dessus, pas
+    // une valeur codée dans le modèle : l'email annonçait « 7 jours » même
+    // quand la plateforme en était réglée à 14 ou 30.
+    sendConfirmationEmail(email, adminName, clinicName, trialDays).catch(err => {
       console.error("[Email] Erreur d'envoi non bloquante lors de l'inscription :", err);
     });
 
