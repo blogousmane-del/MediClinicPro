@@ -3,6 +3,59 @@ const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 
+// Une quantité doit être un entier strictement positif, et un vrai nombre.
+// Le corps JSON peut porter n'importe quoi : avec une chaîne, `stock + qty`
+// devenait une concaténation — un stock de 10 réapprovisionné de "50" donnait
+// "1050", que Postgres rangeait tel quel. L'interface envoie déjà un
+// `parseInt`, donc seul un appel direct à l'API déclenchait le défaut, mais
+// n'importe quel compte authentifié pouvait corrompre l'inventaire.
+function isPositiveInteger(value) {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+// Le stock est lu puis réécrit. Sans garde, deux opérations simultanées lisent
+// la même valeur et la seconde écrase la première ; pire, la vérification
+// « stock suffisant » et le décrément étaient deux requêtes distinctes, donc le
+// stock pouvait passer sous zéro entre les deux.
+//
+// La mise à jour est conditionnée à la valeur lue (`.eq('stock_quantity', lu)`)
+// et rejouée si quelqu'un est passé entre-temps : zéro ligne modifiée signifie
+// « la valeur a bougé », jamais « échec silencieux ». Un `UPDATE ... SET
+// stock_quantity = stock_quantity - n` serait plus direct, mais PostgREST ne
+// sait pas exprimer une opération sur une colonne et aucune session n'a le
+// droit de créer la fonction SQL correspondante (voir CLAUDE.md).
+const STOCK_MAX_ATTEMPTS = 5;
+
+async function applyStockDelta(medicationId, clinicId, delta) {
+  for (let attempt = 0; attempt < STOCK_MAX_ATTEMPTS; attempt += 1) {
+    const { data: med, error: readError } = await supabase
+      .from('medications')
+      .select('stock_quantity, name')
+      .eq('id', medicationId)
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+
+    if (readError) throw readError;
+    if (!med) return { ok: false, reason: 'not_found' };
+
+    const next = med.stock_quantity + delta;
+    if (next < 0) return { ok: false, reason: 'insufficient', med };
+
+    const { data: updated, error: updateError } = await supabase
+      .from('medications')
+      .update({ stock_quantity: next })
+      .eq('id', medicationId)
+      .eq('clinic_id', clinicId)
+      .eq('stock_quantity', med.stock_quantity)
+      .select('id');
+
+    if (updateError) throw updateError;
+    if (updated && updated.length > 0) return { ok: true, stock: next };
+  }
+
+  return { ok: false, reason: 'conflict' };
+}
+
 // GET /api/pharmacy/medications
 // List medications / search catalog
 router.get('/medications', auth, async (req, res) => {
@@ -41,27 +94,34 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
   try {
     const { name, form, dosage, manufacturer, unit, minStockThreshold, qty, pricePurchase, priceSale, expiryDate, batchNumber, supplier } = req.body;
 
-    if (!name || !form || !dosage || !qty || !pricePurchase || !priceSale) {
+    if (!name || !form || !dosage || !pricePurchase || !priceSale) {
       return res.status(400).json({ error: "Les informations de réapprovisionnement principales sont obligatoires." });
     }
 
-    // Check if medication already exists in the catalog
-    const { data: med, error: checkError } = await supabase
-      .from('medications')
-      .select('*')
-      .eq('clinic_id', req.user.clinicId)
-      .eq('name', name)
-      .eq('form', form)
-      .eq('dosage', dosage)
-      .maybeSingle();
+    if (!isPositiveInteger(qty)) {
+      return res.status(400).json({ error: "La quantité doit être un nombre entier positif." });
+    }
 
-    if (checkError) throw checkError;
+    // Check if medication already exists in the catalog. La lecture est dans la
+    // boucle : si le stock a bougé entre-temps, on repart de la valeur fraîche
+    // plutôt que d'écraser l'écriture de l'autre requête.
+    let med = null;
+    let applied = false;
+    for (let attempt = 0; attempt < STOCK_MAX_ATTEMPTS && !applied; attempt += 1) {
+      const { data: found, error: checkError } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('clinic_id', req.user.clinicId)
+        .eq('name', name)
+        .eq('form', form)
+        .eq('dosage', dosage)
+        .maybeSingle();
 
-    let medId;
-    if (med) {
-      // Update existing record
-      medId = med.id;
-      const { error: updateError } = await supabase
+      if (checkError) throw checkError;
+      med = found;
+      if (!med) break;
+
+      const { data: updated, error: updateError } = await supabase
         .from('medications')
         .update({
           stock_quantity: med.stock_quantity + qty,
@@ -74,10 +134,21 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
           batch_number: batchNumber || med.batch_number,
           supplier: supplier || med.supplier
         })
-        .eq('id', medId)
-        .eq('clinic_id', req.user.clinicId);
+        .eq('id', med.id)
+        .eq('clinic_id', req.user.clinicId)
+        .eq('stock_quantity', med.stock_quantity)
+        .select('id');
 
       if (updateError) throw updateError;
+      applied = !!(updated && updated.length > 0);
+    }
+
+    let medId;
+    if (med) {
+      if (!applied) {
+        return res.status(409).json({ error: "Le stock a été modifié en même temps. Merci de réessayer." });
+      }
+      medId = med.id;
     } else {
       // Create new medication record
       const { data: newMed, error: insertError } = await supabase
@@ -236,11 +307,17 @@ router.post('/dispense/:id', auth, checkRole(['admin', 'pharmacist']), async (re
       return res.status(404).json({ error: "Ordonnance non trouvée dans cette clinique." });
     }
 
-    // Process each item
+    // Deux passes. PostgREST n'offre pas de transaction : un refus survenant au
+    // milieu de la boucle laisserait les articles déjà traités modifiés. Tout
+    // ce qui peut être vérifié l'est donc avant la première écriture.
+    const planned = [];
     for (const disp of dispensations) {
-      const { itemId, qty } = disp;
+      const { itemId, qty } = disp || {};
 
-      // Load prescription item
+      if (!isPositiveInteger(qty)) {
+        return res.status(400).json({ error: "La quantité à délivrer doit être un nombre entier positif." });
+      }
+
       const { data: prItem, error: itemError } = await supabase
         .from('prescription_items')
         .select('*')
@@ -249,43 +326,58 @@ router.post('/dispense/:id', auth, checkRole(['admin', 'pharmacist']), async (re
         .maybeSingle();
 
       if (itemError) throw itemError;
+      if (!prItem) {
+        return res.status(400).json({ error: "Un des articles ne fait pas partie de cette ordonnance." });
+      }
 
-      if (prItem && qty > 0) {
-        // If linked to a catalog medication, decrement stock
-        if (prItem.medication_id) {
-          const { data: med, error: medError } = await supabase
-            .from('medications')
-            .select('stock_quantity, name')
-            .eq('id', prItem.medication_id)
-            .eq('clinic_id', req.user.clinicId)
-            .maybeSingle();
+      // Rien n'empêchait de délivrer 100 boîtes sur une ordonnance qui en
+      // prescrivait 2 : seul le stock était comparé, jamais le reste à
+      // délivrer. L'interface calculait bien la différence, mais elle seule.
+      const remaining = Math.max(0, prItem.quantity_prescribed - prItem.quantity_dispensed);
+      if (qty > remaining) {
+        return res.status(400).json({
+          error: `Quantité supérieure au reste à délivrer pour ${prItem.medication_name || 'cet article'} (reste ${remaining}).`
+        });
+      }
 
-          if (medError) throw medError;
-          if (med) {
-            if (med.stock_quantity < qty) {
-              return res.status(400).json({ 
-                error: `Stock insuffisant pour le médicament ${med.name}. Stock actuel: ${med.stock_quantity}, Demandé: ${qty}` 
-              });
-            }
+      planned.push({ prItem, qty });
+    }
 
-            // Decrement Stock
-            const { error: decStockError } = await supabase
-              .from('medications')
-              .update({ stock_quantity: med.stock_quantity - qty })
-              .eq('id', prItem.medication_id)
-              .eq('clinic_id', req.user.clinicId);
+    for (const { prItem, qty } of planned) {
+      // If linked to a catalog medication, decrement stock
+      if (prItem.medication_id) {
+        const movement = await applyStockDelta(prItem.medication_id, req.user.clinicId, -qty);
 
-            if (decStockError) throw decStockError;
-          }
+        if (!movement.ok && movement.reason === 'insufficient') {
+          return res.status(400).json({
+            error: `Stock insuffisant pour le médicament ${movement.med.name}. Stock actuel: ${movement.med.stock_quantity}, Demandé: ${qty}`
+          });
         }
+        if (!movement.ok && movement.reason === 'conflict') {
+          return res.status(409).json({ error: "Le stock a été modifié en même temps. Merci de réessayer." });
+        }
+        // `not_found` : l'article porte un médicament absent du catalogue de la
+        // clinique. On délivre sans mouvement de stock, comme avant.
+      }
 
-        // Update Prescription Item quantity dispensed
-        const { error: updateItemDispError } = await supabase
-          .from('prescription_items')
-          .update({ quantity_dispensed: prItem.quantity_dispensed + qty })
-          .eq('id', itemId);
+      const { data: updatedItem, error: updateItemDispError } = await supabase
+        .from('prescription_items')
+        .update({ quantity_dispensed: prItem.quantity_dispensed + qty })
+        .eq('id', prItem.id)
+        .eq('prescription_id', prescriptionId)
+        .eq('quantity_dispensed', prItem.quantity_dispensed)
+        .select('id');
 
-        if (updateItemDispError) throw updateItemDispError;
+      if (updateItemDispError) throw updateItemDispError;
+
+      // Même garde que sur le stock. Si une autre dispensation est passée
+      // entre-temps, on rend les unités retirées : mieux vaut demander de
+      // réessayer qu'un stock décrémenté deux fois pour une seule sortie.
+      if (!updatedItem || updatedItem.length === 0) {
+        if (prItem.medication_id) {
+          await applyStockDelta(prItem.medication_id, req.user.clinicId, qty);
+        }
+        return res.status(409).json({ error: "Cette ordonnance a été modifiée en même temps. Merci de réessayer." });
       }
     }
 
