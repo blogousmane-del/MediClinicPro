@@ -473,10 +473,17 @@ router.put('/plan', auth, checkRole(['admin']), async (req, res) => {
     }
 
     // Deuxième porte, celle que la garde ci-dessus ne fermait pas : une clinique
-    // NÉE en Starter et arrivée au bout de son essai n'a jamais rien payé, donc
-    // paidHistoryCount vaut 0 et elle pouvait se redonner 7 jours en cliquant
-    // « Starter », indéfiniment. L'essai est unique : une fois la date passée,
-    // il faut payer. Détecté sans migration, sur le plan courant et la date.
+    // NÉE en Starter n'a jamais rien payé, donc paidHistoryCount vaut 0 et elle
+    // pouvait se redonner 7 jours en cliquant « Starter », indéfiniment.
+    //
+    // La condition porte sur le plan SEUL, sans regarder la date : une première
+    // version ne refusait que les cliniques déjà expirées, et il suffisait de
+    // cliquer la veille de l'échéance pour repartir sur sept jours — l'essai
+    // perpétuel était juste devenu un essai perpétuel avec un rappel dans
+    // l'agenda. Être en Starter signifie que l'essai a déjà commencé ; il ne se
+    // relance jamais. Le passage à Starter reste ouvert aux cliniques sur un
+    // plan payant sans historique de paiement (héritage de l'ancienne valeur
+    // par défaut 'hopital' de la colonne), qui n'ont, elles, jamais eu d'essai.
     const { data: currentClinic, error: currentClinicError } = await supabase
       .from('clinics')
       .select('plan, subscription_status, subscription_expires_at')
@@ -484,9 +491,11 @@ router.put('/plan', auth, checkRole(['admin']), async (req, res) => {
       .single();
     if (currentClinicError) throw currentClinicError;
 
-    if (currentClinic.plan === 'starter' && isClinicExpired(currentClinic)) {
+    if (currentClinic.plan === 'starter') {
       return res.status(400).json({
-        error: "Votre période d'essai gratuite est terminée et ne peut pas être relancée. Choisissez le plan Clinique ou Hôpital pour réactiver votre clinique."
+        error: isClinicExpired(currentClinic)
+          ? "Votre période d'essai gratuite est terminée et ne peut pas être relancée. Choisissez le plan Clinique ou Hôpital pour réactiver votre clinique."
+          : "Votre période d'essai gratuite est déjà en cours et ne peut pas être prolongée. Elle se termine à la date affichée ci-dessus."
       });
     }
 

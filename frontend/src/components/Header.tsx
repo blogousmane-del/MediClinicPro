@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../utils/api';
 import { useNotifications } from '../contexts/NotificationContext';
 import { Sun, Moon, Bell, AlertTriangle, ShieldAlert, Menu, ChevronDown, Inbox, CheckCheck } from 'lucide-react';
+import { daysUntilExpiry } from '../utils/subscription';
 
 interface HeaderProps {
   title: string;
@@ -28,7 +29,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
   const { user, clinic, maintenanceMessage, refreshProfile, subscription } = useAuth();
   const { showToast } = useNotifications();
   const [theme, setTheme] = useState<string>('light');
-  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [availabilityMenuOpen, setAvailabilityMenuOpen] = useState<boolean>(false);
   const [isUpdatingAvailability, setIsUpdatingAvailability] = useState<boolean>(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -40,15 +40,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
-
-    // Calculate subscription remaining days
-    if (clinic && clinic.subscription_expires_at) {
-      const expires = new Date(clinic.subscription_expires_at);
-      const today = new Date();
-      const diffTime = expires.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      setDaysRemaining(diffDays);
-    }
   }, [clinic]);
 
   useEffect(() => {
@@ -122,10 +113,11 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
     }
   };
 
-  // L'expiration vient du serveur (AuthContext.subscription), pas d'un calcul
-  // local : cette pastille annonçait « 1 j. restant » avec Math.ceil pendant que
-  // le serveur, qui compare des instants, refusait déjà toute écriture.
-  // `daysRemaining` ne sert plus qu'au compte à rebours avant échéance.
+  // L'expiration et le décompte viennent du serveur (AuthContext.subscription),
+  // pas d'un calcul local : cette pastille annonçait « 1 j. restant » avec son
+  // propre Math.ceil pendant que le serveur, qui compare des instants, refusait
+  // déjà toute écriture.
+  const daysRemaining = daysUntilExpiry(subscription);
   const isExpiringSoon = !subscription.expired && daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 3;
   const isExpired = subscription.expired;
   const isLocked = subscription.locked;

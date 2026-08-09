@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { SkeletonPage } from '../components/Skeleton';
 import { SubscriptionLockScreen } from '../components/SubscriptionLockScreen';
+import { daysUntilExpiry } from '../utils/subscription';
 import {
   Users,
   Calendar as CalendarIcon,
@@ -73,9 +74,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
     }
   };
 
+  // `isLockedOut` fait partie des dépendances : le chargement est sauté tant que
+  // la clinique est verrouillée, et sans ce déclencheur le tableau de bord
+  // restait vide APRÈS le paiement — l'écran de verrou disparaissait, mais rien
+  // ne relançait la requête sautée, et il fallait recharger la page à la main.
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLockedOut]);
 
   const apptListToRender = (todayAppts || []).map((a: any) => ({
     id: a.id,
@@ -108,10 +114,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
   const activeSelectedDay = isCurrentMonth ? today.getDate() : null;
 
   // Trial countdown — Starter is the only free/trial tier (7 days, see
-  // backend/utils/plans.js). Same day-diff formula as Header.tsx's expiry chip.
-  const trialDaysRemaining = clinic?.subscription_expires_at
-    ? Math.ceil((new Date(clinic.subscription_expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-    : null;
+  // backend/utils/plans.js). Le décompte vient du helper partagé, alimenté par
+  // l'état que le serveur a calculé : trois formules parallèles pouvaient
+  // afficher trois nombres différents le jour de l'échéance.
+  const trialDaysRemaining = daysUntilExpiry(subscription);
   const showTrialBanner = user?.role === 'admin' && clinic?.plan === 'starter' && trialDaysRemaining !== null && trialDaysRemaining > 0;
 
   if (loading) {

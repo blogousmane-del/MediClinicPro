@@ -4,6 +4,22 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // Vite refuse par défaut les requêtes dont l'en-tête Host n'est pas
+    // localhost. Un tunnel (ngrok) arrive avec son propre domaine et se
+    // ferait rejeter par « Blocked request. This host is not allowed. ».
+    allowedHosts: ['.ngrok-free.app', '.ngrok.app', '.ngrok.io', '.ngrok-free.dev'],
+    proxy: {
+      // Hors localhost, utils/api.ts vise `/api` (comme la réécriture Vercel
+      // en production). En dev ce chemin n'existe pas : sans ce proxy, un
+      // appareil qui passe par le tunnel charge l'interface mais reçoit du
+      // HTML sur chaque appel d'API. Un seul tunnel suffit avec ça.
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      }
+    }
+  },
   build: {
     // Vite defaults to Lightning CSS for minification when it's present in
     // node_modules, which rewrites `@media (max-width: 768px)` into the

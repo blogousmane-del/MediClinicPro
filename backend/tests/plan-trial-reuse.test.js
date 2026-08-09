@@ -52,12 +52,19 @@ test('essai Starter expire : la reactivation gratuite est refusee', async () => 
   assert.ok(new Date(db.clinics[0].subscription_expires_at) < new Date(), 'la clinique reste expiree');
 });
 
-test('essai Starter en cours : le plan reste activable', async () => {
-  seedClinic({ plan: 'starter', expiresAt: daysAhead(3) });
+// Le trou que la première version de cette garde laissait ouvert : elle ne
+// refusait que les cliniques DÉJÀ expirées. Il suffisait donc de cliquer
+// « Starter » la veille de l'échéance pour repartir sur 7 jours, indéfiniment,
+// sans jamais rien payer.
+test('essai Starter en cours : impossible de le relancer par anticipation', async () => {
+  seedClinic({ plan: 'starter', expiresAt: daysAhead(1) });
+  const before = db.clinics[0].subscription_expires_at;
 
   const res = await activateStarter();
 
-  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.status, 400);
+  assert.match((await res.json()).error, /d(e|é)j(a|à) utilis|termin/i);
+  assert.strictEqual(db.clinics[0].subscription_expires_at, before, 'la date d echeance ne doit pas bouger');
 });
 
 // La garde préexistante, conservée : une clinique ayant déjà payé ne redescend

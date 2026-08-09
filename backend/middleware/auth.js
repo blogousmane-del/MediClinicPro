@@ -130,7 +130,6 @@ async function auth(req, res, next) {
       const subscription = getSubscriptionState(clinic);
       const isExpired = subscription.expired;
       const isSuspended = clinic.suspended_by_platform === true;
-      req.subscriptionState = subscription;
 
       // Suspension is a platform decision, not a billing state — unlike
       // SUBSCRIPTION_EXPIRED there is deliberately no billing-route bypass:

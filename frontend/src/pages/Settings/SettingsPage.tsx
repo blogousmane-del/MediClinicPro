@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { PhoneInput } from '../../components/PhoneInput';
 import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
+import { daysUntilExpiry } from '../../utils/subscription';
 import { PasswordChangeForm } from '../../components/PasswordChangeForm';
 
 interface DaySchedule {
@@ -62,7 +63,7 @@ function formatSchedule(st: StaffUser): string | null {
 }
 
 export const SettingsPage: React.FC = () => {
-  const { user: currentUser, clinic, renewSubscription, pollSubscriptionStatus, activateFreePlan, refreshProfile } = useAuth();
+  const { user: currentUser, clinic, renewSubscription, pollSubscriptionStatus, activateFreePlan, refreshProfile, subscription } = useAuth();
   const { showToast } = useNotifications();
 
   const [activeSubTab, setActiveSubTab] = useState<'billing' | 'clinic' | 'users' | 'security' | 'support'>('billing');
@@ -112,9 +113,10 @@ export const SettingsPage: React.FC = () => {
   const renewalTargetPlanId: 'clinique' | 'hopital' | null =
     selectedPaidPlan || (currentPlanId === 'clinique' || currentPlanId === 'hopital' ? currentPlanId : null);
   const pricePerMonth = (renewalTargetPlanId && plansCatalog?.[renewalTargetPlanId]?.price) || 0;
-  const trialDaysLeft = clinic?.subscription_expires_at
-    ? Math.max(0, Math.ceil((new Date(clinic.subscription_expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
-    : null;
+  // Décompte et état d'expiration viennent du serveur via AuthContext : cette
+  // page avait sa propre formule, l'en-tête la sienne, et le jour de l'échéance
+  // elles pouvaient annoncer deux nombres différents.
+  const trialDaysLeft = daysUntilExpiry(subscription);
 
   const fetchClinicDetails = async () => {
     try {
@@ -648,9 +650,11 @@ export const SettingsPage: React.FC = () => {
                 Choisissez votre plan
               </h2>
               <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: 0 }}>
-                {clinic?.subscription_status === 'expired'
-                  ? "Abonnement expiré — choisissez un plan ci-dessous pour réactiver l'écriture des données."
-                  : 'Commencez gratuitement, évoluez selon vos besoins. Sans engagement.'}
+                {subscription.locked
+                  ? "Abonnement expiré — votre clinique est verrouillée. Choisissez un plan ci-dessous pour la rouvrir."
+                  : subscription.expired
+                    ? `Abonnement expiré — accès en lecture seule, blocage complet dans ${subscription.graceDaysLeft} jour(s). Choisissez un plan ci-dessous.`
+                    : 'Commencez gratuitement, évoluez selon vos besoins. Sans engagement.'}
               </p>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>
                 Plan {(currentPlanId && plansCatalog?.[currentPlanId]?.name) || ''}

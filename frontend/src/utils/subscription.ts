@@ -78,6 +78,20 @@ export function isTabLocked(tab: string, locked: boolean): boolean {
   return (LOCKED_TABS as readonly string[]).includes(tab);
 }
 
+/**
+ * Jours entiers avant l'échéance, 0 une fois celle-ci passée. Seul calcul de
+ * compte à rebours de l'application : l'en-tête, le tableau de bord et les
+ * paramètres en avaient chacun le leur, ce qui donnait trois réponses possibles
+ * à la même question le jour de l'échéance.
+ */
+export function daysUntilExpiry(state: SubscriptionState, now: Date = new Date()): number | null {
+  if (!state.expiresAt) return null;
+  if (state.expired) return 0;
+  const expires = new Date(state.expiresAt);
+  if (Number.isNaN(expires.getTime())) return null;
+  return Math.max(0, Math.ceil((expires.getTime() - now.getTime()) / DAY_MS));
+}
+
 /** Format court d'une date ISO pour les messages d'abonnement (« 09/08/2026 »). */
 export function formatDate(iso: string | null): string {
   if (!iso) return '';
