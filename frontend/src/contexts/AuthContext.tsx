@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { parsePhoneNumber } from 'libphonenumber-js';
-import { api } from '../utils/api';
+import { api, setSubscriptionErrorHandler } from '../utils/api';
+import { deriveSubscriptionState, type SubscriptionState } from '../utils/subscription';
 
 export interface User {
   id: number;
@@ -28,6 +29,10 @@ interface AuthContextType {
   clinic: Clinic | null;
   /** Bandeau piloté depuis Platform Admin > Config. système. Vide = aucun bandeau. */
   maintenanceMessage: string;
+  /** État d'abonnement calculé par le serveur : expiration, verrou, délai de grâce. */
+  subscription: SubscriptionState;
+  /** Suspension décidée par la plateforme — distincte d'un impayé, le paiement ne la lève pas. */
+  suspended: boolean;
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -52,13 +57,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [serverSubscription, setServerSubscription] = useState<SubscriptionState | null>(null);
+  const [suspended, setSuspended] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Le serveur fait foi ; le calcul local ne sert que si /auth/me ne renvoie pas
+  // encore le bloc (onglet resté ouvert pendant un déploiement).
+  const subscription = serverSubscription || deriveSubscriptionState(clinic);
 
   const refreshProfile = async () => {
     const token = localStorage.getItem('mediclinic_token');
     if (!token) {
       setUser(null);
       setClinic(null);
+      setServerSubscription(null);
+      setSuspended(false);
       setLoading(false);
       return;
     }
@@ -67,12 +80,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await api.get('/auth/me');
       setUser(data.user);
       setClinic(data.clinic);
+      setServerSubscription(data.subscription || null);
+      setSuspended(Boolean(data.suspended));
       setMaintenanceMessage(data.maintenanceMessage || '');
     } catch (error) {
       console.error("Token verification failed. Logging out.", error);
       localStorage.removeItem('mediclinic_token');
       setUser(null);
       setClinic(null);
+      setServerSubscription(null);
+      setSuspended(false);
       setMaintenanceMessage('');
     } finally {
       setLoading(false);
@@ -81,6 +98,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshProfile();
+  }, []);
+
+  // Un refus lié à l'abonnement veut dire que l'état chargé au montage a vieilli
+  // — l'expiration tombe à une heure précise, souvent en pleine session. On
+  // relit le profil pour que le verrou s'affiche sans rechargement. La garde
+  // évite qu'une page enchaînant dix appels refusés déclenche dix relectures.
+  const refreshingRef = useRef(false);
+  useEffect(() => {
+    setSubscriptionErrorHandler(() => {
+      if (refreshingRef.current) return;
+      refreshingRef.current = true;
+      refreshProfile().finally(() => {
+        refreshingRef.current = false;
+      });
+    });
+    return () => setSubscriptionErrorHandler(null);
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -129,6 +162,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('mediclinic_token');
     setUser(null);
     setClinic(null);
+    setServerSubscription(null);
+    setSuspended(false);
   };
 
   const onboardClinic = async (address: string, phone: string, staff: any[], modules: string[]) => {
@@ -201,6 +236,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         clinic,
         maintenanceMessage,
+        subscription,
+        suspended,
         isAuthenticated: !!user,
         loading,
         login,

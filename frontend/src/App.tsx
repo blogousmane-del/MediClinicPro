@@ -6,6 +6,8 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { MobileQuickActionsBar } from './components/MobileQuickActionsBar';
 import { SkeletonPage } from './components/Skeleton';
+import { SubscriptionLockScreen } from './components/SubscriptionLockScreen';
+import { isTabLocked } from './utils/subscription';
 import { initRippleEffect } from './utils/ripple';
 
 // Logged-out entry pages: kept eager (small, must render instantly on first paint).
@@ -48,7 +50,7 @@ const initialTab = () => {
 };
 
 const MainAppContent: React.FC = () => {
-  const { user, clinic, loading } = useAuth();
+  const { user, clinic, loading, subscription, suspended } = useAuth();
 
   // Navigation tabs
   const [currentTab, setCurrentTab] = useState<string>(initialTab);
@@ -130,8 +132,15 @@ const MainAppContent: React.FC = () => {
   }
 
   // 2. Onboarding workflow (If clinic address is not configured yet)
+  //
+  // Le verrou d'abonnement lève cette redirection : une clinique jamais
+  // configurée et déjà expirée resterait sinon prisonnière d'un formulaire dont
+  // l'enregistrement est refusé côté serveur, sans jamais atteindre les plans.
+  // En la laissant passer vers l'application normale, elle trouve Paramètres >
+  // Abonnez-vous ; l'onboarding réapparaîtra une fois l'abonnement réglé.
+  const isLockedOut = subscription.locked || suspended;
   const needsOnboarding = !clinic?.address || clinic.address.trim() === '';
-  if (needsOnboarding && user.role === 'admin') {
+  if (needsOnboarding && user.role === 'admin' && !isLockedOut) {
     return <Suspense fallback={<TabFallback />}><OnboardingPage /></Suspense>;
   }
 
@@ -146,6 +155,10 @@ const MainAppContent: React.FC = () => {
   }
 
   // 4. Main Authenticated Interface
+  // Une suspension ferme les mêmes modules qu'une expiration : dans les deux
+  // cas la clinique ne peut plus travailler, seul le message diffère.
+  const lockedTab = isTabLocked(currentTab, isLockedOut);
+
   const handleQuickAction = (action: string) => {
     if (action === 'new_patient') {
       setSelectedPatientId(null);
@@ -183,9 +196,20 @@ const MainAppContent: React.FC = () => {
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
         
-        {/* Render Tab components. Once a tab has been visited it stays mounted
-            (hidden via CSS) instead of unmounting, so switching back doesn't
-            re-run its data fetch. */}
+        {/* Abonnement expiré au-delà du délai de grâce, ou compte suspendu :
+            l'onglet demandé cède la place à l'écran de paiement. Rendu ICI
+            plutôt que dans chacune des sept pages — les onglets déjà visités
+            restent montés (visitedTabsRef), les remplacer les démonte et coupe
+            leurs requêtes, que le serveur refuserait de toute façon. */}
+        {lockedTab ? (
+          <SubscriptionLockScreen
+            tabLabel={tabTitles[currentTab]}
+            onGoToBilling={() => setCurrentTab('settings')}
+          />
+        ) : (
+        /* Render Tab components. Once a tab has been visited it stays mounted
+           (hidden via CSS) instead of unmounting, so switching back doesn't
+           re-run its data fetch. */
         <Suspense fallback={<TabFallback />}>
           {visitedTabsRef.current.has('dashboard') && (
             <div style={{ display: currentTab === 'dashboard' ? undefined : 'none' }}>
@@ -242,6 +266,7 @@ const MainAppContent: React.FC = () => {
             <div style={{ display: currentTab === 'profile' ? undefined : 'none' }}><ProfilePage /></div>
           )}
         </Suspense>
+        )}
       </main>
 
       {/* Mobile-only quick action bar (hidden on desktop) */}

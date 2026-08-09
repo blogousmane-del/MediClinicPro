@@ -27,7 +27,7 @@ function stubModule(relativePath, exports) {
 // .from().select().eq().maybeSingle() / .single() / .insert() / .update(),
 // le tout « thenable » pour fonctionner avec await.
 function queryBuilder(table) {
-  const state = { op: 'select', filters: [], payload: null, singleRow: false };
+  const state = { op: 'select', filters: [], payload: null, singleRow: false, count: false, head: false };
   const rowMatches = (row) => state.filters.every(([column, value, op]) => (
     op === 'in' ? value.includes(row[column]) : row[column] === value
   ));
@@ -48,11 +48,25 @@ function queryBuilder(table) {
       return { data: state.singleRow ? hits[0] || null : hits, error: null };
     }
 
+    // `.select('*', { count: 'exact', head: true })` : les routes s'en servent
+    // pour compter sans rapatrier les lignes (limites de personnel du plan,
+    // historique de paiement). Sans `count` ici, la garde comptée passait
+    // toujours pour « zéro » et le test validait une protection inerte.
+    if (state.count) {
+      return { data: state.head ? null : hits, error: null, count: hits.length };
+    }
+
     return { data: state.singleRow ? hits[0] || null : hits, error: null };
   };
 
   const builder = {
-    select() { return builder; },
+    select(_columns, options) {
+      if (options && options.count) {
+        state.count = true;
+        state.head = options.head === true;
+      }
+      return builder;
+    },
     eq(column, value) { state.filters.push([column, value]); return builder; },
     in(column, values) { state.filters.push([column, values, 'in']); return builder; },
     limit() { return builder; },

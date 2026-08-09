@@ -13,8 +13,10 @@ import {
   Settings as SettingsIcon,
   LogOut,
   X,
+  Lock,
   Building2
 } from 'lucide-react';
+import { isTabLocked } from '../utils/subscription';
 
 // Client-side hint only — the real access boundary is the backend's
 // SUPER_ADMIN_EMAILS allowlist (superAdminOnly middleware). Hiding this entry
@@ -29,8 +31,9 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isOpen, onClose }) => {
-  const { user, clinic, logout } = useAuth();
+  const { user, clinic, logout, subscription, suspended } = useAuth();
   const { isOnline } = useOffline();
+  const isLockedOut = subscription.locked || suspended;
   const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
 
   if (!user) return null;
@@ -230,6 +233,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             {filteredItems.map(item => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
+              // Module fermé par l'expiration : grisé et marqué d'un cadenas.
+              // Le clic reste actif et mène à l'écran de paiement — un bouton
+              // inerte laisserait croire à une panne.
+              const locked = isTabLocked(item.id, isLockedOut);
 
               return (
                 <button
@@ -246,7 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                     borderRadius: '10px',
                     border: 'none',
                     backgroundColor: isActive ? '#1c4436' : 'transparent',
-                    color: isActive ? '#ffffff' : '#9bb0a9',
+                    color: isActive ? '#ffffff' : locked ? '#5f736c' : '#9bb0a9',
                     textAlign: 'left',
                     width: '100%',
                     cursor: 'pointer',
@@ -269,7 +276,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 >
                   {/* Show icon when item is active or settings */}
                   {isActive && <Icon size={18} color="#ffffff" />}
-                  <span>{item.label}</span>
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {locked && <Lock size={14} color="#6b8078" />}
                 </button>
               );
             })}

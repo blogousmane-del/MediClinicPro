@@ -16,8 +16,13 @@ const ACTIONS: { action: string; label: string; icon: React.ComponentType<{ size
 // desktop via CSS (index.css .mobile-quick-actions) — desktop already has
 // the full sidebar + per-page "new" buttons, so this bar is redundant there.
 export const MobileQuickActionsBar: React.FC<MobileQuickActionsBarProps> = ({ onQuickAction }) => {
-  const { user } = useAuth();
+  const { user, subscription, suspended } = useAuth();
   if (!user) return null;
+
+  // Ces trois raccourcis ouvrent tous un formulaire de création dans un module
+  // fermé par l'expiration : la barre disparaît plutôt que d'offrir des actions
+  // qui se heurteraient à l'écran de paiement.
+  if (subscription.locked || suspended) return null;
 
   const items = ACTIONS.filter(a => a.roles.includes(user.role));
   if (items.length === 0) return null;

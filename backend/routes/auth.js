@@ -11,6 +11,7 @@ const { computeEffectiveAvailability } = require('../utils/schedule');
 const { getPlan, isRoleAllowedForPlan, isStaffLimitReached, isKnownRole } = require('../utils/plans');
 const { validatePassword } = require('../utils/password');
 const { getSettings } = require('../utils/platformSettings');
+const { getSubscriptionState } = require('../utils/subscription');
 const { recordLoginFailure, REASONS } = require('../utils/loginFailures');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -405,6 +406,13 @@ router.get('/me', auth, async (req, res) => {
         availabilityStatus: computeEffectiveAvailability(user)
       },
       clinic,
+      // État d'abonnement calculé côté serveur et transmis tel quel : le
+      // frontend n'a plus à le déduire de subscription_expires_at. Il le
+      // faisait à deux endroits avec Math.ceil pendant que le serveur comparait
+      // des instants, et les deux pouvaient annoncer « expire dans 1 jour »
+      // alors que l'application était déjà fermée.
+      subscription: getSubscriptionState(clinic),
+      suspended: clinic.suspended_by_platform === true,
       maintenanceMessage
     });
   } catch (error) {

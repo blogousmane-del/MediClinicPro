@@ -4,6 +4,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { SkeletonPage } from '../components/Skeleton';
+import { SubscriptionLockScreen } from '../components/SubscriptionLockScreen';
 import {
   Users,
   Calendar as CalendarIcon,
@@ -36,7 +37,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickAction }) => {
-  const { user, clinic } = useAuth();
+  const { user, clinic, subscription, suspended } = useAuth();
+  const isLockedOut = subscription.locked || suspended;
   const { showToast } = useNotifications();
   const [stats, setStats] = useState<Stats | null>(null);
   const [todayAppts, setTodayAppts] = useState<any[]>([]);
@@ -48,6 +50,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
   const [calendarDate, setCalendarDate] = useState<Date>(today);
 
   const fetchDashboardData = async () => {
+    // Verrouillé, ces deux routes répondent 403 : les appeler ne produirait
+    // qu'un toast d'erreur au chargement. Le tableau de bord reste ouvert mais
+    // affiche l'invitation à payer à la place de ses chiffres.
+    if (isLockedOut) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const statsData = await api.get('/financials/stats');
@@ -111,6 +120,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
         <SkeletonPage cards={3} label="Chargement du tableau de bord…" />
       </div>
     );
+  }
+
+  // Le tableau de bord reste accessible pour ne pas jeter l'utilisateur contre
+  // un mur dès la connexion, mais il n'a plus de chiffres à montrer : ils
+  // viennent tous de routes fermées.
+  if (isLockedOut) {
+    return <SubscriptionLockScreen tabLabel="Tableau de bord" onGoToBilling={() => setCurrentTab('settings')} />;
   }
 
   return (

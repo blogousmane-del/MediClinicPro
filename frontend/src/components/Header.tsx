@@ -25,7 +25,7 @@ interface NotificationItem {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
-  const { user, clinic, maintenanceMessage, refreshProfile } = useAuth();
+  const { user, clinic, maintenanceMessage, refreshProfile, subscription } = useAuth();
   const { showToast } = useNotifications();
   const [theme, setTheme] = useState<string>('light');
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
@@ -122,8 +122,13 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
     }
   };
 
-  const isExpiringSoon = daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 3;
-  const isExpired = clinic?.subscription_status === 'expired' || (daysRemaining !== null && daysRemaining <= 0);
+  // L'expiration vient du serveur (AuthContext.subscription), pas d'un calcul
+  // local : cette pastille annonçait « 1 j. restant » avec Math.ceil pendant que
+  // le serveur, qui compare des instants, refusait déjà toute écriture.
+  // `daysRemaining` ne sert plus qu'au compte à rebours avant échéance.
+  const isExpiringSoon = !subscription.expired && daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 3;
+  const isExpired = subscription.expired;
+  const isLocked = subscription.locked;
 
   return (
     <>
@@ -214,7 +219,11 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
             fontWeight: 600
           }}>
             <ShieldAlert size={16} />
-            <span style={{ whiteSpace: 'nowrap' }}>Abonnement Expiré</span>
+            <span style={{ whiteSpace: 'nowrap' }}>
+              {isLocked
+                ? 'Abonnement Expiré'
+                : `Expiré — accès bloqué dans ${subscription.graceDaysLeft} j.`}
+            </span>
           </div>
         )}
 

@@ -7,6 +7,7 @@ const { validateAndNormalizePhone } = require('../utils/phone');
 const { isWithinSchedule, computeEffectiveAvailability } = require('../utils/schedule');
 const { PLANS, getPlan, isRoleAllowedForPlan, isStaffLimitReached, isKnownRole } = require('../utils/plans');
 const { validatePassword } = require('../utils/password');
+const { isClinicExpired } = require('../utils/subscription');
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TICKET_CATEGORIES = ['facturation', 'bug', 'general', 'autre'];
@@ -469,6 +470,24 @@ router.put('/plan', auth, checkRole(['admin']), async (req, res) => {
     if (paidHistoryError) throw paidHistoryError;
     if ((paidHistoryCount || 0) > 0) {
       return res.status(400).json({ error: "Ce compte a déjà eu un abonnement payant — le renouvellement doit se faire par paiement (Mobile Money ou espèces), le plan Starter gratuit n'est plus disponible." });
+    }
+
+    // Deuxième porte, celle que la garde ci-dessus ne fermait pas : une clinique
+    // NÉE en Starter et arrivée au bout de son essai n'a jamais rien payé, donc
+    // paidHistoryCount vaut 0 et elle pouvait se redonner 7 jours en cliquant
+    // « Starter », indéfiniment. L'essai est unique : une fois la date passée,
+    // il faut payer. Détecté sans migration, sur le plan courant et la date.
+    const { data: currentClinic, error: currentClinicError } = await supabase
+      .from('clinics')
+      .select('plan, subscription_status, subscription_expires_at')
+      .eq('id', req.user.clinicId)
+      .single();
+    if (currentClinicError) throw currentClinicError;
+
+    if (currentClinic.plan === 'starter' && isClinicExpired(currentClinic)) {
+      return res.status(400).json({
+        error: "Votre période d'essai gratuite est terminée et ne peut pas être relancée. Choisissez le plan Clinique ou Hôpital pour réactiver votre clinique."
+      });
     }
 
     const plan = getPlan('starter');

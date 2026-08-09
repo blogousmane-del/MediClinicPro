@@ -1,6 +1,31 @@
 const jwt = require('jsonwebtoken');
 const { supabase } = require('../database');
-const { isClinicExpired } = require('../utils/subscription');
+const { getSubscriptionState } = require('../utils/subscription');
+
+// Domaines métier fermés quand le verrou tombe (expiration + délai de grâce
+// écoulé) : plus aucune lecture, pas seulement plus d'écriture. Sans cette
+// liste, le verrou de l'interface serait cosmétique — l'API continuerait de
+// rendre tous les dossiers à qui les demande.
+const LOCKED_API_PREFIXES = [
+  '/api/patients',
+  '/api/appointments',
+  '/api/consultations',
+  '/api/pharmacy',
+  '/api/laboratory',
+  '/api/deposits',
+  '/api/financials'
+];
+
+// Testées AVANT la liste ci-dessus : /api/financials/subscription est le tunnel
+// de paiement, la seule porte de sortie du verrou, et il vit sous le préfixe
+// /api/financials. Inverser l'ordre enfermerait la clinique dehors.
+const LOCK_EXEMPT_PREFIXES = [
+  '/api/financials/subscription',
+  '/api/auth',
+  '/api/settings',
+  '/api/notifications',
+  '/api/platform'
+];
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -102,8 +127,10 @@ async function auth(req, res, next) {
       // is read or written there.
       const isNotificationsRoute = pathIs('/api/notifications');
 
-      const isExpired = isClinicExpired(clinic);
+      const subscription = getSubscriptionState(clinic);
+      const isExpired = subscription.expired;
       const isSuspended = clinic.suspended_by_platform === true;
+      req.subscriptionState = subscription;
 
       // Suspension is a platform decision, not a billing state — unlike
       // SUBSCRIPTION_EXPIRED there is deliberately no billing-route bypass:
@@ -115,6 +142,38 @@ async function auth(req, res, next) {
           code: "ACCOUNT_SUSPENDED",
           message: "Ce compte a été suspendu par l'administrateur de la plateforme. Contactez le support pour plus d'informations."
         });
+      }
+
+      // Verrou dur : l'abonnement est expiré depuis plus que le délai de grâce.
+      // Contrairement au blocage d'écriture ci-dessous, il ferme AUSSI les
+      // lectures des domaines métier — c'est ce qui rend l'application
+      // réellement inutilisable et pousse au paiement. Les exemptions passent
+      // en premier ; `pathIs` compare par segment, donc
+      // /api/financials/subscription/checkout est exempté sans exempter un
+      // hypothétique /api/financials-autre-chose.
+      //
+      // Placé APRÈS le bloc de suspension : une clinique à la fois suspendue et
+      // expirée doit lire « contactez le support », pas « payez » — payer ne
+      // lève pas une suspension. D'où aussi le code renvoyé ci-dessous quand
+      // les deux sont vrais sur une simple lecture, que le bloc suspension
+      // laisse passer.
+      if (subscription.locked) {
+        const isExempt = LOCK_EXEMPT_PREFIXES.some(pathIs);
+        if (!isExempt && LOCKED_API_PREFIXES.some(pathIs)) {
+          if (isSuspended) {
+            return res.status(403).json({
+              error: "Compte suspendu",
+              code: "ACCOUNT_SUSPENDED",
+              message: "Ce compte a été suspendu par l'administrateur de la plateforme. Contactez le support pour plus d'informations."
+            });
+          }
+          return res.status(403).json({
+            error: "Abonnement MediClinic expiré",
+            code: "SUBSCRIPTION_LOCKED",
+            message: "Votre abonnement a expiré. Choisissez un plan depuis Paramètres → Abonnez-vous pour réactiver votre clinique.",
+            graceEndsAt: subscription.graceEndsAt
+          });
+        }
       }
 
       if (isExpired && !isReadRequest && !isBillingRoute && !isPlatformRoute && !isNotificationsRoute) {
