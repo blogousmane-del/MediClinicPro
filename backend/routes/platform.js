@@ -6,12 +6,16 @@
 // this file.
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
 const { superAdminOnly } = require('../middleware/superAdmin');
 const { sendTicketStatusEmail } = require('../utils/mailer');
 const { PLAN_IDS, getPlan, isRoleAllowedForPlan } = require('../utils/plans');
 const { isClinicExpired } = require('../utils/subscription');
+const { validatePassword } = require('../utils/password');
+const { validateAndNormalizePhone } = require('../utils/phone');
+const { getSettings } = require('../utils/platformSettings');
 
 router.use(auth, superAdminOnly);
 
@@ -26,7 +30,7 @@ router.get('/overview', async (req, res) => {
 
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, clinic_id, role, active');
+      .select('id, clinic_id, role, active, created_at');
     if (usersError) throw usersError;
 
     const { data: patients, error: patientsError } = await supabase
@@ -36,12 +40,24 @@ router.get('/overview', async (req, res) => {
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
     const { data: monthPayments, error: paymentsError } = await supabase
       .from('subscription_payments')
       .select('amount')
       .eq('status', 'paid')
       .gte('paid_at', startOfMonth);
     if (paymentsError) throw paymentsError;
+
+    // Mois précédent, pour la variation affichée sous la carte Revenu. Borné des
+    // deux côtés : sans le `.lt`, le mois courant serait compté dedans et la
+    // variation vaudrait toujours à peu près zéro.
+    const { data: lastMonthPayments, error: lastMonthError } = await supabase
+      .from('subscription_payments')
+      .select('amount')
+      .eq('status', 'paid')
+      .gte('paid_at', startOfLastMonth)
+      .lt('paid_at', startOfMonth);
+    if (lastMonthError) throw lastMonthError;
 
     const { data: recentActivity, error: activityError } = await supabase
       .from('activity_logs')
@@ -90,6 +106,21 @@ router.get('/overview', async (req, res) => {
       .sort((a, b) => new Date(a.subscriptionExpiresAt) - new Date(b.subscriptionExpiresAt));
 
     const monthlyRevenue = (monthPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+    const lastMonthRevenue = (lastMonthPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    // Variations affichées sous chaque carte. Comptées sur created_at, donc sur
+    // la date d'entrée réelle de la ligne — pas une estimation.
+    const isThisMonth = (value) => value && value >= startOfMonth;
+    const clinicsNewThisMonth = (clinics || []).filter(c => isThisMonth(c.created_at)).length;
+    const usersNewThisMonth = (users || []).filter(u => isThisMonth(u.created_at)).length;
+
+    // `null` quand le mois précédent n'a rien encaissé : une variation en
+    // pourcentage à partir de zéro n'a pas de sens, et afficher « +100 % » ou
+    // « +∞ % » serait un chiffre inventé. L'interface montre alors le montant du
+    // mois précédent au lieu d'un pourcentage.
+    const revenueDeltaPct = lastMonthRevenue > 0
+      ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
+      : null;
 
     res.json({
       stats: {
@@ -98,7 +129,11 @@ router.get('/overview', async (req, res) => {
         totalUsers: (users || []).length,
         monthlyRevenue,
         currency: 'XOF',
-        openTickets: (openTicketRows || []).length
+        openTickets: (openTicketRows || []).length,
+        clinicsNewThisMonth,
+        usersNewThisMonth,
+        lastMonthRevenue,
+        revenueDeltaPct
       },
       clinics: enrichedClinics,
       expiringSoon,
@@ -316,6 +351,131 @@ router.put('/tickets/:id', async (req, res) => {
   } catch (error) {
     console.error("Update ticket error:", error);
     res.status(500).json({ error: "Erreur lors de la mise à jour du ticket." });
+  }
+});
+
+// POST /api/platform/clinics
+// Création d'une clinique et de son compte administrateur par l'opérateur —
+// la contrepartie de POST /auth/register, qui reste le chemin normal (une
+// clinique s'inscrit seule). Sert aux cas où l'opérateur enrôle un client
+// lui-même : démonstration, reprise de dossier, inscription par téléphone.
+//
+// Les règles de POST /auth/register sont reprises telles quelles, sans
+// exception : mot de passe validé par utils/password.js, téléphone normalisé,
+// email en minuscules et sans espaces, plan Starter avec la durée d'essai
+// pilotée depuis Config. système. Un compte créé ici doit être indiscernable
+// d'un compte inscrit normalement — la porte de l'opérateur ne doit pas être
+// celle par laquelle entrent les comptes mal formés.
+router.post('/clinics', async (req, res) => {
+  try {
+    const { clinicName, adminName, email: rawEmail, password, phone } = req.body;
+    const email = (rawEmail || '').trim().toLowerCase();
+
+    if (!clinicName || !adminName || !email || !password) {
+      return res.status(400).json({ error: "Nom de la clinique, nom de l'administrateur, email et mot de passe sont requis." });
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
+    }
+
+    // Téléphone facultatif ici, contrairement à l'inscription publique :
+    // l'opérateur enrôle parfois depuis un dossier papier incomplet. S'il est
+    // fourni, il est validé et normalisé comme partout ailleurs.
+    let normalizedPhone = '';
+    if (phone && String(phone).trim()) {
+      const phoneCheck = validateAndNormalizePhone(phone);
+      if (!phoneCheck.valid) {
+        return res.status(400).json({ error: phoneCheck.error });
+      }
+      normalizedPhone = phoneCheck.e164;
+    }
+
+    const { data: existingUser, error: checkError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+    if (checkError) throw checkError;
+    if (existingUser) {
+      return res.status(400).json({ error: "Cette adresse email est déjà enregistrée." });
+    }
+
+    const starterPlan = getPlan('starter');
+    const { values: platformValues } = await getSettings();
+    const trialDays = platformValues.starter_trial_days || starterPlan.trialDays;
+    const trialExpiry = new Date();
+    trialExpiry.setDate(trialExpiry.getDate() + trialDays);
+
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .insert({
+        name: clinicName,
+        phone: normalizedPhone,
+        address: '',
+        // Même piège qu'à l'inscription publique : la colonne plan a 'hopital'
+        // pour défaut (rattrapage des cliniques historiques), donc ne pas
+        // l'écrire ici offrirait le palier le plus cher gratuitement.
+        plan: 'starter',
+        subscription_status: 'trial',
+        subscription_expires_at: trialExpiry.toISOString()
+      })
+      .select()
+      .single();
+    if (clinicError) throw clinicError;
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const { data: adminUser, error: userError } = await supabase
+      .from('users')
+      .insert({
+        clinic_id: clinic.id,
+        name: adminName,
+        email,
+        password_hash: passwordHash,
+        role: 'admin',
+        active: 1
+      })
+      .select()
+      .single();
+
+    // La clinique existe déjà à ce stade : sans rattrapage, un échec ici
+    // laisserait une clinique sans aucun compte, invisible et impossible à
+    // administrer. PostgREST n'offre pas de transaction, d'où la suppression
+    // manuelle.
+    if (userError) {
+      await supabase.from('clinics').delete().eq('id', clinic.id);
+      throw userError;
+    }
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: clinic.id,
+      user_id: req.user.userId,
+      action: 'PLATFORM_CLINIC_CREATE',
+      details: `Clinique « ${clinicName} » créée par l'administrateur de la plateforme, avec l'administrateur ${adminName}.`
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Clinique « ${clinicName} » créée avec un essai de ${trialDays} jours.`,
+      clinic: {
+        id: clinic.id,
+        name: clinic.name,
+        plan: clinic.plan,
+        status: 'active',
+        subscriptionExpiresAt: clinic.subscription_expires_at,
+        createdAt: clinic.created_at,
+        practitioners: 1,
+        patients: 0,
+        address: '',
+        unlimitedStaff: false,
+        suspended: false
+      },
+      admin: { id: adminUser.id, name: adminUser.name, email: adminUser.email }
+    });
+  } catch (error) {
+    console.error("Platform clinic create error:", error);
+    res.status(500).json({ error: "Erreur lors de la création de la clinique." });
   }
 });
 

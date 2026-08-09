@@ -13,7 +13,6 @@ import {
   Users,
   CreditCard,
   TrendingUp,
-  AlertTriangle,
   Clock,
   LogOut,
   ArrowLeft,
@@ -22,8 +21,28 @@ import {
   Shield,
   Settings as SettingsIcon,
   Activity,
-  Megaphone
+  Megaphone,
+  Plus,
+  X
 } from 'lucide-react';
+
+// Date du jour en toutes lettres, comme le sous-titre de la maquette. Calculée
+// à chaque rendu du module plutôt que figée : la console reste ouverte des
+// heures, mais jamais au point de traverser deux jours sans rechargement.
+const todayLabel = new Date().toLocaleDateString('fr-FR', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric'
+});
+
+interface NewClinicPayload {
+  clinicName: string;
+  adminName: string;
+  email: string;
+  password: string;
+  phone: string;
+}
 
 interface ClinicOverview {
   id: number;
@@ -55,6 +74,13 @@ interface Overview {
     monthlyRevenue: number;
     currency: string;
     openTickets: number;
+    // Variations sous chaque carte, comptées sur created_at / paid_at côté
+    // serveur. `revenueDeltaPct` vaut null quand le mois précédent n'a rien
+    // encaissé : un pourcentage à partir de zéro n'existe pas.
+    clinicsNewThisMonth: number;
+    usersNewThisMonth: number;
+    lastMonthRevenue: number;
+    revenueDeltaPct: number | null;
   };
   clinics: ClinicOverview[];
   expiringSoon: ClinicOverview[];
@@ -142,6 +168,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null);
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [showNewClinic, setShowNewClinic] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -191,6 +218,19 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
       console.error(err);
       showToast('error', 'Erreur', err.error || "Impossible de mettre à jour le ticket.");
     }
+  };
+
+  const handleCreateClinic = async (payload: NewClinicPayload) => {
+    await api.post('/platform/clinics', payload);
+    showToast('success', 'Clinique créée', `« ${payload.clinicName} » a été enregistrée avec son administrateur.`);
+    setShowNewClinic(false);
+    // La nouvelle clinique doit apparaître immédiatement dans la liste, et les
+    // compteurs de la vue d'ensemble s'en trouvent changés : on relit la source
+    // plutôt que d'insérer la ligne à la main dans l'état local.
+    const result = await api.get('/platform/overview');
+    setOverview(result);
+    setPlatformUsers(null);
+    setSection('clinics');
   };
 
   const handleToggleClinicOverride = async (clinicId: number, unlimited: boolean) => {
@@ -412,20 +452,52 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
 
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div className="platform-admin-main-header" style={{ padding: '1.25rem 2rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)' }}>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
-            {sectionTitles[section]}
-          </h1>
+        {/* Bandeau haut de la maquette Banani : titre + sous-titre à gauche,
+            action à droite. La barre de recherche et la cloche de la maquette
+            ne sont pas reprises — la recherche existe déjà dans chaque section
+            qui en a une, et un compteur de notifications au niveau opérateur
+            n'a aucune source. Même arbitrage que sur le TopBar de la partie
+            clinique (voir .planning/banani/STATUS.md). */}
+        <div className="platform-admin-main-header" style={{ padding: '1.25rem 2rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
+              {sectionTitles[section]}
+            </h1>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+              {todayLabel} · Console d'administration
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNewClinic(v => !v)}
+            className="page-cta-btn"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: 'none', backgroundColor: '#3D6B5E', color: '#FFFFFF', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+          >
+            {showNewClinic ? <X size={14} /> : <Plus size={14} />}
+            {showNewClinic ? 'Fermer' : 'Nouvelle clinique'}
+          </button>
         </div>
 
         <div className="platform-admin-main-body" style={{ padding: '1.5rem 2rem', flex: 1 }}>
+          {/* Hors du bloc conditionnel ci-dessous : le formulaire doit rester
+              accessible même si /platform/overview a échoué — créer une
+              clinique ne dépend pas de la lecture du tableau de bord. */}
+          {showNewClinic && (
+            <NewClinicForm onSubmit={handleCreateClinic} onCancel={() => setShowNewClinic(false)} />
+          )}
           {loading && !overview ? (
             <SkeletonPage cards={3} label="Chargement de la console…" />
           ) : (section === 'overview' || section === 'clinics') && !overview ? (
             <p style={{ color: 'var(--text-secondary)' }}>Aucune donnée disponible.</p>
           ) : (
             <>
-              {section === 'overview' && overview && <OverviewSection overview={overview} onViewTickets={() => setSection('tickets')} />}
+              {section === 'overview' && overview && (
+                <OverviewSection
+                  overview={overview}
+                  onViewTickets={() => setSection('tickets')}
+                  onViewClinics={() => setSection('clinics')}
+                />
+              )}
               {section === 'clinics' && overview && (
                 <ClinicsSection
                   onChangePlan={handleChangeClinicPlan}
@@ -460,13 +532,244 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
   );
 };
 
-const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void }> = ({ overview, onViewTickets }) => {
+// Formulaire d'enrôlement d'une clinique par l'opérateur. Contrepartie de la
+// page d'inscription publique : mêmes champs, mêmes règles côté serveur
+// (POST /api/platform/clinics reprend celles de POST /auth/register). Le
+// téléphone est le seul champ facultatif ici — l'opérateur enrôle parfois
+// depuis un dossier papier incomplet.
+const NewClinicForm: React.FC<{
+  onSubmit: (payload: NewClinicPayload) => Promise<void>;
+  onCancel: () => void;
+}> = ({ onSubmit, onCancel }) => {
+  const [form, setForm] = useState<NewClinicPayload>({
+    clinicName: '', adminName: '', email: '', password: '', phone: ''
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string>('');
+
+  const set = (key: keyof NewClinicPayload) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(prev => ({ ...prev, [key]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      await onSubmit(form);
+    } catch (err: any) {
+      // Le message du serveur est le plus précis (mot de passe trop court,
+      // email déjà pris, téléphone invalide) : on l'affiche tel quel, dans le
+      // formulaire, plutôt que de le réduire à un message générique.
+      setError(err?.error || "La clinique n'a pas pu être créée.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const field = (label: string, key: keyof NewClinicPayload, type = 'text', required = true, hint?: string) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {label}{!required && <span style={{ color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}> (facultatif)</span>}
+      </label>
+      <input
+        type={type}
+        value={form[key]}
+        onChange={set(key)}
+        required={required}
+        style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '0.85rem', width: '100%' }}
+      />
+      {hint && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{hint}</span>}
+    </div>
+  );
+
+  return (
+    <form onSubmit={handleSubmit} className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div>
+        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Nouvelle clinique</h2>
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+          Crée la clinique et son compte administrateur. Elle démarre sur le plan Starter, avec la durée d'essai réglée dans Config. système.
+        </p>
+      </div>
+
+      <div className="new-clinic-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+        {field('Nom de la clinique', 'clinicName')}
+        {field("Nom de l'administrateur", 'adminName')}
+        {field('Email', 'email', 'email')}
+        {field('Mot de passe', 'password', 'password', true, 'Minimum 8 caractères')}
+        {field('Téléphone', 'phone', 'tel', false)}
+      </div>
+
+      {error && (
+        <p style={{ fontSize: '0.8rem', color: '#C0392B', margin: 0 }}>{error}</p>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{ padding: '9px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#3D6B5E', color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.7 : 1 }}
+        >
+          {submitting ? 'Création…' : 'Créer la clinique'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'transparent', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+        >
+          Annuler
+        </button>
+      </div>
+    </form>
+  );
+};
+
+// Réponse partielle de GET /api/platform/config — seuls les champs dont ce
+// panneau a besoin. La section Config. système en lit une version complète.
+interface HealthConfig {
+  email: { channel: 'resend' | 'smtp' | 'console' };
+  rateLimit: { backend: 'redis' | 'memory' };
+  database: { connected: boolean };
+}
+
+type HealthLine = { label: string; status: string; ok: boolean };
+
+// « Santé du système » de la maquette Banani, rendu à partir de mesures réelles.
+// Banani en montre quatre lignes ; la quatrième, « Sauvegardes », n'a aucune
+// source dans cette application — les sauvegardes Supabase ne sont pas visibles
+// depuis l'API — donc elle n'est pas reprise plutôt qu'affichée en vert par
+// défaut. Les trois autres sortent de GET /api/platform/config, plus la
+// limitation de débit qui est une vraie information d'exploitation.
+const SystemHealthPanel: React.FC = () => {
+  const [config, setConfig] = useState<HealthConfig | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<HealthConfig>('/platform/config')
+      .then(data => { if (!cancelled) setConfig(data); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const emailLabels: Record<HealthConfig['email']['channel'], HealthLine> = {
+    resend: { label: 'E-mail', status: 'Opérationnel — Resend', ok: true },
+    smtp: { label: 'E-mail', status: 'Opérationnel — SMTP', ok: true },
+    // Aucun email ne part réellement dans ce mode : il est écrit dans les
+    // journaux du serveur. C'est exactement l'état « Dégradé » de la maquette.
+    console: { label: 'E-mail', status: 'Dégradé — journal console', ok: false }
+  };
+
+  const lines: HealthLine[] = config
+    ? [
+        // Cette réponse a voyagé par l'API : qu'elle soit là est la mesure.
+        { label: 'API', status: 'Opérationnel', ok: true },
+        {
+          label: 'Base de données',
+          status: config.database.connected ? 'Opérationnel' : 'Injoignable',
+          ok: config.database.connected
+        },
+        emailLabels[config.email.channel],
+        {
+          label: 'Limitation de débit',
+          status: config.rateLimit.backend === 'redis'
+            ? 'Opérationnel — Redis'
+            : 'Dégradé — mémoire locale',
+          ok: config.rateLimit.backend === 'redis'
+        }
+      ]
+    : [];
+
+  return (
+    <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Activity size={16} color="var(--text-muted)" />
+        <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Santé du système</h2>
+      </div>
+
+      {failed ? (
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+          État indisponible — la configuration n'a pas pu être lue.
+        </p>
+      ) : !config ? (
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Lecture de l'état…</p>
+      ) : (
+        lines.map(line => (
+          // alignItems flex-start et pastille décalée d'un poil : sur une ligne
+          // dont le statut passe à la ligne (colonne étroite, mobile), un
+          // centrage vertical détachait la pastille du texte au lieu de la
+          // poser en regard de sa première ligne.
+          <div key={line.label} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', flexShrink: 0 }}>{line.label}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', minWidth: 0 }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: line.ok ? '#3D8A6A' : '#D4813A',
+                flexShrink: 0,
+                marginTop: '5px'
+              }} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: line.ok ? '#3D8A6A' : '#D4813A', textAlign: 'right' }}>
+                {line.status}
+              </span>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+};
+
+const OverviewSection: React.FC<{
+  overview: Overview;
+  onViewTickets: () => void;
+  onViewClinics: () => void;
+}> = ({ overview, onViewTickets, onViewClinics }) => {
   const { stats, clinics, expiringSoon, recentActivity } = overview;
+
+  // Quatre cartes, dans l'ordre de la maquette Banani. « Cliniques expirées »
+  // a quitté cette rangée (choix utilisateur) — l'information reste lisible
+  // dans l'onglet Cliniques, où chaque ligne porte son statut.
+  //
+  // Chaque `delta` décrit une mesure réelle ou l'absence de mesure. Aucune
+  // formule ne produit ici de valeur qui ne vienne pas du serveur : la maquette
+  // affiche « +3 ce mois » et « +8 % », mais ce sont des remplissages, et ce
+  // projet a déjà eu à retirer des chiffres inventés du tableau de bord.
+  const revenueDelta = stats.revenueDeltaPct !== null
+    ? `${stats.revenueDeltaPct >= 0 ? '+' : ''}${stats.revenueDeltaPct} % vs mois dernier`
+    : stats.lastMonthRevenue === 0
+      ? 'Aucun encaissement le mois dernier'
+      : '';
+
   const statCards = [
-    { label: 'Cliniques actives', value: stats.clinicsActive, icon: Building2 },
-    { label: 'Cliniques expirées', value: stats.clinicsExpired, icon: AlertTriangle },
-    { label: 'Utilisateurs totaux', value: stats.totalUsers, icon: Users },
-    { label: 'Revenu du mois', value: `${stats.monthlyRevenue.toLocaleString()} FCFA`, icon: TrendingUp }
+    {
+      label: 'Cliniques actives',
+      value: stats.clinicsActive.toLocaleString('fr-FR'),
+      icon: Building2,
+      delta: stats.clinicsNewThisMonth > 0 ? `+${stats.clinicsNewThisMonth} ce mois` : 'Aucune nouvelle ce mois'
+    },
+    {
+      label: 'Utilisateurs totaux',
+      value: stats.totalUsers.toLocaleString('fr-FR'),
+      icon: Users,
+      delta: stats.usersNewThisMonth > 0 ? `+${stats.usersNewThisMonth} ce mois` : 'Aucun nouveau ce mois'
+    },
+    {
+      label: 'Revenu du mois',
+      value: stats.monthlyRevenue.toLocaleString('fr-FR'),
+      unit: 'FCFA',
+      icon: TrendingUp,
+      delta: revenueDelta
+    },
+    {
+      label: 'Tickets support',
+      value: stats.openTickets.toLocaleString('fr-FR'),
+      icon: LifeBuoy,
+      // Banani affiche « 3 urgents » ; support_tickets n'a pas de colonne de
+      // priorité, donc cette ligne décrit l'état, elle ne le chiffre pas.
+      delta: stats.openTickets > 0 ? 'En attente de traitement' : 'Aucun ticket ouvert'
+    }
   ];
 
   return (
@@ -475,23 +778,45 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
         {statCards.map((s, i) => {
           const Icon = s.icon;
           return (
-            <div key={i} className="card" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</span>
+            <div key={i} className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</span>
                 <div className="stat-icon-box">
                   <Icon size={15} color="#3D6B5E" />
                 </div>
               </div>
-              <span style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--text-primary)' }}>{s.value}</span>
+              {/* Valeur et unité séparées, comme dans la maquette : le montant
+                  garde sa taille de titre, « FCFA » reste discret et aligné sur
+                  la ligne de base. */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+                <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</span>
+                {s.unit && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', paddingBottom: '2px' }}>{s.unit}</span>}
+              </div>
+              {s.delta && (
+                <span style={{ fontSize: '0.7rem', color: '#3D6B5E', fontWeight: 600 }}>{s.delta}</span>
+              )}
             </div>
           );
         })}
       </div>
 
       <div style={{ display: 'flex', gap: '1.25rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
-        <div className="card" style={{ flex: '2 1 480px', padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
+        <div className="card" style={{ flex: '2 1 480px', padding: 0, overflow: 'hidden', alignSelf: 'flex-start' }}>
+          {/* « Voir toutes → » est dans la maquette et n'a rien de décoratif :
+              ce tableau ne montre que les 5 premières cliniques sur
+              {clinics.length}. Sans le lien, rien n'indique qu'il y en a
+              d'autres ni où les trouver. */}
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Cliniques enregistrées</h2>
+            {clinics.length > 5 && (
+              <button
+                type="button"
+                onClick={onViewClinics}
+                style={{ background: 'none', border: 'none', color: '#3D6B5E', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0, flexShrink: 0 }}
+              >
+                Voir toutes ({clinics.length}) →
+              </button>
+            )}
           </div>
           <ClinicsTable clinics={clinics.slice(0, 5)} />
         </div>
@@ -527,11 +852,14 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
             {overview.recentTickets.length === 0 ? (
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>Aucun ticket ouvert.</p>
             ) : (
+              // Sujet au-dessus, clinique en dessous, comme dans la maquette :
+              // côte à côte, les deux se disputaient la largeur de la colonne
+              // droite et se coupaient tous les deux en deux lignes.
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {overview.recentTickets.map(t => (
-                  <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span>{t.subject}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{t.clinicName}</span>
+                  <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t.subject}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.clinicName}</span>
                   </div>
                 ))}
               </div>
@@ -544,14 +872,7 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
             </button>
           </div>
 
-          {/* Placeholder — no real uptime/health-check infrastructure exists yet */}
-          <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={16} color="var(--text-muted)" />
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Santé du système</h2>
-            </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Supervision de l'infrastructure — bientôt disponible.</p>
-          </div>
+          <SystemHealthPanel />
         </div>
       </div>
 
@@ -561,10 +882,14 @@ const OverviewSection: React.FC<{ overview: Overview; onViewTickets: () => void 
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {recentActivity.map(a => (
-            <div key={a.id} style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
+            // flexWrap et retrait du flexShrink:0 sur le nom de clinique : un
+            // nom long refusait de se réduire, poussait le libellé hors de la
+            // carte et le faisait couper net sur mobile, sans défilement pour
+            // aller le lire. Seul l'horodatage reste insécable, il est court.
+            <div key={a.id} style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.35rem 1rem', padding: '0.75rem 1.25rem', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
               <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace', flexShrink: 0 }}>{formatDateTime(a.createdAt)}</span>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 600, flexShrink: 0 }}>{a.clinicName}</span>
-              <span style={{ color: 'var(--text-primary)' }}>{a.details || a.action}</span>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 600, minWidth: 0 }}>{a.clinicName}</span>
+              <span style={{ color: 'var(--text-primary)', minWidth: 0, flex: '1 1 auto' }}>{a.details || a.action}</span>
             </div>
           ))}
           {recentActivity.length === 0 && (

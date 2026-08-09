@@ -1,6 +1,6 @@
 # Banani implementation status
 
-Last updated: 2026-08-02 (Nouveau Rendez-vous pixel-parity correction pass)
+Last updated: 2026-08-09 (Platform Admin pixel-parity pass — see the entry at the bottom)
 
 Full import requested by user 2026-07-22 — all 25 pages + 16 shared components. After comparing Banani's mocks against the existing app, most existing pages turned out to already be more capable than Banani's static designs (theme-aware, role-gated, live-data-wired). User decision: light visual/icon polish on existing pages, keep all logic; full builds only for genuinely new/missing content.
 
@@ -178,3 +178,52 @@ User compared 2 Banani source screenshots against 2 of the shipped implementatio
 Fixed all 3 in `NewAppointmentPage.tsx`: restructured so `<form>` now wraps a new header row (back-button + title on the left, "Annuler" + "Confirmer le rendez-vous" pair on the right, `justifyContent: 'space-between'`); removed the recap box's stray Annuler button and shortened its remaining button label to just "Confirmer" (matching Banani's distinct copy for the two CTAs); added a `bgLight` field to each `PRIORITIES` entry (`var(--primary-light)`/`var(--warning-light)`/`var(--danger-light)`) wired into the selected button's `backgroundColor`.
 
 Re-verified with a fresh Playwright pass at 375/768/1280px (screenshots regenerated, all 3 widths viewed) — header buttons wrap sensibly on narrow mobile, recap box shows only "Confirmer", Normal priority shows the teal-tinted fill when selected. `tsc -b`, `npm run lint` (only pre-existing unrelated warnings elsewhere in the codebase), and `npm run build` all clean.
+
+## 2026-08-09 Banani re-fetch — Platform Admin, passe de parité pixel
+Plan : `platform-admin-pixel-parity-2026-08-09.md`.
+
+**Piège de départ, à retenir.** L'utilisateur a demandé cette passe avec une
+capture de la Vue d'ensemble, mais la sélection Banani pointait encore sur
+`new_screen11.jsx` (Nouveau Rendez-vous), restée de la session du 02-08 et déjà
+implémentée. L'écran voulu, `new_screen9.jsx`, a été récupéré par `screenIds`
+explicite — l'identifiant était noté dans `platform-admin.md`. **Avant de
+construire à partir d'une sélection Banani, vérifier qu'elle correspond bien à
+ce que l'utilisateur décrit** : les deux avaient déjà été livrés, et rien dans
+la réponse du MCP ne signale qu'une sélection est périmée.
+
+**Rappel structurel, troisième fois que la question se pose** (2026-07-26,
+2026-07-27, aujourd'hui) : le flux Banani n'a **qu'un seul écran** pour toute la
+console, `new_screen9.jsx`. Cliniques, Utilisateurs, Abonnements, Support,
+Notifications, Rapports, Sécurité et Config. système n'ont aucune maquette.
+« Pixel-parfait » ne peut porter que sur la Vue d'ensemble.
+
+Backend : `GET /platform/overview` gagne les variations mensuelles
+(`clinicsNewThisMonth`, `usersNewThisMonth`, `lastMonthRevenue`,
+`revenueDeltaPct`, ce dernier `null` quand le mois précédent est à zéro) ;
+`POST /api/platform/clinics` est nouveau — création d'une clinique et de son
+admin par l'opérateur, aux règles exactes de `POST /auth/register`, avec
+suppression de rattrapage si l'insertion de l'admin échoue. 12 tests
+(`platform-clinic-create.test.js`), total du dépôt à **190**.
+
+Frontend : cartes de stats calées sur les 4 de Banani avec ligne de variation
+(choix utilisateur : « Cliniques expirées » quitte la rangée) ; nouveau
+`SystemHealthPanel` alimenté par `GET /platform/config`, où le mode e-mail
+`console` et la limitation de débit en mémoire s'affichent « Dégradé » parce
+qu'ils le sont ; bandeau haut avec sous-titre daté et bouton « Nouvelle
+clinique » ouvrant un `NewClinicForm` ; lien « Voir toutes (n) → » au-delà de
+5 cliniques. Écartés faute de source réelle : la cloche à compteur et la ligne
+« Sauvegardes » du panneau santé — mêmes motifs que les suppressions de
+2026-07-26.
+
+Trois défauts de mise en page corrigés en chemin, dont un préexistant : dans le
+journal d'activité, `flexShrink: 0` sur le nom de clinique poussait le libellé
+hors de la carte, coupé net à 375px sans défilement pour le lire.
+
+Vérifié : 190 tests, `tsc -b`/lint/build propres, captures Playwright à
+375/768/1280px. **Méthode de capture à réutiliser** : routes `/api/**`
+interceptées et servies depuis des fixtures, donc le vrai composant React est
+rendu sans qu'aucune requête ne touche la base de production. Deux pièges
+rencontrés — des fixtures incomplètes font planter le Dashboard traversé avant
+la console et emportent tout l'arbre React (page blanche, barre latérale
+comprise), et le lien d'entrée s'atteint via le bouton `aria-label="Menu
+principal"` sous 900px.

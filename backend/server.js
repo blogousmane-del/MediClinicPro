@@ -90,6 +90,19 @@ const captureRawBody = (req, _res, buf) => { req.rawBody = buf; };
 app.use(express.json({ verify: captureRawBody }));
 app.use(express.urlencoded({ extended: false, verify: captureRawBody }));
 
+// Aucune réponse d'API ne doit être mise en cache. Express n'envoie qu'un ETag
+// par défaut, sans Cache-Control : les réponses de /api/auth/me,
+// /api/financials/stats ou /api/patients partaient donc dans le cache disque du
+// navigateur et y SURVIVAIENT à la déconnexion — sur un poste partagé de
+// clinique, le cas normal ici, l'utilisateur suivant pouvait les y relire.
+// Monté avant toutes les routes pour couvrir aussi les webhooks et /api/health.
+// Contrepartie assumée : les 304 redeviennent des 200, donc un peu plus de
+// bande passante sur des connexions mobiles.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // Anti Brute-force rate limiting on auth routes (Upstash Redis-backed when configured, see middleware/rateLimiter.js)
 // `loginAccountLimiter` compte par email visé et doit donc être monté APRÈS
 // express.json ci-dessus, sinon req.body n'existe pas encore.
