@@ -12,6 +12,31 @@ test('unpaid est en attente, pas paye', () => {
   assert.strictEqual(chariow.mapChariowStatus('UNPAID'), 'pending');
 });
 
+test('le prix est lu dans la forme reelle de GET /products', () => {
+  // Forme constatee en production le 2026-08-09 : ni `amount`, ni `price`, mais
+  // pricing.current_price. Une lecture unique rendait undefined, ce qui
+  // neutralisait le controle de devise et faisait echouer celui du prix.
+  const produit = {
+    id: 'prd_tn4e8e01',
+    pricing: { type: 'one_time', current_price: { value: 174000, formatted: 'F CFA 174,000', currency: 'XOF' } }
+  };
+  assert.deepStrictEqual(chariow.extractAmount(produit), { value: 174000, currency: 'XOF' });
+});
+
+test('les autres formes de montant restent lues', () => {
+  assert.deepStrictEqual(chariow.extractAmount({ amount: { value: 9000, currency: 'xof' } }), { value: 9000, currency: 'XOF' });
+  assert.deepStrictEqual(chariow.extractAmount({ price: { value: 27000, currency: 'XOF' } }), { value: 27000, currency: 'XOF' });
+  assert.deepStrictEqual(chariow.extractAmount({ amount: 14500, currency: 'XOF' }), { value: 14500, currency: 'XOF' });
+});
+
+test('une forme inconnue rend NaN, jamais un zero credible', () => {
+  // Zero passerait le controle « montant fini » et pourrait crediter un
+  // abonnement non paye. NaN echoue ferme.
+  const { value, currency } = chariow.extractAmount({ montant: 9000 });
+  assert.ok(Number.isNaN(value));
+  assert.strictEqual(currency, '');
+});
+
 test('le motif de refus est lu quel que soit le champ utilise par Chariow', () => {
   // Ne lire que `message` rendait « raison inconnue » alors que la reponse
   // portait l'explication — l'exploitant cherchait alors la panne ailleurs.

@@ -86,18 +86,51 @@ async function probe(pathname) {
   const rows = Array.isArray(body.data) ? body.data : (body.data && body.data.products) || body.products || [];
   console.log(`Produits : ${rows.length} trouvé(s)`);
 
-  for (const p of rows) {
-    const price = p.price && p.price.value !== undefined ? p.price.value : p.price;
-    const currency = (p.price && p.price.currency) || p.currency || '?';
-    console.log(`  ${p.id}  ${String(price).padStart(8)} ${currency}  ${p.name || ''}`);
+  // Même logique que extractAmount() dans services/payments/chariow.js, mais
+  // recopiée : requérir l'adaptateur chargerait platformSettings puis la base,
+  // ce qui fait échouer bruyamment ce script hors d'un environnement configuré
+  // — alors qu'il doit précisément servir quand rien ne marche.
+  const extractAmount = (source) => {
+    for (const c of [source.amount, source.pricing && source.pricing.current_price, source.price]) {
+      if (!c || typeof c !== 'object') continue;
+      const value = Number(c.value !== undefined ? c.value : c.amount);
+      if (Number.isFinite(value)) return { value, currency: String(c.currency || '').toUpperCase() };
+    }
+    const flat = Number(source.amount);
+    return Number.isFinite(flat)
+      ? { value: flat, currency: String(source.currency || '').toUpperCase() }
+      : { value: NaN, currency: '' };
+  };
+
+  // Le nom des produits Chariow n'est pas fiable (copies successives) : c'est
+  // le PRIX qui identifie la combinaison plan/durée sans ambiguïté.
+  const { PLANS } = require('../utils/plans');
+  const expected = new Map();
+  for (const [id, plan] of Object.entries(PLANS)) {
+    if (!plan.price) continue;
+    for (const months of [1, 3, 6, 12]) expected.set(plan.price * months, `${id}_${months}`);
   }
 
-  const foreign = rows.filter((p) => {
-    const c = (p.price && p.price.currency) || p.currency;
-    return c && String(c).toUpperCase() !== 'XOF';
-  });
+  console.log('');
+  console.log('IDENTIFIANT     PRIX  DEVISE  STATUT      RATTACHEMENT DEDUIT DU PRIX');
+  const foreign = [];
+  for (const p of rows) {
+    const { value, currency } = extractAmount(p);
+    if (currency && currency !== 'XOF') foreign.push(currency);
+    const match = expected.get(value) || '— aucun plan à ce prix';
+    console.log(
+      `${String(p.id).padEnd(15)}${String(value).padStart(7)}  ${String(currency || '?').padEnd(7)} ${String(p.status || '?').padEnd(11)} ${match}`
+    );
+  }
+
   if (foreign.length) {
-    console.log(`\nATTENTION: ${foreign.length} produit(s) hors XOF. MediClinic n'accepte que le XOF.`);
+    console.log(`\nATTENTION: ${foreign.length} produit(s) hors XOF (${[...new Set(foreign)].join(', ')}). Ne les rattachez à aucun plan.`);
+  }
+
+  const covered = new Set(rows.map((p) => expected.get(extractAmount(p).value)).filter(Boolean));
+  const missing = [...new Set(expected.values())].filter((key) => !covered.has(key));
+  if (missing.length) {
+    console.log(`\nATTENTION: aucune combinaison trouvée pour ${missing.join(', ')} — ces durées ne seront pas achetables.`);
   }
 
   console.log('\nLa clé fonctionne. Si l\'écran de configuration la refuse malgré ça, le problème est côté serveur, pas côté Chariow.');

@@ -76,6 +76,41 @@ function resolveChariowPhone({ phone, phoneCountry, phoneLocal } = {}) {
   return null;
 }
 
+/**
+ * Extrait { value, currency } d'un objet Chariow.
+ *
+ * Le format varie selon l'endpoint, et une lecture unique s'est révélée fausse
+ * en conditions réelles : GET /products renvoie `pricing.current_price`, là où
+ * la documentation décrit `amount` pour une vente. Une seule voie de lecture
+ * rendait `undefined`, ce qui neutralisait silencieusement le contrôle de
+ * devise à la configuration et faisait échouer le contrôle de prix au checkout.
+ *
+ * On essaie donc les formes connues dans l'ordre et on retient la première qui
+ * porte un nombre exploitable. Rien n'est deviné : une forme inconnue rend
+ * `{ value: NaN, currency: '' }`, que les appelants traitent comme un refus.
+ */
+function extractAmount(source) {
+  const candidates = [
+    source && source.amount,
+    source && source.pricing && source.pricing.current_price,
+    source && source.price,
+    source && source.total
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const value = Number(candidate.value !== undefined ? candidate.value : candidate.amount);
+    if (!Number.isFinite(value)) continue;
+    return { value, currency: String(candidate.currency || '').toUpperCase() };
+  }
+
+  // Forme plate : { amount: 9000, currency: 'XOF' }
+  const flat = Number(source && source.amount);
+  if (Number.isFinite(flat)) return { value: flat, currency: String((source && source.currency) || '').toUpperCase() };
+
+  return { value: NaN, currency: '' };
+}
+
 function parseProducts(raw) {
   if (!raw) return {};
   try {
@@ -220,10 +255,7 @@ async function createCheckout({ productId, email, firstName, lastName, phone, re
     ok: true,
     saleId: String(purchase.id),
     checkoutUrl,
-    amount: {
-      value: Number(purchase.amount && purchase.amount.value),
-      currency: String((purchase.amount && purchase.amount.currency) || '').toUpperCase()
-    }
+    amount: extractAmount(purchase)
   };
 }
 
@@ -240,10 +272,7 @@ async function getSale(saleId) {
   return {
     ok: true,
     status: mapChariowStatus(sale.status),
-    amount: {
-      value: Number(sale.amount && sale.amount.value),
-      currency: String((sale.amount && sale.amount.currency) || '').toUpperCase()
-    },
+    amount: extractAmount(sale),
     // Le nom du champ varie selon la version de l'API : on prend le premier
     // présent, et surtout jamais l'heure courante en repli (voir
     // chariowReconcile.js, qui retombe sur created_at de la ligne).
@@ -262,18 +291,25 @@ async function listProducts(overrides = {}) {
   const rows = Array.isArray(call.data) ? call.data : call.data.products || [];
   return {
     ok: true,
-    products: rows.map((p) => ({
-      id: String(p.id),
-      name: p.name || '',
-      price: Number(p.price && p.price.value !== undefined ? p.price.value : p.price),
-      currency: String((p.price && p.price.currency) || p.currency || '').toUpperCase()
-    }))
+    products: rows.map((p) => {
+      const amount = extractAmount(p);
+      return {
+        id: String(p.id),
+        name: p.name || '',
+        price: amount.value,
+        currency: amount.currency,
+        // Un produit non publié ne peut pas être acheté : le rattacher à un
+        // plan vendrait une durée que le checkout refusera.
+        status: p.status || ''
+      };
+    })
   };
 }
 
 module.exports = {
   mapChariowStatus,
   describeError,
+  extractAmount,
   resolveChariowPhone,
   productIdFor,
   loadConfig,
