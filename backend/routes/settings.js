@@ -5,7 +5,8 @@ const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { isWithinSchedule, computeEffectiveAvailability } = require('../utils/schedule');
-const { PLANS, getPlan, isRoleAllowedForPlan, isStaffLimitReached } = require('../utils/plans');
+const { PLANS, getPlan, isRoleAllowedForPlan, isStaffLimitReached, isKnownRole } = require('../utils/plans');
+const { validatePassword } = require('../utils/password');
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TICKET_CATEGORIES = ['facturation', 'bug', 'general', 'autre'];
@@ -133,6 +134,17 @@ router.post('/users', auth, checkRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: "Tous les champs sont requis." });
     }
 
+    // Le rôle est vérifié avant le plan : isRoleAllowedForPlan() laisse passer
+    // n'importe quelle chaîne dès que le plan n'a pas de liste de rôles.
+    if (!isKnownRole(role)) {
+      return res.status(400).json({ error: `Le rôle "${role}" n'existe pas.` });
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
+    }
+
     const schedule = parseScheduleInput(req.body);
     if (schedule.error) {
       return res.status(400).json({ error: schedule.error });
@@ -238,6 +250,10 @@ router.put('/users/:id', auth, checkRole(['admin']), async (req, res) => {
 
     if (parseInt(userId) === req.user.userId && active === 0) {
       return res.status(400).json({ error: "Vous ne pouvez pas désactiver votre propre compte." });
+    }
+
+    if (role !== undefined && !isKnownRole(role)) {
+      return res.status(400).json({ error: `Le rôle "${role}" n'existe pas.` });
     }
 
     const targetRole = role || user.role;

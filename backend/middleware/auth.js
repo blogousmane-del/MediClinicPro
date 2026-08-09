@@ -23,15 +23,44 @@ async function auth(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
 
-    // Check clinic subscription status
-    const { data: clinic, error: clinicError } = await supabase
-      .from('clinics')
-      .select('subscription_status, subscription_expires_at, suspended_by_platform')
-      .eq('id', decoded.clinicId)
-      .maybeSingle();
+    // Deux lectures indépendantes, en parallèle : la clinique (abonnement,
+    // suspension) et le compte lui-même.
+    const [
+      { data: clinic, error: clinicError },
+      { data: account, error: accountError }
+    ] = await Promise.all([
+      supabase
+        .from('clinics')
+        .select('subscription_status, subscription_expires_at, suspended_by_platform')
+        .eq('id', decoded.clinicId)
+        .maybeSingle(),
+      supabase
+        .from('users')
+        .select('id, active')
+        .eq('id', decoded.userId)
+        .eq('clinic_id', decoded.clinicId)
+        .maybeSingle()
+    ]);
 
     if (clinicError) {
       console.error("Auth Middleware Clinic Error:", clinicError);
+    }
+
+    // Le JWT vit 24 h et rien ne le révoque : sans cette relecture, désactiver
+    // un compte (PUT /settings/users/:id ou PUT /api/platform/users/:id) ne
+    // produisait aucun effet avant l'expiration du jeton — le collaborateur
+    // renvoyé gardait lecture ET écriture pendant une journée entière. Une
+    // erreur de lecture (base injoignable) ne déconnecte personne : seul un
+    // `active` explicitement à 0, ou un compte disparu, ferme la porte.
+    if (accountError) {
+      console.error("Auth Middleware Account Error:", accountError);
+    } else if (!account) {
+      return res.status(401).json({ error: "Compte introuvable. Veuillez vous reconnecter." });
+    } else if (Number(account.active) !== 1) {
+      return res.status(401).json({
+        error: "Ce compte a été désactivé. Contactez l'administrateur de votre clinique.",
+        code: "ACCOUNT_DEACTIVATED"
+      });
     }
 
     if (clinic) {

@@ -75,6 +75,14 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
       return res.status(400).json({ error: "Les informations de facturation essentielles sont requises." });
     }
 
+    // Le montant n'était pas validé : seul `!amountTotal` était testé, donc
+    // « -50000 » ou « beaucoup » entraient tels quels en base et faussaient
+    // GET /financials/stats. Même contrôle que POST /deposits.
+    const amount = Number(amountTotal);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: "Le montant encaissé doit être un nombre supérieur à 0." });
+    }
+
     // Refus avant toute autre vérification, et indépendamment du plan : la
     // restriction ne vient plus du palier d'abonnement mais du fournisseur.
     if (paymentMethod !== 'cash') {
@@ -102,7 +110,7 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
         clinic_id: req.user.clinicId,
         patient_id: patientId,
         user_id: req.user.userId,
-        amount_total: amountTotal,
+        amount_total: amount,
         payment_method: paymentMethod,
         reference_number: referenceNumber || `REF-${Date.now()}`,
         // Encaissé au comptoir : réglé d'emblée, aucune confirmation à

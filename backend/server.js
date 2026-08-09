@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 
-const { authLimiter } = require('./middleware/rateLimiter');
+const { authLimiter, loginAccountLimiter } = require('./middleware/rateLimiter');
 const { initDb, supabase } = require('./database');
 const authRoutes = require('./routes/auth');
 const patientRoutes = require('./routes/patients');
@@ -91,7 +91,9 @@ app.use(express.json({ verify: captureRawBody }));
 app.use(express.urlencoded({ extended: false, verify: captureRawBody }));
 
 // Anti Brute-force rate limiting on auth routes (Upstash Redis-backed when configured, see middleware/rateLimiter.js)
-app.use('/api/auth/login', authLimiter);
+// `loginAccountLimiter` compte par email visé et doit donc être monté APRÈS
+// express.json ci-dessus, sinon req.body n'existe pas encore.
+app.use('/api/auth/login', authLimiter, loginAccountLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/google', authLimiter);
 

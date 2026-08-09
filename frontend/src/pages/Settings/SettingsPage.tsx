@@ -1159,7 +1159,7 @@ export const SettingsPage: React.FC = () => {
 
                   <div className="form-group">
                     <label>Mot de passe initial *</label>
-                    <input type="password" placeholder="Minimum 6 caractères" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} className="input-control" required />
+                    <input type="password" placeholder="Minimum 8 caractères" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} className="input-control" required />
                   </div>
 
                   <div className="form-group">

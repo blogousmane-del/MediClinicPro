@@ -8,7 +8,8 @@ const { supabase } = require('../database');
 const { JWT_SECRET, auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { computeEffectiveAvailability } = require('../utils/schedule');
-const { getPlan, isRoleAllowedForPlan, isStaffLimitReached } = require('../utils/plans');
+const { getPlan, isRoleAllowedForPlan, isStaffLimitReached, isKnownRole } = require('../utils/plans');
+const { validatePassword } = require('../utils/password');
 const { getSettings } = require('../utils/platformSettings');
 const { recordLoginFailure, REASONS } = require('../utils/loginFailures');
 
@@ -24,6 +25,11 @@ router.post('/register', async (req, res) => {
 
     if (!clinicName || !adminName || !email || !password || !phone) {
       return res.status(400).json({ error: "Tous les champs sont requis." });
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
     }
 
     const phoneCheck = validateAndNormalizePhone(phone);
@@ -414,8 +420,11 @@ router.put('/password', auth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 6 caractères." });
+    // Même règle qu'à la création du compte (utils/password.js) : c'est le seul
+    // endroit qui en imposait une, et elle y était plus faible qu'ailleurs.
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
     }
 
     const { data: user, error: userError } = await supabase
@@ -512,6 +521,13 @@ router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
         const { name, email: rawEmail, password, role } = member;
         const email = (rawEmail || '').trim().toLowerCase();
         if (name && email && password && role) {
+          if (!isKnownRole(role)) {
+            return res.status(400).json({ error: `Le rôle "${role}" n'existe pas.` });
+          }
+          const memberPasswordError = validatePassword(password);
+          if (memberPasswordError) {
+            return res.status(400).json({ error: `${memberPasswordError} (collaborateur ${email})` });
+          }
           if (!isRoleAllowedForPlan(clinicForPlan.plan, role)) {
             const plan = getPlan(clinicForPlan.plan);
             return res.status(403).json({ error: `Le plan ${plan.name} n'autorise pas le rôle "${role}". Passez à un plan supérieur dans Abonnez-vous pour débloquer ce rôle.` });

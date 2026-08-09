@@ -14,10 +14,14 @@ async function superAdminOnly(req, res, next) {
     return res.status(403).json({ error: "Tableau de bord plateforme non configuré." });
   }
 
+  // `active` fait partie du filtre : un compte Super Admin désactivé ne doit
+  // pas conserver l'accès à la console au seul motif que son email figure dans
+  // l'allowlist.
   const { data: user, error } = await supabase
     .from('users')
-    .select('email')
+    .select('email, active')
     .eq('id', req.user.userId)
+    .eq('active', 1)
     .maybeSingle();
 
   if (error || !user || !SUPER_ADMIN_EMAILS.includes(user.email)) {

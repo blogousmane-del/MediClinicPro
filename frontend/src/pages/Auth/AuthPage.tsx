@@ -133,8 +133,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
       return;
     }
 
-    if (registerPassword.length < 6) {
-      showToast('error', 'Sécurité du mot de passe', 'Le mot de passe doit contenir au moins 6 caractères.');
+    if (registerPassword.length < 8) {
+      showToast('error', 'Sécurité du mot de passe', 'Le mot de passe doit contenir au moins 8 caractères.');
       return;
     }
 
@@ -673,7 +673,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                     <Lock size={17} className="auth-icon-left" />
                     <input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Minimum 6 caractères"
+                      placeholder="Minimum 8 caractères"
                       value={registerPassword}
                       onChange={e => setRegisterPassword(e.target.value)}
                       disabled={isSubmitting}

@@ -66,50 +66,75 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: "Un patient avec le même nom, date de naissance et téléphone existe déjà." });
     }
 
-    // Generate folder number (MED-YYYY-XXXX) - globally unique to prevent key conflicts
+    // Numéro de dossier (MED-AAAA-XXXX). La colonne folder_number porte une
+    // contrainte UNIQUE GLOBALE (voir supabase_schema.sql) : la séquence est
+    // donc calculée sur toutes les cliniques, seule requête de ce fichier qui
+    // ne filtre pas par clinic_id, et c'est délibéré.
+    //
+    // L'ancienne version lisait la table patients ENTIÈRE pour en tirer un
+    // Math.max. Deux défauts : PostgREST plafonne le nombre de lignes rendues
+    // (1000 par défaut), donc au-delà la séquence était recalculée trop bas et
+    // l'insertion tombait sur la contrainte UNIQUE avec un 500 opaque ; et deux
+    // créations simultanées obtenaient le même numéro. On ne lit plus qu'une
+    // ligne — la dernière créée de l'année, dont la séquence est la plus haute
+    // — et on retente sur collision.
     const currentYear = new Date().getFullYear();
     const prefix = `MED-${currentYear}-`;
 
-    const { data: existingFolders, error: fetchError } = await supabase
+    const { data: lastFolders, error: fetchError } = await supabase
       .from('patients')
       .select('folder_number')
-      .like('folder_number', `${prefix}%`);
+      .like('folder_number', `${prefix}%`)
+      .order('id', { ascending: false })
+      .limit(1);
 
     if (fetchError) throw fetchError;
 
-    let nextSeq = 1;
-    if (existingFolders && existingFolders.length > 0) {
-      const sequences = existingFolders.map(p => {
-        const parts = p.folder_number.split('-');
-        const lastPart = parts[parts.length - 1];
-        return parseInt(lastPart, 10) || 0;
-      });
-      nextSeq = Math.max(...sequences) + 1;
+    const parseSeq = (folder) => {
+      const parts = String(folder || '').split('-');
+      return parseInt(parts[parts.length - 1], 10) || 0;
+    };
+    let nextSeq = (lastFolders && lastFolders.length > 0 ? parseSeq(lastFolders[0].folder_number) : 0) + 1;
+
+    // padStart(4) reste un affichage : au-delà de 9999 dossiers dans l'année le
+    // numéro passe simplement à 5 chiffres, l'unicité tient toujours.
+    let folderNumber = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+    let newPatient = null;
+    let insertError = null;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      folderNumber = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+      const result = await supabase
+        .from('patients')
+        .insert({
+          clinic_id: req.user.clinicId,
+          folder_number: folderNumber,
+          first_name: firstName,
+          last_name: lastName,
+          birth_date: birthDate,
+          gender,
+          phone: normalizedPhone,
+          email: email || '',
+          address: address || '',
+          allergies: allergies || '',
+          antecedents: antecedents || '',
+          archived: 0
+        })
+        .select()
+        .single();
+
+      insertError = result.error;
+      if (!insertError) {
+        newPatient = result.data;
+        break;
+      }
+      // 23505 = violation d'unicité : un autre dossier a pris ce numéro entre
+      // la lecture et l'écriture. On avance d'un cran et on retente.
+      if (insertError.code !== '23505') break;
+      nextSeq += 1;
     }
 
-    const sequenceNum = String(nextSeq).padStart(4, '0');
-    const folderNumber = `${prefix}${sequenceNum}`;
-
-    const { data: newPatient, error: insertError } = await supabase
-      .from('patients')
-      .insert({
-        clinic_id: req.user.clinicId,
-        folder_number: folderNumber,
-        first_name: firstName,
-        last_name: lastName,
-        birth_date: birthDate,
-        gender,
-        phone: normalizedPhone,
-        email: email || '',
-        address: address || '',
-        allergies: allergies || '',
-        antecedents: antecedents || '',
-        archived: 0
-      })
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
+    if (insertError && !newPatient) throw insertError;
 
     // Log Activity
     await supabase.from('activity_logs').insert({

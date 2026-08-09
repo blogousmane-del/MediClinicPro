@@ -4,6 +4,7 @@
 // endpoints. Degrades gracefully (503) when CRON_SECRET isn't configured,
 // consistent with every other optional feature in this app.
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { supabase } = require('../database');
 const { getPlan } = require('../utils/plans');
@@ -12,11 +13,23 @@ const { sendRenewalReminderEmail } = require('../utils/mailer');
 const CRON_SECRET = process.env.CRON_SECRET || '';
 const REMINDER_THRESHOLDS_DAYS = [3, 1]; // two touchpoints before auto-block; exact-day match means a once-daily cron never double-sends
 
+// Comparaison à durée constante, comme pour les secrets de webhook
+// (webhooks.js, bictorys.js, paytech.js) : `!==` s'arrête au premier octet
+// différent et laisse fuir, en théorie, la longueur du préfixe correct.
+function secretMatches(provided, expected) {
+  const a = Buffer.from(String(provided || ''));
+  const b = Buffer.from(String(expected || ''));
+  // timingSafeEqual exige des tampons de même longueur : comparer d'abord les
+  // longueurs évite l'exception, au prix d'une fuite sans intérêt (la longueur
+  // d'un secret faux).
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 function requireCronSecret(req, res, next) {
   if (!CRON_SECRET) {
     return res.status(503).json({ error: "Tâches planifiées non configurées (CRON_SECRET manquant)." });
   }
-  if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+  if (!secretMatches(req.headers.authorization, `Bearer ${CRON_SECRET}`)) {
     return res.status(401).json({ error: "Non autorisé." });
   }
   next();

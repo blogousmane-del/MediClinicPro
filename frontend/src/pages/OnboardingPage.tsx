@@ -305,7 +305,7 @@ export const OnboardingPage: React.FC = () => {
                   <span className="onboard-label">Mot de passe</span>
                   <input
                     type="password"
-                    placeholder="Minimum 6 caractères"
+                    placeholder="Minimum 8 caractères"
                     value={newStaffPass}
                     onChange={e => setNewStaffPass(e.target.value)}
                     className="input-control onboard-input w-full"

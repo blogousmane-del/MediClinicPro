@@ -19,8 +19,8 @@ export const PasswordChangeForm: React.FC = () => {
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newPasswordInput.length < 6) {
-      showToast('error', 'Mot de passe trop court', 'Le nouveau mot de passe doit contenir au moins 6 caractères.');
+    if (newPasswordInput.length < 8) {
+      showToast('error', 'Mot de passe trop court', 'Le nouveau mot de passe doit contenir au moins 8 caractères.');
       return;
     }
     if (newPasswordInput !== confirmPasswordInput) {
@@ -90,7 +90,7 @@ export const PasswordChangeForm: React.FC = () => {
         <label>Nouveau mot de passe</label>
         <input
           type="password"
-          placeholder="Minimum 6 caractères"
+          placeholder="Minimum 8 caractères"
           value={newPasswordInput}
           onChange={e => setNewPasswordInput(e.target.value)}
           className="input-control"

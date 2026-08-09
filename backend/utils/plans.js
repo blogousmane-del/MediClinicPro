@@ -66,6 +66,20 @@ const PLANS = {
 
 const PLAN_IDS = Object.keys(PLANS);
 
+// Liste canonique des rôles, alignée sur frontend/src/contexts/AuthContext.tsx.
+// La colonne users.role est du texte libre (aucun ENUM ni CHECK côté base) et
+// isRoleAllowedForPlan() renvoie `true` pour n'importe quelle chaîne dès que le
+// plan n'a pas de restriction (clinique, hôpital) : sans ce garde-fou, un
+// administrateur pouvait créer un collaborateur avec le rôle « directeur » ou
+// « Admin ». Aucune escalade de privilèges — checkRole() compare à des listes
+// fermées, donc un rôle inconnu n'ouvre rien — mais le compte devient
+// inutilisable et l'interface affiche un rôle qu'elle ne sait pas filtrer.
+const VALID_ROLES = ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager', 'nurse'];
+
+function isKnownRole(role) {
+  return VALID_ROLES.includes(role);
+}
+
 function getPlan(planId) {
   return PLANS[planId] || PLANS.hopital; // unknown/legacy clinics degrade to the most permissive plan, never lock anyone out silently
 }
@@ -91,6 +105,8 @@ function isPaymentMethodAllowed(planId, method) {
 module.exports = {
   PLANS,
   PLAN_IDS,
+  VALID_ROLES,
+  isKnownRole,
   getPlan,
   isRoleAllowedForPlan,
   isStaffLimitReached,
