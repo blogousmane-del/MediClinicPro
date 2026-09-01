@@ -85,10 +85,10 @@ const FREQUENCY_OPTIONS = [
 interface PrescriptionItem {
   id: number;
   medication_name: string;
-  form: string;
+  form?: string;
   posology: string;
   frequency: string;
-  durationDays: number;
+  durationDays?: number;
   quantity_prescribed: number;
   quantity_dispensed: number;
 }
@@ -96,10 +96,10 @@ interface PrescriptionItem {
 interface Prescription {
   id: number;
   patient_name: string;
-  patient_age: string;
+  patient_age?: string;
   doctor_name: string;
   date: string;
-  diagnostic: string;
+  diagnostic?: string;
   status: 'remise' | 'partielle' | 'validee';
   notes?: string;
   items: PrescriptionItem[];
@@ -182,21 +182,24 @@ export const OrdonnancesPage: React.FC = () => {
         setPrescriptions(data.map((p: any) => ({
           id: p.id,
           patient_name: `${p.patient_first_name} ${p.patient_last_name}`,
-          patient_age: '45 ans',
+          // Rien d'inventé ici : l'âge vient de la vraie date de naissance, et
+          // le diagnostic comme les notes n'ont pas de colonne en base — ils
+          // restent vides au lieu d'afficher « Consultation générale » et
+          // « Prendre selon les indications » sur toutes les ordonnances.
+          patient_age: p.patient_birth_date ? `${calculateAge(p.patient_birth_date)} ans` : undefined,
           doctor_name: p.doctor_name,
           date: new Date(p.date_time).toLocaleDateString('fr-FR'),
-          diagnostic: 'Consultation générale',
           status: p.status === 'dispensed' ? 'remise' : p.status === 'partial' ? 'partielle' : 'validee',
-          notes: 'Prendre selon les indications.',
           items: p.items ? p.items.map((it: any) => ({
             id: it.id,
             medication_name: it.medication_name,
-            form: it.form || 'Comprimé',
-            posology: it.dosage || '1 comprimé',
-            frequency: it.frequency || 'x2/jour',
-            durationDays: 7,
-            quantity_prescribed: it.quantity_prescribed || 21,
-            quantity_dispensed: it.quantity_dispensed || 21
+            form: it.form || undefined,
+            // Les quantités retombaient sur 21 quand elles valaient 0 : une
+            // ordonnance non délivrée s'affichait comme entièrement délivrée.
+            posology: [it.dosage, it.frequency, it.duration].filter(Boolean).join(' — '),
+            frequency: it.frequency || '',
+            quantity_prescribed: it.quantity_prescribed ?? 0,
+            quantity_dispensed: it.quantity_dispensed ?? 0
           })) : []
         })));
       }
@@ -250,16 +253,16 @@ export const OrdonnancesPage: React.FC = () => {
 
   const handleOpenEditModal = (presc: Prescription) => {
     setEditingPrescriptionId(presc.id);
-    setSelectedPatientName(`${presc.patient_name} (${presc.patient_age})`);
+    setSelectedPatientName(presc.patient_age ? `${presc.patient_name} (${presc.patient_age})` : presc.patient_name);
     setDoctorName(presc.doctor_name);
-    setDiagnostic(presc.diagnostic);
+    setDiagnostic(presc.diagnostic || '');
     setNotes(presc.notes || '');
     setMedicationLines(presc.items.map(it => ({
       id: it.id,
       medication_name: MEDICATION_CATALOG.includes(it.medication_name) ? it.medication_name : 'Autre (Saisir manuellement)',
       custom_name: MEDICATION_CATALOG.includes(it.medication_name) ? '' : it.medication_name,
       form: it.form || 'Comprimé',
-      posology: it.posology.split(' - ')[0] || '1 comprimé',
+      posology: it.posology.split(' — ')[0] || '',
       frequency: it.frequency || 'x2/jour (Matin & Soir)',
       durationDays: 7,
       quantity: it.quantity_prescribed
@@ -318,7 +321,7 @@ export const OrdonnancesPage: React.FC = () => {
           ...p,
           patient_name: selectedPatientName.split(' (')[0],
           doctor_name: doctorName,
-          diagnostic: diagnostic || 'Consultation générale',
+          diagnostic: diagnostic || undefined,
           notes,
           items: formattedItems
         } : p));
@@ -328,10 +331,10 @@ export const OrdonnancesPage: React.FC = () => {
         const newPresc: Prescription = {
           id: Date.now(),
           patient_name: selectedPatientName.split(' (')[0],
-          patient_age: selectedPatientName.includes('(') ? selectedPatientName.split('(')[1].replace(')', '') : '45 ans',
+          patient_age: selectedPatientName.includes('(') ? selectedPatientName.split('(')[1].replace(')', '') : undefined,
           doctor_name: doctorName,
-          date: '14 juil. 2025',
-          diagnostic: diagnostic || 'Consultation générale',
+          date: new Date().toLocaleDateString('fr-FR'),
+          diagnostic: diagnostic || undefined,
           status: 'validee',
           notes: notes || undefined,
           items: formattedItems
@@ -380,15 +383,15 @@ export const OrdonnancesPage: React.FC = () => {
           </div>
 
           <div class="patient-box">
-            <div><strong>Patient :</strong> ${presc.patient_name} (${presc.patient_age})</div>
-            <div><strong>Diagnostic :</strong> ${presc.diagnostic}</div>
+            <div><strong>Patient :</strong> ${presc.patient_name}${presc.patient_age ? ` (${presc.patient_age})` : ''}</div>
+            ${presc.diagnostic ? `<div><strong>Diagnostic :</strong> ${presc.diagnostic}</div>` : ''}
           </div>
 
           <div class="rx-title">ORDONNANCE MÉDICALE (Rx)</div>
 
           ${presc.items.map(it => `
             <div class="item-row">
-              <div class="item-name">• ${it.medication_name} (${it.form || 'Comprimé'})</div>
+              <div class="item-name">• ${it.medication_name}${it.form ? ` (${it.form})` : ''}</div>
               <div class="item-posology">Posologie : ${it.posology} — Quantité : ${it.quantity_prescribed} unités</div>
             </div>
           `).join('')}
@@ -446,7 +449,8 @@ export const OrdonnancesPage: React.FC = () => {
   };
 
   const filteredItems = prescriptions.filter(p => {
-    const matchesSearch = p.patient_name.toLowerCase().includes(search.toLowerCase()) || p.diagnostic.toLowerCase().includes(search.toLowerCase());
+    const haystack = `${p.patient_name} ${p.diagnostic || ''}`.toLowerCase();
+    const matchesSearch = haystack.includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (filterStatus === 'validee') return p.status === 'validee';
     if (filterStatus === 'remise') return p.status === 'remise';
@@ -473,7 +477,7 @@ export const OrdonnancesPage: React.FC = () => {
             Ordonnances
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
-            {prescriptions.length} ordonnances · {currentMonthLabel}
+            {prescriptions.length} ordonnance{prescriptions.length > 1 ? 's' : ''} · {currentMonthLabel}
           </p>
         </div>
 
@@ -606,7 +610,7 @@ export const OrdonnancesPage: React.FC = () => {
             statusPill = (
               <span style={{
                 backgroundColor: 'var(--brand-soft)',
-                color: 'var(--brand-fill)',
+                color: 'var(--brand-soft-ink)',
                 padding: '4px 12px',
                 borderRadius: '8px',
                 fontSize: '0.78rem',
@@ -694,25 +698,33 @@ export const OrdonnancesPage: React.FC = () => {
                       <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
                         {presc.patient_name}
                       </h3>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {presc.patient_age}
-                      </span>
+                      {presc.patient_age && (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {presc.patient_age}
+                        </span>
+                      )}
                     </div>
 
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
                       Prescrit par {presc.doctor_name} · {presc.date}
                     </p>
 
-                    <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: '4px 0 0 0', fontWeight: 500 }}>
-                      <strong>Diagnostic :</strong> {presc.diagnostic}
-                    </p>
+                    {presc.diagnostic && (
+                      <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: '4px 0 0 0', fontWeight: 500 }}>
+                        <strong>Diagnostic :</strong> {presc.diagnostic}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
                   {statusPill}
                   <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {presc.status === 'partielle' ? 'Partiellement remise' : 'Délivrée'}
+                    {presc.status === 'remise'
+                      ? 'Délivrée'
+                      : presc.status === 'partielle'
+                        ? 'Partiellement remise'
+                        : 'En attente de délivrance'}
                   </div>
                 </div>
               </div>
@@ -745,7 +757,8 @@ export const OrdonnancesPage: React.FC = () => {
                       >
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                            {it.medication_name} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>({it.form || 'Comprimé'})</span>
+                            {it.medication_name}
+                            {it.form && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}> ({it.form})</span>}
                           </div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                             {it.posology}
@@ -863,7 +876,7 @@ export const OrdonnancesPage: React.FC = () => {
                         gap: '6px',
                         padding: '8px 16px',
                         backgroundColor: 'var(--brand-soft)',
-                        color: 'var(--brand-fill)',
+                        color: 'var(--brand-soft-ink)',
                         border: '1px solid var(--brand-line)',
                         borderRadius: '8px',
                         fontWeight: 700,
@@ -1165,7 +1178,7 @@ export const OrdonnancesPage: React.FC = () => {
               <div style={{ backgroundColor: 'var(--bg-primary)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
                 <strong>Patient :</strong> {dispenseModalPresc.patient_name}<br/>
                 <strong>Prescripteur :</strong> {dispenseModalPresc.doctor_name}<br/>
-                <strong>Diagnostic :</strong> {dispenseModalPresc.diagnostic}
+                <strong>Diagnostic :</strong> {dispenseModalPresc.diagnostic || '—'}
               </div>
 
               <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>
@@ -1173,8 +1186,8 @@ export const OrdonnancesPage: React.FC = () => {
               </div>
               {dispenseModalPresc.items.map(it => (
                 <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '0.825rem' }}>
-                  <span>• {it.medication_name} ({it.form || 'Comprimé'})</span>
-                  <span style={{ fontWeight: 700, color: 'var(--brand-fill)' }}>{it.quantity_prescribed} unités</span>
+                  <span>• {it.medication_name}{it.form ? ` (${it.form})` : ''}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--brand-soft-ink)' }}>{it.quantity_prescribed} unités</span>
                 </div>
               ))}
             </div>

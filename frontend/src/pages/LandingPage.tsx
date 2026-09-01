@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../utils/api';
 import { AppPreview } from '../components/AppPreview';
+import { buildPlanFeatureRows } from '../utils/planFeatures';
 import {
   ShieldCheck,
   Calendar,
@@ -19,8 +20,7 @@ import {
   Star,
   Zap,
   Clock,
-  MonitorSmartphone,
-  UserPlus
+  MonitorSmartphone
 } from 'lucide-react';
 
 const marqueeModules = [
@@ -90,31 +90,6 @@ const pricingPlans: {
 // Quatre des cinq lignes précédentes étaient identiques sur les trois cartes :
 // la grille occupait de la place sans aider personne à choisir. Ce qui est
 // commun aux trois plans est écrit une seule fois, sous la grille.
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'administrateur', doctor: 'médecin', secretary: 'secrétaire',
-  pharmacist: 'pharmacien', lab_tech: 'laborantin', manager: 'gestionnaire', nurse: 'infirmier'
-};
-
-const buildPricingFeatureRows = (plan: (typeof pricingPlans)[number]): { label: string; ok: boolean }[] => [
-  {
-    label: plan.staffLimit === null
-      ? 'Comptes utilisateurs illimités'
-      : `${plan.staffLimit} comptes utilisateurs actifs`,
-    ok: true
-  },
-  {
-    label: plan.allowedRoles
-      ? `${plan.allowedRoles.length} rôles : ${plan.allowedRoles.map(r => ROLE_LABELS[r] || r).join(', ')}`
-      : 'Les 7 rôles, dont pharmacien et laborantin',
-    ok: true
-  },
-  {
-    label: plan.price === 0
-      ? `Essai unique de ${plan.period}, non renouvelable`
-      : 'Reconductible de 1 à 12 mois, sans engagement',
-    ok: true
-  }
-];
 
 interface LandingPageProps {
   onNavigate: (tab: 'login' | 'register' | 'terms') => void;
@@ -701,7 +676,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
 
           <div className="pricing-cards-grid" style={{ maxWidth: '960px', margin: '0 auto' }}>
             {effectivePlans.map(plan => {
-              const featureRows = buildPricingFeatureRows(plan);
+              const featureRows = buildPlanFeatureRows({
+                price: plan.price,
+                staffLimit: plan.staffLimit,
+                allowedRoles: plan.allowedRoles,
+                trialLabel: plan.period
+              });
               return (
                 <div
                   key={plan.id}

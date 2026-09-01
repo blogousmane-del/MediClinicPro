@@ -5,7 +5,6 @@ import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
-  Bell,
   Plus,
   Trash2,
   RefreshCw,
@@ -296,32 +295,6 @@ export const AccountingPage: React.FC = () => {
           flex-wrap: wrap;
           gap: 0.75rem;
         }
-        .acc-header-search {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-        .acc-search-box {
-          position: relative;
-          width: 220px;
-        }
-        .acc-search-box input {
-          width: 100%;
-          padding: 8px 12px 8px 34px;
-          border-radius: 10px;
-          border: 1px solid var(--border);
-          background-color: var(--bg-secondary);
-          font-size: 0.85rem;
-          outline: none;
-          color: var(--text-primary);
-        }
-        .acc-search-icon {
-          position: absolute;
-          left: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          pointer-events: none;
-        }
 
         /* Tabs */
         .acc-tabs {
@@ -410,21 +383,9 @@ export const AccountingPage: React.FC = () => {
           }
 
           /* Hide search bar on very small screens, keep bell */
-          .acc-search-box {
-            width: 100%;
-          }
           .acc-header {
             flex-direction: column;
             align-items: stretch;
-          }
-          .acc-header-search {
-            flex-direction: row;
-            justify-content: flex-end;
-          }
-          .acc-search-box {
-            flex: 1;
-            width: auto;
-            max-width: 200px;
           }
 
           /* Service fields → stacked 2 per row */
@@ -483,29 +444,6 @@ export const AccountingPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="acc-header-search">
-            <div className="acc-search-box">
-              <Search size={15} color="var(--text-muted)" className="acc-search-icon" />
-              <input type="text" placeholder="Rechercher un patient..." />
-            </div>
-            <div style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
-              <div style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-secondary)'
-              }}>
-                <Bell size={18} />
-              </div>
-              <span style={{
-                position: 'absolute', top: '-4px', right: '-4px',
-                backgroundColor: 'var(--danger)', color: 'white', fontSize: '0.68rem',
-                fontWeight: 700, width: '17px', height: '17px', borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '2px solid var(--bg-primary)'
-              }}>3</span>
-            </div>
-          </div>
         </div>
 
         {/* 2. Tab Switcher */}
@@ -527,15 +465,6 @@ export const AccountingPage: React.FC = () => {
         {/* VIEW 1: NOUVELLE FACTURE */}
         {viewMode === 'create' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-            <div>
-              <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
-                Nouvelle facture
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '2px' }}>
-                Remplissez les informations ci-dessous
-              </p>
-            </div>
 
             {/* 2-column grid (collapses to 1 on tablet/mobile) */}
             <div className="acc-form-grid">
@@ -774,7 +703,7 @@ export const AccountingPage: React.FC = () => {
                     <span>TVA (18%)</span>
                     <span style={{ fontWeight: 600 }}>{tva.toLocaleString()} FCFA</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-fill)', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-soft-ink)', marginTop: '4px' }}>
                     <span>Total</span>
                     <span>{total.toLocaleString()} FCFA</span>
                   </div>
@@ -820,7 +749,7 @@ export const AccountingPage: React.FC = () => {
                   disabled={isSubmittingInvoice}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                    padding: '10px 18px', backgroundColor: 'var(--brand-soft)', color: 'var(--brand-fill)',
+                    padding: '10px 18px', backgroundColor: 'var(--brand-soft)', color: 'var(--brand-soft-ink)',
                     border: '1px solid var(--brand-line)', borderRadius: '10px',
                     fontWeight: 700, fontSize: '0.875rem', cursor: isSubmittingInvoice ? 'not-allowed' : 'pointer',
                     opacity: isSubmittingInvoice ? 0.6 : 1

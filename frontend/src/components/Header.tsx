@@ -184,7 +184,10 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
           style={{
             fontSize: '1.15rem',
             fontWeight: 600,
-            textTransform: 'capitalize',
+            // Pas de `capitalize` : en français il met une majuscule à chaque
+            // mot, y compris aux articles — « Dépôts De Garantie ». Les titres
+            // arrivent déjà correctement capitalisés depuis App.tsx.
+
             fontFamily: 'var(--font-secondary)',
             margin: 0
           }}

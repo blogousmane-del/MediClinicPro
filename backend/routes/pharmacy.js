@@ -218,7 +218,7 @@ router.get('/prescriptions', auth, async (req, res) => {
 
     let queryBuilder = supabase
       .from('prescriptions')
-      .select('*, patient:patients(first_name, last_name, folder_number), doctor:users(name), items:prescription_items(*)')
+      .select('*, patient:patients(first_name, last_name, folder_number, birth_date), doctor:users(name), items:prescription_items(*)')
       .eq('clinic_id', req.user.clinicId);
 
     if (status) {
@@ -233,6 +233,9 @@ router.get('/prescriptions', auth, async (req, res) => {
       patient_first_name: pr.patient ? pr.patient.first_name : 'Inconnu',
       patient_last_name: pr.patient ? pr.patient.last_name : 'Inconnu',
       folder_number: pr.patient ? pr.patient.folder_number : '',
+      // L'âge était inventé côté client (« 45 ans » pour toute ordonnance) ;
+      // il se calcule à partir de la vraie date de naissance.
+      patient_birth_date: pr.patient ? pr.patient.birth_date : null,
       doctor_name: pr.doctor ? pr.doctor.name : 'Inconnu',
       items: pr.items || []
     }));

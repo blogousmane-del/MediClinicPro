@@ -10,7 +10,6 @@ import {
   Eye,
   Pencil,
   Trash2,
-  Bell,
   Check,
   X,
   User,
@@ -238,74 +237,12 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
   if (isCreating) {
     return (
       <div className="app-page">
-        {/* Top Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
-              Ajouter un patient
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-              Lundi 14 juillet 2025
-            </p>
-          </div>
 
-          <div className="page-header-actions">
-            <div className="page-search-box">
-              <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                type="text"
-                placeholder="Rechercher un patient..."
-                className="input-control"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 36px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  backgroundColor: 'var(--bg-secondary)',
-                  fontSize: '0.85rem'
-                }}
-              />
-            </div>
-
-            <div style={{ position: 'relative', cursor: 'pointer' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-secondary)'
-              }}>
-                <Bell size={18} />
-              </div>
-              <span style={{
-                position: 'absolute',
-                top: '-4px',
-                right: '-4px',
-                backgroundColor: 'var(--danger)',
-                color: 'white',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                width: '18px',
-                height: '18px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid var(--bg-primary)'
-              }}>3</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Title Banner */}
+        {/* En-tête du formulaire : un seul titre. */}
         <div>
-          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
             Nouveau patient
-          </h2>
+          </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px' }}>
             Enregistrer un patient dans votre clinique
           </p>
@@ -320,7 +257,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          color: 'var(--brand-fill)',
+          color: 'var(--brand-soft-ink)',
           fontSize: '0.85rem',
           fontWeight: 500
         }}>
@@ -471,7 +408,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 </div>
               </div>
 
-              <div style={{ backgroundColor: 'var(--brand-soft)', border: '1px solid var(--brand-line)', borderRadius: '16px', padding: '1.5rem', color: 'var(--brand-fill)' }}>
+              <div style={{ backgroundColor: 'var(--brand-soft)', border: '1px solid var(--brand-line)', borderRadius: '16px', padding: '1.5rem', color: 'var(--brand-soft-ink)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
                   <Lightbulb size={18} color="var(--brand-fill)" />
                   <span>Conseil</span>
@@ -506,7 +443,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
   return (
     <div className="app-page">
 
-      {/* 1. Header / Breadcrumb matching Image 1 */}
+
+      {/* En-tête de page : un seul titre, et la recherche qui marche. */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -515,90 +453,11 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
         gap: '1rem'
       }}>
         <div>
-          <h1 style={{
-            fontSize: '1.35rem',
-            fontWeight: 700,
-            fontFamily: 'var(--font-secondary)',
-            color: 'var(--text-primary)',
-            margin: 0
-          }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
             Registre des patients
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-            Lundi 14 juillet 2025
-          </p>
-        </div>
-
-        <div className="page-header-actions">
-          <div className="page-search-box">
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Rechercher un patient..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)'
-            }}>
-              <Bell size={18} />
-            </div>
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: 'var(--danger)',
-              color: 'white',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--bg-primary)'
-            }}>3</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Main Page Title & Top Button matching Image 1 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem'
-      }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
-            Registre des Patients
-          </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
-            {patientRowsToRender.length} patients · Base de données centralisée
+            {patientRowsToRender.length} patient{patientRowsToRender.length > 1 ? 's' : ''} enregistré{patientRowsToRender.length > 1 ? 's' : ''}
           </p>
         </div>
 
@@ -827,7 +686,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                       {isAllergyNone ? (
                         <span style={{
                           backgroundColor: 'var(--brand-soft)',
-                          color: 'var(--brand-fill)',
+                          color: 'var(--brand-soft-ink)',
                           padding: '3px 10px',
                           borderRadius: '12px',
                           fontSize: '0.75rem',

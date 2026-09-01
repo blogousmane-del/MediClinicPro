@@ -6,7 +6,6 @@ import { SkeletonCards } from '../../components/Skeleton';
 import {
   Search,
   Plus,
-  Bell,
   AlertTriangle,
   CheckCircle2,
   MoreHorizontal,
@@ -249,13 +248,12 @@ export const PharmacyPage: React.FC = () => {
       form: m.form || 'Comprimé',
       ref: m.batch_number ? `#${m.batch_number}` : 'N/A',
       supplier: m.supplier || 'Non renseigné',
-      packaging: 'Boîte standard',
+      unit: m.unit || '',
       stock_min: m.min_stock_threshold,
       price_purchase: m.price_purchase,
       price_sale: m.price_sale,
       margin: `${marginPct}%`,
       expiry: m.expiry_date ? m.expiry_date.split('T')[0] : null,
-      replenish_time: 'Récemment',
       stock_quantity: m.stock_quantity,
       status,
       near_expiry: nearExpiry
@@ -286,75 +284,12 @@ export const PharmacyPage: React.FC = () => {
   return (
     <div className="app-page">
       
-      {/* 1. Header Breadcrumb matching Image 2 */}
+      {/* En-tête de page : un seul titre, et rien de décoratif. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
-            Gestion de la pharmacie
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-            Lundi 14 juillet 2025
-          </p>
-        </div>
-
-        <div className="page-header-actions">
-          <div className="page-search-box">
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Rechercher un patient..."
-              className="input-control"
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                fontSize: '0.85rem'
-              }}
-            />
-          </div>
-
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)'
-            }}>
-              <Bell size={18} />
-            </div>
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: 'var(--danger)',
-              color: 'white',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--bg-primary)'
-            }}>3</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Main Title & Action Button matching Image 2 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
             Inventaire pharmacie
-          </h2>
+          </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
             {itemsToRender.length} articles · Valeur stock : {totalStockValue.toLocaleString()} FCFA
           </p>
@@ -647,7 +582,7 @@ export const PharmacyPage: React.FC = () => {
                   </div>
 
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                    {med.supplier} · {med.packaging} · Réf. {med.ref}
+                    {med.supplier}{med.unit ? ` · ${med.unit}` : ''} · Réf. {med.ref}
                   </p>
                 </div>
 
@@ -708,11 +643,6 @@ export const PharmacyPage: React.FC = () => {
                   <div>
                     <span>Expiration</span>
                     <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>{med.expiry}</div>
-                  </div>
-
-                  <div>
-                    <span>Réappro.</span>
-                    <div style={{ fontWeight: 700, color: 'var(--text-muted)', marginTop: '2px' }}>{med.replenish_time}</div>
                   </div>
                 </div>
 

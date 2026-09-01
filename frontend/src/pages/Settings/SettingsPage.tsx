@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
+import { buildPlanFeatureRows, PLAN_COMMON_NOTE } from '../../utils/planFeatures';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { SkeletonCards, SkeletonTableRows } from '../../components/Skeleton';
 import {
-  Search,
-  Bell,
   Check,
   X,
   Plus,
@@ -67,6 +66,13 @@ export const SettingsPage: React.FC = () => {
   const { showToast } = useNotifications();
 
   const [activeSubTab, setActiveSubTab] = useState<'billing' | 'clinic' | 'users' | 'security' | 'support'>('billing');
+  const SUBTAB_TITLES: Record<typeof activeSubTab, string> = {
+    billing: 'Abonnement',
+    clinic: 'Informations de la clinique',
+    users: 'Gestion des utilisateurs',
+    security: 'Sécurité',
+    support: 'Support'
+  };
   const [loading, setLoading] = useState<boolean>(true);
 
   // Clinic config form states
@@ -375,23 +381,6 @@ export const SettingsPage: React.FC = () => {
     hopital: { badge: 'Tout inclus', note: 'Idéal pour les cliniques multi-praticiens', ctaLabel: 'Choisir Hôpital' }
   };
 
-  // Comparison rows are derived from the real plan config (staffLimit/allowedRoles/
-  // paymentMethods), never hardcoded, so the excluded/included markers can't drift
-  // from what the backend actually enforces.
-  const buildFeatureRows = (planData: any): { label: string; ok: boolean }[] => {
-    const staffLabel = planData.staffLimit === null || planData.staffLimit === undefined
-      ? "Utilisateurs & rôles illimités"
-      : `${planData.staffLimit} utilisateurs${planData.allowedRoles ? ' & rôles restreints' : ' & rôles illimités'}`;
-    return [
-      { label: staffLabel, ok: true },
-      { label: 'Patients & Dossiers illimités', ok: true },
-      { label: 'Rendez-vous, Ordonnances & Pharmacie', ok: true },
-      { label: 'Laboratoire & Comptabilité', ok: true },
-      // « Encaissements Mobile Money » retiré ici comme dans LandingPage.tsx :
-      // l'encaissement patient en ligne disparaît avec le passage à Chariow.
-      { label: 'Paiement Espèces', ok: true }
-    ];
-  };
 
   const roleLabels: Record<string, string> = {
     admin: 'Administrateur',
@@ -539,58 +528,13 @@ export const SettingsPage: React.FC = () => {
 
       <div className="settings-page">
         
-        {/* 1. Top Header */}
+        {/* En-tête : le titre suit l'onglet ouvert, au lieu d'annoncer
+            « Gestion des abonnements » sur les cinq. */}
         <div className="settings-header">
           <div>
             <h1 style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
-              Gestion des abonnements
+              {SUBTAB_TITLES[activeSubTab]}
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '2px', margin: 0 }}>
-              Lundi 14 juillet 2025
-            </p>
-          </div>
-
-          <div className="settings-header-right">
-            <div className="settings-search-box">
-              <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-              <input
-                type="text"
-                placeholder="Rechercher..."
-                className="input-control"
-              />
-            </div>
-
-            <div style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-secondary)'
-              }}>
-                <Bell size={18} />
-              </div>
-              <span style={{
-                position: 'absolute',
-                top: '-4px',
-                right: '-4px',
-                backgroundColor: 'var(--danger)',
-                color: 'white',
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                width: '17px',
-                height: '17px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid var(--bg-primary)'
-              }}>3</span>
-            </div>
           </div>
         </div>
 
@@ -642,7 +586,7 @@ export const SettingsPage: React.FC = () => {
             <div style={{ textAlign: 'center', maxWidth: '560px', margin: '0 auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '10px' }}>
                 <Star size={14} color="var(--brand-fill)" fill="var(--brand-fill)" />
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-fill)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-soft-ink)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Nos formules
                 </span>
               </div>
@@ -701,7 +645,12 @@ export const SettingsPage: React.FC = () => {
                   const isSelectedForRenewal = planId !== 'starter' && renewalTargetPlanId === planId;
                   const isHighlighted = planId === 'hopital'; // permanent marketing highlight on the top tier, matches Banani, independent of what's actually subscribed
                   const meta = PLAN_CARD_META[planId];
-                  const featureRows = buildFeatureRows(planData);
+                  const featureRows = buildPlanFeatureRows({
+                    price: planData.price,
+                    staffLimit: planData.staffLimit,
+                    allowedRoles: planData.allowedRoles,
+                    trialLabel: planData.trialDays ? `${planData.trialDays} jours` : undefined
+                  });
 
                   return (
                     <div
@@ -721,7 +670,7 @@ export const SettingsPage: React.FC = () => {
                       {isCurrent && (
                         <span style={{
                           position: 'absolute', top: '1.1rem', right: '1.1rem',
-                          fontSize: '0.65rem', fontWeight: 800, color: 'var(--brand-fill)',
+                          fontSize: '0.65rem', fontWeight: 800, color: 'var(--brand-soft-ink)',
                           backgroundColor: 'var(--brand-line)', padding: '3px 9px', borderRadius: '999px',
                           textTransform: 'uppercase', letterSpacing: '0.03em'
                         }}>
@@ -733,8 +682,12 @@ export const SettingsPage: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: isCurrent ? '5.5rem' : 0 }}>
                         <span style={{
                           fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
-                          backgroundColor: isHighlighted ? 'var(--brand-fill)' : (planId === 'clinique' ? 'var(--brand-line)' : 'var(--bg-primary)'),
-                          color: isHighlighted ? '#ffffff' : 'var(--brand-fill)'
+                          // `--brand-fill` en couleur de texte donnait du vert
+                          // foncé sur fond sombre : illisible en thème sombre.
+                          // `--brand-soft`/`--brand-soft-ink` sont la paire
+                          // prévue pour ça, définie pour les deux thèmes.
+                          backgroundColor: isHighlighted ? 'var(--brand-fill)' : 'var(--brand-soft)',
+                          color: isHighlighted ? 'var(--brand-fill-fg)' : 'var(--brand-soft-ink)'
                         }}>
                           {meta.badge}
                         </span>
@@ -835,9 +788,9 @@ export const SettingsPage: React.FC = () => {
             {!loading && plansCatalog && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
                 <div style={{ flex: 1, borderTop: '1px solid var(--border)' }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '10px', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '10px' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Tous les plans incluent : accès web & mobile, mises à jour incluses, changement de plan à tout moment
+                    {PLAN_COMMON_NOTE}
                   </span>
                 </div>
                 <div style={{ flex: 1, borderTop: '1px solid var(--border)' }} />

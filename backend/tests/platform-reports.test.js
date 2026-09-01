@@ -38,7 +38,10 @@ test('le recurrent ne se confond pas avec la somme encaissee', async () => {
   });
   db.subscription_payments.push({
     id: 1, clinic_id: 1, plan: 'hopital', months: 12, amount: 174000,
-    provider: 'bictorys', status: 'paid', created_at: isoAgo(2 * DAY), paid_at: isoAgo(2 * DAY)
+    // `paid_at` doit tomber dans le mois courant : réglé il y a deux jours, ce
+    // test échouait les 1er et 2 de chaque mois, quand « il y a deux jours »
+    // appartient au mois précédent. Il a échoué le 2026-09-01.
+    provider: 'bictorys', status: 'paid', created_at: isoAgo(2 * DAY), paid_at: new Date().toISOString()
   });
 
   const body = await getJson('/api/platform/reports/revenue');

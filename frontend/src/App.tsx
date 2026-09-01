@@ -75,16 +75,20 @@ const MainAppContent: React.FC = () => {
   const [openApptModal, setOpenApptModal] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
+  // Le titre de la barre du haut reprend l'intitulé de la barre latérale : un
+  // même onglet s'appelait « Comptabilité » à gauche, « Grand Livre & Recettes »
+  // en haut et « Créer une facture » dans la page. Le titre de la page dit ce
+  // qu'on est en train de faire ; celui-ci dit seulement où l'on est.
   const tabTitles: Record<string, string> = {
     dashboard: 'Tableau de bord',
-    appointments: 'Gestion des Rendez-vous',
-    patients: selectedPatientId ? 'Dossier Patient' : 'Registre des Patients',
-    pharmacy: 'Gestion de Pharmacie',
-    prescriptions: 'Gestion des Ordonnances',
-    laboratory: 'File du Laboratoire',
-    accounting: 'Grand Livre & Recettes',
+    appointments: 'Rendez-vous',
+    patients: selectedPatientId ? 'Dossier patient' : 'Patients',
+    pharmacy: 'Pharmacie',
+    prescriptions: 'Ordonnances',
+    laboratory: 'Laboratoire',
+    accounting: 'Comptabilité',
     deposits: 'Dépôts de garantie',
-    settings: 'Paramètres du cabinet',
+    settings: 'Paramètres',
     profile: 'Mon profil',
     'platform-admin': 'Administration plateforme'
   };
