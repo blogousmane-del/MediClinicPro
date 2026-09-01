@@ -258,4 +258,42 @@ Reste en couleurs écrites en dur : 149 dans `LandingPage.tsx` (phase 3), 39 dan
 `OnboardingPage.tsx` (écran volontairement sombre, accents réalignés sur la marque), et des
 `#ffffff` posés sur des aplats de couleur, qui sont corrects dans les deux thèmes.
 
-**Phases 3 et 4 — à faire.**
+**Phase 3 — faite.** Tokens `--lp-*` scopés sur `.landing-page` (palette claire fixe, même raison
+que les CGU). Héros : titre en `clamp()` sans césure manuelle, ligne de réassurance sortie du
+héros, badge de prix sorti de la photo. Carrousel infini et bandeau de quatre colonnes fusionnés
+en une seule section « Sept modules, un seul dossier patient » plus les quatre faits, en
+composition asymétrique ; le CSS mort du carrousel est supprimé. Maquette d'aperçu extraite dans
+`components/AppPreview.tsx` (521 lignes sorties de `LandingPage.tsx`) et repeinte avec la palette
+claire réelle de l'application. Tarifs : les cartes ne gardent que les trois lignes qui
+**diffèrent** (comptes, rôles, durée), le commun est écrit une fois sous la grille ; pastilles de
+paiement ramenées à une seule famille neutre. Section finale réécrite. Boutons, cartes de tarifs
+et bandeaux extraits en classes : `LandingPage.tsx` passe de 180 à 74 objets `style={{}}` et de
+149 couleurs en dur à 2 (deux `#ffffff` sur aplat sombre).
+
+**Phase 4 — faite, avec une limite structurelle.** `npm run images` (script `sharp`, dépendance de
+développement) produit AVIF et WebP en deux largeurs : la photo du héros passe de **606 Ko à 16 Ko**
+en AVIF, celle du laboratoire de 523 Ko à 18 Ko. `<picture>` avec `srcset`/`sizes`, `width`/`height`
+réels, `fetchpriority="high"` sur le héros, `loading="lazy"` sous la ligne de flottaison. Feuille
+des polices sortie du chemin critique. Pagination factice retirée de la liste des patients (deux
+boutons sans gestionnaire), lien CGU du pied de page passé de `<span onClick>` à `<button>`,
+`aria-label` ajoutés aux boutons-icônes. `AuthPage` et les CGU passées en chargement différé :
+`AuthPage` tirait `libphonenumber-js`, téléchargé par tout visiteur de la vitrine.
+
+Mesures Lighthouse sur la page construite (`vite preview`) :
+
+| | avant | après |
+|---|---|---|
+| Performance (bureau) | 74 | **87** |
+| Accessibilité | 93 | **100** |
+| First Contentful Paint | 1,4 s | **0,8 s** |
+| Speed Index | 3,2 s | **1,9 s** |
+| Total Blocking Time | 190 ms | **80 ms** |
+| LCP / CLS | 1,9 s / 0 | **1,9 s / 0** |
+
+**Limite restante, à décider.** Au préréglage *mobile* de Lighthouse (4G bridée, processeur ×4),
+la vitrine reste à 46 de performance, LCP 6,4 s, FCP 3,6 s. Le découpage a fait tomber le blocage
+du fil principal de 1 200 ms à 880 ms, mais le plafond est structurel : la page vitrine est rendue
+par une application React côté client, donc le visiteur télécharge et exécute 386 Ko de JavaScript
+avant de voir le moindre texte. Aucun réglage d'image ou de police ne corrige cela. La sortie est
+un **prérendu HTML de la vitrine** (SSG au build, ou fonction de rendu côté serveur), ce qui touche
+l'architecture du routage (`App.tsx` n'a pas de vraies routes) et sort du cadre de cet audit.

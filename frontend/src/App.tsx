@@ -10,10 +10,16 @@ import { SubscriptionLockScreen } from './components/SubscriptionLockScreen';
 import { isTabLocked } from './utils/subscription';
 import { initRippleEffect } from './utils/ripple';
 
-// Logged-out entry pages: kept eager (small, must render instantly on first paint).
+// Vitrine : gardée en chargement direct, c'est le premier rendu.
 import { LandingPage } from './pages/LandingPage';
-import { TermsOfServicePage } from './pages/TermsOfServicePage';
-import { AuthPage } from './pages/Auth/AuthPage';
+
+// Connexion/inscription et CGU : découpées comme les pages authentifiées.
+// AuthPage tire PhoneInput, donc react-phone-number-input et libphonenumber-js,
+// soit la plus grosse dépendance du dépôt. Chargée d'emblée, elle était
+// téléchargée par tout visiteur de la vitrine, y compris ceux qui ne cliquent
+// jamais sur « Connexion ». Mesuré : 1,2 s de blocage du fil principal en 4G.
+const AuthPage = lazy(() => import('./pages/Auth/AuthPage').then(m => ({ default: m.AuthPage })));
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then(m => ({ default: m.TermsOfServicePage })));
 
 // Authenticated pages: code-split so the initial bundle doesn't ship every
 // tab's code upfront. Each is only fetched the first time its tab is opened.
@@ -123,10 +129,18 @@ const MainAppContent: React.FC = () => {
   // 1. Unauthenticated workflow
   if (!user) {
     if (loggedOutTab === 'login' || loggedOutTab === 'register') {
-      return <AuthPage initialTab={loggedOutTab} onNavigate={setLoggedOutTab} />;
+      return (
+        <Suspense fallback={<TabFallback />}>
+          <AuthPage initialTab={loggedOutTab} onNavigate={setLoggedOutTab} />
+        </Suspense>
+      );
     }
     if (loggedOutTab === 'terms') {
-      return <TermsOfServicePage onBack={() => setLoggedOutTab('landing')} onRegister={() => setLoggedOutTab('register')} />;
+      return (
+        <Suspense fallback={<TabFallback />}>
+          <TermsOfServicePage onBack={() => setLoggedOutTab('landing')} onRegister={() => setLoggedOutTab('register')} />
+        </Suspense>
+      );
     }
     return <LandingPage onNavigate={setLoggedOutTab} />;
   }

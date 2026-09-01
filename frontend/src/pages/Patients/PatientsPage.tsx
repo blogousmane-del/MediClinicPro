@@ -18,7 +18,6 @@ import {
   FileText,
   Lightbulb,
   ChevronRight,
-  ChevronLeft,
   Info
 } from 'lucide-react';
 
@@ -922,64 +921,16 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
           </table>
         </div>
 
-        {/* 5. Pagination Footer matching Image 1 */}
+        {/* Compteur de la liste. Les deux flèches et le « 1 » qui étaient ici
+            imitaient une pagination : aucun des deux boutons n'avait de
+            gestionnaire, et la liste n'est pas paginée. Un contrôle qui ne fait
+            rien coûte un clic et une hésitation à chaque passage. */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
           fontSize: '0.8rem',
           color: 'var(--text-muted)',
           paddingTop: '0.5rem'
         }}>
-          <span>
-            Affichage de 1 à {patientRowsToRender.length} sur {patientRowsToRender.length} patients
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <button style={{
-              background: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-              cursor: 'pointer'
-            }}>
-              <ChevronLeft size={16} />
-            </button>
-
-            <span style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              backgroundColor: 'var(--brand-fill)',
-              color: '#ffffff',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              1
-            </span>
-
-            <button style={{
-              background: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-              cursor: 'pointer'
-            }}>
-              <ChevronRight size={16} />
-            </button>
-          </div>
+          {patientRowsToRender.length} patient{patientRowsToRender.length > 1 ? 's' : ''} affiché{patientRowsToRender.length > 1 ? 's' : ''}
         </div>
 
       </div>

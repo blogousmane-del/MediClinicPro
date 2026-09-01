@@ -175,6 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               {/* Mobile Close Button */}
               <button
                 onClick={onClose}
+                aria-label="Fermer le menu"
                 className="sidebar-close-btn"
                 style={{
                   background: 'none',

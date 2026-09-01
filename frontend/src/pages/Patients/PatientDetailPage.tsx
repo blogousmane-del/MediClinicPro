@@ -377,7 +377,7 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
       
       {/* Back Button & Patient Header */}
       <div className="flex align-center gap-3">
-        <button onClick={onBack} className="btn btn-secondary" style={{ padding: '8px 12px' }}>
+        <button onClick={onBack} aria-label="Revenir à la liste des patients" className="btn btn-secondary" style={{ padding: '8px 12px' }}>
           <ArrowLeft size={16} />
         </button>
         <div>

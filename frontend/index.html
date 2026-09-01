@@ -14,7 +14,19 @@
          usages réels. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
+    <!-- Chargement non bloquant : la feuille des polices coûtait 810 ms de
+         rendu bloqué (mesuré par Lighthouse). Le media="print" la sort du
+         chemin critique, le onload la réactive une fois arrivée. Avec
+         display=swap, le texte s'affiche d'abord dans la police de repli. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
+    </noscript>
 
     <title>MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire</title>
     <!-- Prix : 9 000 FCFA = plan Clinique, le moins cher des plans payants

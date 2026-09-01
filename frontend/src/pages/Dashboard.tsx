@@ -522,7 +522,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                   {/* Right side Badge & Chevron */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                     {statusBadge}
-                    <button style={{
+                    <button
+                      aria-label={`Ouvrir le rendez-vous de ${appt.name}`}
+                      onClick={() => setCurrentTab('appointments')}
+                      style={{
                       background: 'none',
                       border: '1px solid var(--border)',
                       borderRadius: '8px',

@@ -612,6 +612,7 @@ export const AccountingPage: React.FC = () => {
                     <button
                       onClick={handleGenerateInvoiceNum}
                       title="Générer un autre numéro"
+                      aria-label="Générer un autre numéro de facture"
                       style={{
                         flexShrink: 0, background: 'none', border: '1px solid var(--border)',
                         borderRadius: '8px', padding: '8px', color: 'var(--text-secondary)',
