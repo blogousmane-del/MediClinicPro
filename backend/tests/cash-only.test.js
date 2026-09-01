@@ -89,3 +89,42 @@ test('un depot de garantie en especes passe toujours', async () => {
   assert.strictEqual(res.status, 201, await res.text());
   assert.strictEqual(db.deposits.length, 1);
 });
+
+// Le numéro de facture était tiré au hasard par le navigateur, sur quatre
+// chiffres, et envoyé tel quel : `payments.reference_number` ne porte aucune
+// contrainte d'unicité, donc deux factures pouvaient sortir avec le même
+// numéro sans la moindre erreur. Il est désormais dérivé de l'identifiant de
+// la ligne, attribué par le serveur.
+test('le numero de facture est attribue par le serveur', async () => {
+  resetDb();
+  seed();
+
+  const res = await postJson('/api/financials/checkout', {
+    patientId: 1, amountTotal: 7500, paymentMethod: 'cash',
+    referenceNumber: '#INV-2025-4242',
+    items: [{ name: 'Consultation', cost: 7500 }]
+  });
+  const body = await res.json();
+
+  assert.strictEqual(res.status, 201);
+  assert.match(body.invoiceNumber, /^FAC-\d{4}-\d{5}$/, 'le numéro suit FAC-<année>-<id>');
+  assert.strictEqual(db.payments[0].reference_number, body.invoiceNumber);
+  assert.notStrictEqual(db.payments[0].reference_number, '#INV-2025-4242', 'le numéro envoyé par le client est ignoré');
+});
+
+test('deux encaissements ne partagent pas un numero de facture', async () => {
+  resetDb();
+  seed();
+
+  const first = await postJson('/api/financials/checkout', {
+    patientId: 1, amountTotal: 5000, paymentMethod: 'cash', items: [{ name: 'Consultation', cost: 5000 }]
+  });
+  const second = await postJson('/api/financials/checkout', {
+    patientId: 1, amountTotal: 9000, paymentMethod: 'cash', items: [{ name: 'Pansement', cost: 9000 }]
+  });
+
+  const a = (await first.json()).invoiceNumber;
+  const b = (await second.json()).invoiceNumber;
+  assert.notStrictEqual(a, b);
+  assert.strictEqual(new Set(db.payments.map(p => p.reference_number)).size, 2);
+});

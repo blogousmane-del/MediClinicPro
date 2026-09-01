@@ -69,7 +69,7 @@ router.get('/payments', auth, async (req, res) => {
 // webhooks Bictorys/PayTech, qui n'ont pas été démontés.
 router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), async (req, res) => {
   try {
-    const { patientId, amountTotal, paymentMethod, referenceNumber, items } = req.body;
+    const { patientId, amountTotal, paymentMethod, items } = req.body;
 
     if (!patientId || !amountTotal || !paymentMethod || !items || !Array.isArray(items)) {
       return res.status(400).json({ error: "Les informations de facturation essentielles sont requises." });
@@ -112,7 +112,9 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
         user_id: req.user.userId,
         amount_total: amount,
         payment_method: paymentMethod,
-        reference_number: referenceNumber || `REF-${Date.now()}`,
+        // Numéro provisoire : il est remplacé juste après par un numéro dérivé
+        // de l'identifiant de la ligne (voir plus bas).
+        reference_number: null,
         // Encaissé au comptoir : réglé d'emblée, aucune confirmation à
         // attendre d'un fournisseur.
         status: 'paid',
@@ -124,6 +126,22 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
 
     if (insertError) throw insertError;
 
+    // Le numéro de facture était tiré au hasard par le navigateur
+    // (`#INV-2025-<4 chiffres>`, année figée) et envoyé tel quel. Sur
+    // `payments.reference_number` il n'y a aucune contrainte d'unicité : deux
+    // factures pouvaient donc porter le même numéro sans la moindre erreur,
+    // ce qu'aucune comptabilité n'accepte. Il est maintenant dérivé de
+    // l'identifiant de la ligne, unique par construction, et attribué par le
+    // serveur au moment de l'encaissement.
+    const invoiceNumber = `FAC-${new Date().getFullYear()}-${String(paymentResult.id).padStart(5, '0')}`;
+    const { error: numberError } = await supabase
+      .from('payments')
+      .update({ reference_number: invoiceNumber })
+      .eq('id', paymentResult.id)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (numberError) throw numberError;
+
     await supabase.from('activity_logs').insert({
       clinic_id: req.user.clinicId,
       user_id: req.user.userId,
@@ -134,6 +152,7 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
     res.status(201).json({
       success: true,
       paymentId: paymentResult.id,
+      invoiceNumber,
       message: "Paiement enregistré avec succès."
     });
   } catch (error) {

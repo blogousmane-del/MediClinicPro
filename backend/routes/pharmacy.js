@@ -164,9 +164,9 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
           min_stock_threshold: minStockThreshold != null ? minStockThreshold : 10,
           price_purchase: pricePurchase,
           price_sale: priceSale,
-          expiry_date: expiryDate || '',
-          batch_number: batchNumber || '',
-          supplier: supplier || ''
+          expiry_date: expiryDate || null,
+          batch_number: batchNumber || null,
+          supplier: supplier || null
         })
         .select()
         .single();
@@ -184,9 +184,9 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
         user_id: req.user.userId,
         quantity: qty,
         price_purchase: pricePurchase,
-        expiry_date: expiryDate || '',
-        batch_number: batchNumber || '',
-        supplier: supplier || ''
+        expiry_date: expiryDate || null,
+        batch_number: batchNumber || null,
+        supplier: supplier || null
       });
 
     if (stockEntryError) throw stockEntryError;

@@ -113,13 +113,13 @@ export const PharmacyPage: React.FC = () => {
   const [form, setForm] = useState<string>('Comprimé');
   const [manufacturer, setManufacturer] = useState<string>('');
   const [unit, setUnit] = useState<string>('');
-  const [quantity, setQuantity] = useState<string>('50');
+  const [quantity, setQuantity] = useState<string>('');
   const [minStockThreshold, setMinStockThreshold] = useState<string>('10');
-  const [pricePurchase, setPricePurchase] = useState<string>('850');
-  const [priceSale, setPriceSale] = useState<string>('1200');
-  const [expiryDate, setExpiryDate] = useState<string>('2026-12-31');
-  const [batchNumber, setBatchNumber] = useState<string>('U3KFJT');
-  const [supplier, setSupplier] = useState<string>('Pharmaliv');
+  const [pricePurchase, setPricePurchase] = useState<string>('');
+  const [priceSale, setPriceSale] = useState<string>('');
+  const [expiryDate, setExpiryDate] = useState<string>('');
+  const [batchNumber, setBatchNumber] = useState<string>('');
+  const [supplier, setSupplier] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [editingCurrentStock, setEditingCurrentStock] = useState<number>(0);
 
@@ -160,9 +160,9 @@ export const PharmacyPage: React.FC = () => {
       setMinStockThreshold(medItem.min_stock_threshold != null ? medItem.min_stock_threshold.toString() : '10');
       setPricePurchase(medItem.price_purchase ? medItem.price_purchase.toString() : '850');
       setPriceSale(medItem.price_sale ? medItem.price_sale.toString() : '1200');
-      setExpiryDate(medItem.expiry || '2026-12-31');
-      setBatchNumber(medItem.ref ? medItem.ref.replace('#', '') : 'U3KFJT');
-      setSupplier(medItem.supplier || 'Pharmaliv');
+      setExpiryDate(medItem.expiry || '');
+      setBatchNumber(medItem.ref && medItem.ref !== 'N/A' ? medItem.ref.replace('#', '') : '');
+      setSupplier(medItem.supplier || '');
     } else {
       setEditingMedId(null);
       setEditingCurrentStock(0);
@@ -172,13 +172,13 @@ export const PharmacyPage: React.FC = () => {
       setForm('Comprimé');
       setManufacturer('');
       setUnit('');
-      setQuantity('50');
+      setQuantity('');
       setMinStockThreshold('10');
-      setPricePurchase('850');
-      setPriceSale('1200');
-      setExpiryDate('2026-12-31');
-      setBatchNumber('U3KFJT');
-      setSupplier('Pharmaliv');
+      setPricePurchase('');
+      setPriceSale('');
+      setExpiryDate('');
+      setBatchNumber('');
+      setSupplier('');
     }
     setIsModalOpen(true);
   };
@@ -213,9 +213,11 @@ export const PharmacyPage: React.FC = () => {
         minStockThreshold: minStockThreshold ? parseInt(minStockThreshold) : 10,
         pricePurchase: parseFloat(pricePurchase),
         priceSale: parseFloat(priceSale),
-        expiryDate: expiryDate || '2026-12-31',
-        batchNumber: batchNumber || 'U3KFJT',
-        supplier: supplier || 'Pharmaliv'
+        // Aucun repli inventé : un lot et une péremption faux valent moins
+        // que rien du tout sur une fiche de stock.
+        expiryDate: expiryDate || null,
+        batchNumber: batchNumber || null,
+        supplier: supplier || null
       };
 
       await api.post('/pharmacy/replenish', payload);
