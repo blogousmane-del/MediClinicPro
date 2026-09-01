@@ -264,7 +264,12 @@ export const PharmacyPage: React.FC = () => {
 
   // Filter items based on tab & search
   const filteredItems = itemsToRender.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.supplier.toLowerCase().includes(search.toLowerCase());
+    // `supplier` est nullable en base (supabase_schema.sql:116) : les lignes
+    // créées avant que POST /pharmacy/medications ne force '' peuvent le
+    // renvoyer à null, et `null.toLowerCase()` faisait planter la page entière,
+    // pas seulement la recherche.
+    const haystack = `${item.name || ''} ${item.supplier || ''}`.toLowerCase();
+    const matchesSearch = haystack.includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (filterTab === 'critical') return item.status === 'Critique' || item.status === 'Faible';
     if (filterTab === 'expiring') return item.near_expiry;
