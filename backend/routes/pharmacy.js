@@ -218,7 +218,7 @@ router.get('/prescriptions', auth, async (req, res) => {
 
     let queryBuilder = supabase
       .from('prescriptions')
-      .select('*, patient:patients(first_name, last_name, folder_number, birth_date), doctor:users(name), items:prescription_items(*)')
+      .select('*, patient:patients(first_name, last_name, folder_number, birth_date), doctor:users(name), consultation:consultations(diagnosis, notes), items:prescription_items(*)')
       .eq('clinic_id', req.user.clinicId);
 
     if (status) {
@@ -236,6 +236,12 @@ router.get('/prescriptions', auth, async (req, res) => {
       // L'âge était inventé côté client (« 45 ans » pour toute ordonnance) ;
       // il se calcule à partir de la vraie date de naissance.
       patient_birth_date: pr.patient ? pr.patient.birth_date : null,
+      // `prescriptions` n'a ni diagnostic ni notes : ils appartiennent a la
+      // consultation dont l'ordonnance decoule. Le client les inventait
+      // (« Consultation generale » sur toutes les lignes) faute de les
+      // recevoir.
+      diagnosis: pr.consultation ? pr.consultation.diagnosis || '' : '',
+      notes: pr.consultation ? pr.consultation.notes || '' : '',
       doctor_name: pr.doctor ? pr.doctor.name : 'Inconnu',
       items: pr.items || []
     }));
@@ -283,6 +289,280 @@ router.get('/prescriptions/:id', auth, async (req, res) => {
   } catch (error) {
     console.error("Get Prescription Details Error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération de l'ordonnance." });
+  }
+});
+
+// Une ordonnance ne tient pas debout seule : `prescriptions.consultation_id`
+// est NOT NULL UNIQUE, une ordonnance appartient donc à une consultation et à
+// une seule. Le diagnostic et les notes vivent sur cette consultation — c'est
+// la raison pour laquelle la page Ordonnances les fabriquait côté client, elle
+// n'avait aucun endroit où les envoyer.
+//
+// Deux entrées possibles : `consultationId` quand l'ordonnance prolonge une
+// consultation déjà saisie, sinon on crée la consultation qui la porte. Rien
+// n'est inventé au passage : le motif est celui que le prescripteur écrit.
+async function resolvePrescriptionActors(req, { patientId, doctorId }) {
+  const { data: patient, error: patientError } = await supabase
+    .from('patients')
+    .select('id')
+    .eq('id', patientId)
+    .eq('clinic_id', req.user.clinicId)
+    .maybeSingle();
+
+  if (patientError) throw patientError;
+  if (!patient) return { error: { status: 404, message: "Patient non trouvé dans cette clinique." } };
+
+  // Le prescripteur est choisi dans le formulaire : il doit appartenir à la
+  // clinique, être actif, et pouvoir prescrire. Sans cette vérification, un
+  // identifiant arbitraire signait l'ordonnance de n'importe quel compte.
+  const prescriberId = doctorId || req.user.userId;
+  const { data: doctor, error: doctorError } = await supabase
+    .from('users')
+    .select('id, role, active')
+    .eq('id', prescriberId)
+    .eq('clinic_id', req.user.clinicId)
+    .maybeSingle();
+
+  if (doctorError) throw doctorError;
+  if (!doctor || doctor.active !== 1) {
+    return { error: { status: 400, message: "Le médecin prescripteur n'existe pas ou n'est plus actif." } };
+  }
+  if (!['doctor', 'admin'].includes(doctor.role)) {
+    return { error: { status: 400, message: "Le prescripteur doit être un médecin." } };
+  }
+
+  return { patientId, prescriberId };
+}
+
+// Les lignes sont validées entièrement AVANT la première écriture : PostgREST
+// n'offre pas de transaction, donc un refus en cours de boucle laisserait une
+// ordonnance à moitié écrite.
+async function validatePrescriptionItems(req, items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { error: { status: 400, message: "Une ordonnance doit comporter au moins un médicament." } };
+  }
+
+  const validated = [];
+  for (const item of items) {
+    const name = (item.medicationName || '').trim();
+    if (!name) {
+      return { error: { status: 400, message: "Chaque ligne doit porter un nom de médicament." } };
+    }
+    if (!isPositiveInteger(item.quantityPrescribed)) {
+      return { error: { status: 400, message: `Quantité invalide pour « ${name} » : un entier strictement positif est attendu.` } };
+    }
+
+    if (item.medicationId) {
+      const { data: med, error: medError } = await supabase
+        .from('medications')
+        .select('id')
+        .eq('id', item.medicationId)
+        .eq('clinic_id', req.user.clinicId)
+        .maybeSingle();
+
+      if (medError) throw medError;
+      if (!med) {
+        return { error: { status: 400, message: `Le médicament ID ${item.medicationId} n'existe pas dans le catalogue de votre clinique.` } };
+      }
+    }
+
+    validated.push({
+      medication_id: item.medicationId || null,
+      medication_name: name,
+      dosage: (item.dosage || '').trim(),
+      frequency: (item.frequency || '').trim(),
+      duration: (item.duration || '').trim(),
+      quantity_prescribed: item.quantityPrescribed,
+      quantity_dispensed: 0
+    });
+  }
+
+  return { items: validated };
+}
+
+// POST /api/pharmacy/prescriptions
+// Créer une ordonnance (et, si besoin, la consultation qui la porte)
+router.post('/prescriptions', auth, checkRole(['admin', 'doctor']), async (req, res) => {
+  try {
+    const { patientId, doctorId, consultationId, motif, diagnosis, notes, items } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({ error: "Le patient est requis." });
+    }
+
+    const actors = await resolvePrescriptionActors(req, { patientId, doctorId });
+    if (actors.error) return res.status(actors.error.status).json({ error: actors.error.message });
+
+    const validation = await validatePrescriptionItems(req, items);
+    if (validation.error) return res.status(validation.error.status).json({ error: validation.error.message });
+
+    let targetConsultationId = consultationId || null;
+
+    if (targetConsultationId) {
+      const { data: consultation, error: consultError } = await supabase
+        .from('consultations')
+        .select('id, patient_id')
+        .eq('id', targetConsultationId)
+        .eq('clinic_id', req.user.clinicId)
+        .maybeSingle();
+
+      if (consultError) throw consultError;
+      if (!consultation) {
+        return res.status(404).json({ error: "Consultation non trouvée dans cette clinique." });
+      }
+      if (consultation.patient_id !== patientId) {
+        return res.status(400).json({ error: "Cette consultation concerne un autre patient." });
+      }
+
+      // `consultation_id` est UNIQUE : une consultation ne porte qu'une
+      // ordonnance. Sans ce contrôle, l'insertion remonterait un 23505 opaque.
+      const { data: existing, error: existingError } = await supabase
+        .from('prescriptions')
+        .select('id')
+        .eq('consultation_id', targetConsultationId)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+      if (existing) {
+        return res.status(409).json({ error: "Cette consultation porte déjà une ordonnance." });
+      }
+    } else {
+      const { data: consultData, error: consultError } = await supabase
+        .from('consultations')
+        .insert({
+          clinic_id: req.user.clinicId,
+          patient_id: patientId,
+          doctor_id: actors.prescriberId,
+          motif: (motif || '').trim() || 'Ordonnance',
+          symptoms: '',
+          constants: {},
+          diagnosis: (diagnosis || '').trim(),
+          notes: (notes || '').trim()
+        })
+        .select()
+        .single();
+
+      if (consultError) throw consultError;
+      targetConsultationId = consultData.id;
+    }
+
+    const { data: prescData, error: prescError } = await supabase
+      .from('prescriptions')
+      .insert({
+        clinic_id: req.user.clinicId,
+        consultation_id: targetConsultationId,
+        patient_id: patientId,
+        doctor_id: actors.prescriberId,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (prescError) throw prescError;
+
+    const { error: itemsError } = await supabase
+      .from('prescription_items')
+      .insert(validation.items.map(it => ({ ...it, prescription_id: prescData.id })));
+
+    if (itemsError) throw itemsError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PRESCRIPTION_CREATE',
+      details: `Ordonnance ${prescData.id} créée pour le patient ID ${patientId} (${validation.items.length} médicament(s))`
+    });
+
+    res.status(201).json({
+      success: true,
+      prescriptionId: prescData.id,
+      consultationId: targetConsultationId,
+      message: "Ordonnance enregistrée."
+    });
+  } catch (error) {
+    console.error("Create Prescription Error:", error);
+    res.status(500).json({ error: "Erreur lors de la création de l'ordonnance." });
+  }
+});
+
+// PUT /api/pharmacy/prescriptions/:id
+// Modifier une ordonnance tant qu'aucun médicament n'a été délivré
+router.put('/prescriptions/:id', auth, checkRole(['admin', 'doctor']), async (req, res) => {
+  try {
+    const prescriptionId = req.params.id;
+    const { doctorId, diagnosis, notes, items } = req.body;
+
+    const { data: prescription, error: prescError } = await supabase
+      .from('prescriptions')
+      .select('id, patient_id, consultation_id, status')
+      .eq('id', prescriptionId)
+      .eq('clinic_id', req.user.clinicId)
+      .maybeSingle();
+
+    if (prescError) throw prescError;
+    if (!prescription) {
+      return res.status(404).json({ error: "Ordonnance non trouvée." });
+    }
+
+    // Réécrire les lignes d'une ordonnance déjà servie ferait mentir le stock
+    // déjà décrémenté et les quantités déjà délivrées.
+    const { data: dispensedItems, error: dispensedError } = await supabase
+      .from('prescription_items')
+      .select('id, quantity_dispensed')
+      .eq('prescription_id', prescriptionId);
+
+    if (dispensedError) throw dispensedError;
+    const alreadyDispensed = (dispensedItems || []).some(it => (it.quantity_dispensed || 0) > 0);
+    if (prescription.status !== 'pending' || alreadyDispensed) {
+      return res.status(409).json({ error: "Cette ordonnance a déjà été délivrée, elle n'est plus modifiable." });
+    }
+
+    const actors = await resolvePrescriptionActors(req, { patientId: prescription.patient_id, doctorId });
+    if (actors.error) return res.status(actors.error.status).json({ error: actors.error.message });
+
+    const validation = await validatePrescriptionItems(req, items);
+    if (validation.error) return res.status(validation.error.status).json({ error: validation.error.message });
+
+    const { error: consultUpdateError } = await supabase
+      .from('consultations')
+      .update({ diagnosis: (diagnosis || '').trim(), notes: (notes || '').trim() })
+      .eq('id', prescription.consultation_id)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (consultUpdateError) throw consultUpdateError;
+
+    const { error: deleteError } = await supabase
+      .from('prescription_items')
+      .delete()
+      .eq('prescription_id', prescriptionId);
+
+    if (deleteError) throw deleteError;
+
+    const { error: itemsError } = await supabase
+      .from('prescription_items')
+      .insert(validation.items.map(it => ({ ...it, prescription_id: Number(prescriptionId) })));
+
+    if (itemsError) throw itemsError;
+
+    const { error: updateError } = await supabase
+      .from('prescriptions')
+      .update({ doctor_id: actors.prescriberId })
+      .eq('id', prescriptionId)
+      .eq('clinic_id', req.user.clinicId);
+
+    if (updateError) throw updateError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: req.user.clinicId,
+      user_id: req.user.userId,
+      action: 'PRESCRIPTION_UPDATE',
+      details: `Ordonnance ${prescriptionId} modifiée (${validation.items.length} médicament(s))`
+    });
+
+    res.json({ success: true, message: "Ordonnance mise à jour." });
+  } catch (error) {
+    console.error("Update Prescription Error:", error);
+    res.status(500).json({ error: "Erreur lors de la modification de l'ordonnance." });
   }
 });
 

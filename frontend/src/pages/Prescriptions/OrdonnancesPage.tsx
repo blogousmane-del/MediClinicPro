@@ -16,49 +16,11 @@ import {
   Trash2
 } from 'lucide-react';
 
-// Comprehensive catalog of pharmacy medications in CIV & West Africa
-const MEDICATION_CATALOG = [
-  'Amoxicilline 500mg',
-  'Amoxicilline 1g',
-  'Amoxicilline + Acide Clavulanique (Augmentin) 1g',
-  'Paracétamol 500mg',
-  'Paracétamol (Doliprane) 1000mg',
-  'Paracétamol Sirop 125ml',
-  'Ibuprofène 400mg',
-  'Ibuprofène Sirop 100ml',
-  'Artéméther + Luméfantrine (Coartem) 20/120mg',
-  'Métformine 850mg',
-  'Métformine 500mg',
-  'Lisinopril 10mg',
-  'Amlodipine 5mg',
-  'Oméprazole 20mg',
-  'Dompéridone 10mg',
-  'Spasfon (Phloroglucinol) 80mg',
-  'Smecta (Diosmectite) Sachet',
-  'Sels de réhydratation orale (SRO)',
-  'Ciprofloxacine 500mg',
-  'Azithromycine 500mg',
-  'Flagyl (Métronidazole) 500mg',
-  'Fer + Acide Folique (Fumafer)',
-  'Vitamine C 1000mg Effervescent',
-  'Diclofénac 50mg',
-  'Tramadol 50mg',
-  'Linagliptine 5mg',
-  'Losartan 50mg',
-  'Autre (Saisir manuellement)'
-];
-
-const GALENIC_FORMS = [
-  'Comprimé',
-  'Gélule',
-  'Sirop',
-  'Injectable',
-  'Sachet',
-  'Pommade / Crème',
-  'Gouttes',
-  'Suppositoire',
-  'Autre'
-];
+// Le catalogue de médicaments et la liste de formes galéniques écrits en dur
+// ici présentaient des produits que la clinique n'a pas forcément en stock, et
+// une ligne ainsi prescrite n'était rattachée à aucun `medication_id` — donc
+// sa délivrance ne pouvait pas décrémenter le stock. Le formulaire lit
+// désormais le vrai catalogue via GET /pharmacy/medications.
 
 const POSOLOGY_OPTIONS = [
   '1 comprimé',
@@ -84,19 +46,22 @@ const FREQUENCY_OPTIONS = [
 
 interface PrescriptionItem {
   id: number;
+  medication_id: number | null;
   medication_name: string;
-  form?: string;
+  dosage: string;
+  duration: string;
   posology: string;
   frequency: string;
-  durationDays?: number;
   quantity_prescribed: number;
   quantity_dispensed: number;
 }
 
 interface Prescription {
   id: number;
+  patient_id: number;
   patient_name: string;
   patient_age?: string;
+  doctor_id: number;
   doctor_name: string;
   date: string;
   diagnostic?: string;
@@ -119,6 +84,10 @@ export const OrdonnancesPage: React.FC = () => {
   // showing made-up patients/doctors as if they were real clinic records.
   const [patients, setPatients] = useState<{ id: number; first_name: string; last_name: string; birth_date: string }[]>([]);
   const [doctors, setDoctors] = useState<{ id: number; name: string }[]>([]);
+  // Le catalogue de médicaments est celui de la clinique, pas une liste écrite
+  // en dur : c'est `medication_id` qui permet à la dispensation de décrémenter
+  // le stock. Sans lui, une ordonnance se délivre sans mouvement de stock.
+  const [catalog, setCatalog] = useState<{ id: number; name: string; dosage: string; form: string; stock_quantity: number }[]>([]);
 
   const calculateAge = (birthDateStr: string): number => {
     const birth = new Date(birthDateStr);
@@ -129,47 +98,42 @@ export const OrdonnancesPage: React.FC = () => {
     return age;
   };
 
-  // New & Edit prescription modal state
+  // Une ligne d'ordonnance. `medication_id` est nul pour une saisie libre : le
+// médicament n'est alors pas au catalogue de la clinique et la dispensation ne
+// pourra pas bouger le stock.
+interface MedicationLine {
+  id: number;
+  medication_id: number | null;
+  custom_name: string;
+  posology: string;
+  frequency: string;
+  duration: string;
+  quantity: number;
+}
+
+// Une ligne neuve pointe sur le premier médicament du catalogue de la clinique
+// quand il y en a un : par défaut sur « hors catalogue », toute ordonnance
+// partait sans `medication_id`, donc sans mouvement de stock à la délivrance.
+const blankLine = (id: number, medicationId: number | null = null): MedicationLine => ({
+  id, medication_id: medicationId, custom_name: '', posology: '1 comprimé',
+  frequency: 'x2/jour (Matin & Soir)', duration: '7 jours', quantity: 1
+});
+
+// New & Edit prescription modal state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingPrescriptionId, setEditingPrescriptionId] = useState<number | null>(null);
-  const [selectedPatientName, setSelectedPatientName] = useState<string>('');
-  const [doctorName, setDoctorName] = useState<string>('');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
   const [diagnostic, setDiagnostic] = useState<string>('');
+  // Le motif de la consultation que l'ordonnance crée quand elle n'en prolonge
+  // aucune : `consultations.motif` est NOT NULL.
+  const [motif, setMotif] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Dynamic medication lines for prescription form
-  const [medicationLines, setMedicationLines] = useState<Array<{
-    id: number;
-    medication_name: string;
-    custom_name?: string;
-    form: string;
-    posology: string;
-    frequency: string;
-    durationDays: number;
-    quantity: number;
-  }>>([
-    {
-      id: 1,
-      medication_name: 'Amoxicilline 500mg',
-      custom_name: '',
-      form: 'Comprimé',
-      posology: '1 comprimé',
-      frequency: 'x2/jour (Matin & Soir)',
-      durationDays: 7,
-      quantity: 21
-    },
-    {
-      id: 2,
-      medication_name: 'Paracétamol 500mg',
-      custom_name: '',
-      form: 'Comprimé',
-      posology: '1 comprimé',
-      frequency: 'x2/jour (Matin & Soir)',
-      durationDays: 8,
-      quantity: 10
-    }
-  ]);
+  const [medicationLines, setMedicationLines] = useState<MedicationLine[]>([blankLine(1)]);
+  const firstCatalogId = catalog.length > 0 ? catalog[0].id : null;
 
   // Dispense modal state
   const [dispenseModalPresc, setDispenseModalPresc] = useState<Prescription | null>(null);
@@ -187,13 +151,19 @@ export const OrdonnancesPage: React.FC = () => {
           // restent vides au lieu d'afficher « Consultation générale » et
           // « Prendre selon les indications » sur toutes les ordonnances.
           patient_age: p.patient_birth_date ? `${calculateAge(p.patient_birth_date)} ans` : undefined,
+          patient_id: p.patient_id,
+          doctor_id: p.doctor_id,
           doctor_name: p.doctor_name,
           date: new Date(p.date_time).toLocaleDateString('fr-FR'),
+          diagnostic: p.diagnosis || undefined,
+          notes: p.notes || undefined,
           status: p.status === 'dispensed' ? 'remise' : p.status === 'partial' ? 'partielle' : 'validee',
           items: p.items ? p.items.map((it: any) => ({
             id: it.id,
+            medication_id: it.medication_id || null,
             medication_name: it.medication_name,
-            form: it.form || undefined,
+            dosage: it.dosage || '',
+            duration: it.duration || '',
             // Les quantités retombaient sur 21 quand elles valaient 0 : une
             // ordonnance non délivrée s'affichait comme entièrement délivrée.
             posology: [it.dosage, it.frequency, it.duration].filter(Boolean).join(' — '),
@@ -218,70 +188,56 @@ export const OrdonnancesPage: React.FC = () => {
     api.get('/settings/users')
       .then((data) => setDoctors((Array.isArray(data) ? data : []).filter((u: any) => u.role === 'doctor' && u.active === 1)))
       .catch((err) => console.error(err));
+    api.get('/pharmacy/medications')
+      .then((data) => setCatalog(Array.isArray(data) ? data : []))
+      .catch((err) => console.error(err));
   }, []);
 
   const handleOpenNewModal = () => {
     setEditingPrescriptionId(null);
-    setSelectedPatientName('');
-    setDoctorName('');
+    setSelectedPatientId('');
+    setSelectedDoctorId(user?.role === 'doctor' && user?.id ? String(user.id) : '');
     setDiagnostic('');
+    setMotif('');
     setNotes('');
-    setMedicationLines([
-      {
-        id: 1,
-        medication_name: 'Amoxicilline 500mg',
-        custom_name: '',
-        form: 'Comprimé',
-        posology: '1 comprimé',
-        frequency: 'x2/jour (Matin & Soir)',
-        durationDays: 7,
-        quantity: 21
-      },
-      {
-        id: 2,
-        medication_name: 'Paracétamol 500mg',
-        custom_name: '',
-        form: 'Comprimé',
-        posology: '1 comprimé',
-        frequency: 'x2/jour (Matin & Soir)',
-        durationDays: 8,
-        quantity: 10
-      }
-    ]);
+    // Une ligne vide : le formulaire pré-remplissait deux médicaments réels,
+    // avec posologie et quantités, sur une ordonnance qui n'existait pas
+    // encore. Un clic distrait sur « Enregistrer » prescrivait ces deux-là.
+    setMedicationLines([blankLine(1, firstCatalogId)]);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (presc: Prescription) => {
     setEditingPrescriptionId(presc.id);
-    setSelectedPatientName(presc.patient_age ? `${presc.patient_name} (${presc.patient_age})` : presc.patient_name);
-    setDoctorName(presc.doctor_name);
+    setSelectedPatientId(String(presc.patient_id));
+    setSelectedDoctorId(String(presc.doctor_id));
     setDiagnostic(presc.diagnostic || '');
+    setMotif('');
     setNotes(presc.notes || '');
     setMedicationLines(presc.items.map(it => ({
       id: it.id,
-      medication_name: MEDICATION_CATALOG.includes(it.medication_name) ? it.medication_name : 'Autre (Saisir manuellement)',
-      custom_name: MEDICATION_CATALOG.includes(it.medication_name) ? '' : it.medication_name,
-      form: it.form || 'Comprimé',
-      posology: it.posology.split(' — ')[0] || '',
-      frequency: it.frequency || 'x2/jour (Matin & Soir)',
-      durationDays: 7,
+      medication_id: it.medication_id,
+      custom_name: it.medication_id ? '' : it.medication_name,
+      posology: it.dosage,
+      frequency: it.frequency,
+      duration: it.duration,
       quantity: it.quantity_prescribed
     })));
     setIsModalOpen(true);
   };
 
   const handleAddMedicationLine = () => {
-    const newLine = {
-      id: Date.now(),
-      medication_name: 'Métformine 850mg',
-      custom_name: '',
-      form: 'Comprimé',
-      posology: '1 comprimé',
-      frequency: 'x2/jour (Matin & Soir)',
-      durationDays: 30,
-      quantity: 60
-    };
-    setMedicationLines([...medicationLines, newLine]);
+    setMedicationLines([...medicationLines, blankLine(Date.now(), firstCatalogId)]);
+  };
+
+  // Le nom envoyé au serveur : celui du catalogue de la clinique quand la ligne
+  // y est rattachée, sinon la saisie libre.
+  const lineName = (line: MedicationLine): string => {
+    if (line.medication_id) {
+      const med = catalog.find(m => m.id === line.medication_id);
+      return med ? `${med.name}${med.dosage ? ` ${med.dosage}` : ''}` : '';
+    }
+    return line.custom_name.trim();
   };
 
   const handleRemoveMedicationLine = (id: number) => {
@@ -292,61 +248,65 @@ export const OrdonnancesPage: React.FC = () => {
     setMedicationLines(medicationLines.map(l => l.id === id ? { ...l, [field]: value } : l));
   };
 
+  // L'ordonnance part au serveur et la liste est relue derrière : elle ne
+  // vivait auparavant que dans le state React, donc « Ordonnance générée avec
+  // succès » annonçait un dossier médical qui disparaissait au rechargement.
   const handleCreatePrescriptionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatientName || medicationLines.length === 0) {
-      showToast('error', 'Champs requis', 'Veuillez sélectionner un patient et ajouter au moins un médicament.');
+
+    if (!selectedPatientId) {
+      showToast('error', 'Champs requis', 'Veuillez sélectionner un patient.');
+      return;
+    }
+
+    const emptyLine = medicationLines.find(l => !lineName(l));
+    if (medicationLines.length === 0 || emptyLine) {
+      showToast('error', 'Champs requis', 'Chaque ligne doit porter un médicament.');
+      return;
+    }
+
+    const badQuantity = medicationLines.find(l => !Number.isInteger(l.quantity) || l.quantity <= 0);
+    if (badQuantity) {
+      showToast('error', 'Quantité invalide', `La quantité de « ${lineName(badQuantity)} » doit être un entier supérieur à zéro.`);
       return;
     }
 
     setIsSaving(true);
     try {
-      const formattedItems = medicationLines.map(l => {
-        const finalName = l.medication_name === 'Autre (Saisir manuellement)' ? (l.custom_name || 'Médicament spécial') : l.medication_name;
-        return {
-          id: l.id,
-          medication_name: finalName,
-          form: l.form,
-          posology: `${l.posology} - ${l.frequency} - ${l.durationDays} jours`,
-          frequency: l.frequency,
-          durationDays: l.durationDays,
-          quantity_prescribed: l.quantity,
-          quantity_dispensed: 0
-        };
-      });
+      const items = medicationLines.map(l => ({
+        medicationId: l.medication_id || undefined,
+        medicationName: lineName(l),
+        dosage: l.posology,
+        frequency: l.frequency,
+        duration: l.duration,
+        quantityPrescribed: l.quantity
+      }));
 
       if (editingPrescriptionId) {
-        // Edit existing
-        setPrescriptions(prescriptions.map(p => p.id === editingPrescriptionId ? {
-          ...p,
-          patient_name: selectedPatientName.split(' (')[0],
-          doctor_name: doctorName,
-          diagnostic: diagnostic || undefined,
+        await api.put(`/pharmacy/prescriptions/${editingPrescriptionId}`, {
+          doctorId: selectedDoctorId ? Number(selectedDoctorId) : undefined,
+          diagnosis: diagnostic,
           notes,
-          items: formattedItems
-        } : p));
-        showToast('success', 'Ordonnance modifiée', `Modification enregistrée pour ${selectedPatientName}.`);
+          items
+        });
+        showToast('success', 'Ordonnance modifiée', 'Les modifications ont été enregistrées.');
       } else {
-        // Create new
-        const newPresc: Prescription = {
-          id: Date.now(),
-          patient_name: selectedPatientName.split(' (')[0],
-          patient_age: selectedPatientName.includes('(') ? selectedPatientName.split('(')[1].replace(')', '') : undefined,
-          doctor_name: doctorName,
-          date: new Date().toLocaleDateString('fr-FR'),
-          diagnostic: diagnostic || undefined,
-          status: 'validee',
-          notes: notes || undefined,
-          items: formattedItems
-        };
-        setPrescriptions([newPresc, ...prescriptions]);
-        showToast('success', 'Ordonnance créée', `Ordonnance générée avec succès pour ${selectedPatientName}.`);
+        await api.post('/pharmacy/prescriptions', {
+          patientId: Number(selectedPatientId),
+          doctorId: selectedDoctorId ? Number(selectedDoctorId) : undefined,
+          motif,
+          diagnosis: diagnostic,
+          notes,
+          items
+        });
+        showToast('success', 'Ordonnance créée', "L'ordonnance a été enregistrée.");
       }
 
       setIsModalOpen(false);
+      await fetchPrescriptions();
     } catch (err: any) {
       console.error(err);
-      showToast('error', 'Erreur', 'Impossible d\'enregistrer l\'ordonnance.');
+      showToast('error', 'Erreur', err.error || "Impossible d'enregistrer l'ordonnance.");
     } finally {
       setIsSaving(false);
     }
@@ -391,7 +351,7 @@ export const OrdonnancesPage: React.FC = () => {
 
           ${presc.items.map(it => `
             <div class="item-row">
-              <div class="item-name">• ${it.medication_name}${it.form ? ` (${it.form})` : ''}</div>
+              <div class="item-name">• ${it.medication_name}</div>
               <div class="item-posology">Posologie : ${it.posology} — Quantité : ${it.quantity_prescribed} unités</div>
             </div>
           `).join('')}
@@ -414,16 +374,33 @@ export const OrdonnancesPage: React.FC = () => {
     showToast('success', 'Impression', `Document d'ordonnance pour ${presc.patient_name} prêt.`);
   };
 
-  const handleDuplicate = (presc: Prescription) => {
-    const duplicatedPresc: Prescription = {
-      ...presc,
-      id: Date.now(),
-      date: '14 juil. 2025',
-      status: 'validee',
-      patient_name: `${presc.patient_name} (Copie)`
-    };
-    setPrescriptions([duplicatedPresc, ...prescriptions]);
-    showToast('info', 'Duplication', `Ordonnance de ${presc.patient_name} dupliquée.`);
+  // Le renouvellement crée une vraie ordonnance côté serveur. Il ajoutait
+  // auparavant une copie au state React, datée du « 14 juil. 2025 » et au nom
+  // de « <patient> (Copie) » : rien n'était enregistré, et le patient affiché
+  // n'existait pas.
+  const handleDuplicate = async (presc: Prescription) => {
+    try {
+      await api.post('/pharmacy/prescriptions', {
+        patientId: presc.patient_id,
+        doctorId: presc.doctor_id,
+        motif: "Renouvellement d'ordonnance",
+        diagnosis: presc.diagnostic || '',
+        notes: presc.notes || '',
+        items: presc.items.map(it => ({
+          medicationId: it.medication_id || undefined,
+          medicationName: it.medication_name,
+          dosage: it.dosage,
+          frequency: it.frequency,
+          duration: it.duration,
+          quantityPrescribed: it.quantity_prescribed
+        }))
+      });
+      showToast('success', 'Ordonnance renouvelée', `Une nouvelle ordonnance a été créée pour ${presc.patient_name}.`);
+      await fetchPrescriptions();
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || "Impossible de renouveler l'ordonnance.");
+    }
   };
 
   const handleConfirmDispense = async (presc: Prescription) => {
@@ -758,7 +735,6 @@ export const OrdonnancesPage: React.FC = () => {
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
                             {it.medication_name}
-                            {it.form && <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}> ({it.form})</span>}
                           </div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                             {it.posology}
@@ -864,7 +840,7 @@ export const OrdonnancesPage: React.FC = () => {
                     }}
                   >
                     <Copy size={15} color="var(--text-secondary)" />
-                    <span>Dupliquer</span>
+                    <span>Renouveler</span>
                   </button>
 
                   {presc.status !== 'remise' && ['admin', 'pharmacist'].includes(user?.role || '') && (
@@ -932,18 +908,20 @@ export const OrdonnancesPage: React.FC = () => {
                       SÉLECTIONNER LE PATIENT *
                     </label>
                     <select
-                      value={selectedPatientName}
-                      onChange={(e) => setSelectedPatientName(e.target.value)}
+                      value={selectedPatientId}
+                      onChange={(e) => setSelectedPatientId(e.target.value)}
                       className="input-control"
                       style={{ width: '100%', padding: '8px 12px', borderRadius: '8px' }}
+                      disabled={editingPrescriptionId !== null}
                       required
                     >
                       <option value="" disabled>-- Choisir un patient --</option>
                       {patients.length === 0 && <option value="" disabled>Aucun patient enregistré.</option>}
-                      {patients.map((p) => {
-                        const label = `${p.first_name} ${p.last_name} (${calculateAge(p.birth_date)} ans)`;
-                        return <option key={p.id} value={label}>{label}</option>;
-                      })}
+                      {patients.map((p) => (
+                        <option key={p.id} value={String(p.id)}>
+                          {p.first_name} {p.last_name}{p.birth_date ? ` (${calculateAge(p.birth_date)} ans)` : ''}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -952,8 +930,8 @@ export const OrdonnancesPage: React.FC = () => {
                       MÉDECIN PRESCRIPTEUR *
                     </label>
                     <select
-                      value={doctorName}
-                      onChange={(e) => setDoctorName(e.target.value)}
+                      value={selectedDoctorId}
+                      onChange={(e) => setSelectedDoctorId(e.target.value)}
                       className="input-control"
                       style={{ width: '100%', padding: '8px 12px', borderRadius: '8px' }}
                       required
@@ -961,25 +939,46 @@ export const OrdonnancesPage: React.FC = () => {
                       <option value="" disabled>-- Choisir un médecin --</option>
                       {doctors.length === 0 && <option value="" disabled>Aucun médecin actif. Ajoutez-en un dans Paramètres.</option>}
                       {doctors.map((d) => (
-                        <option key={d.id} value={d.name}>{d.name}</option>
+                        <option key={d.id} value={String(d.id)}>{d.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Diagnostic */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    DIAGNOSTIC / MOTIF DE PRESCRIPTION
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="ex. : Infection des voies respiratoires supérieures"
-                    value={diagnostic}
-                    onChange={(e) => setDiagnostic(e.target.value)}
-                    className="input-control"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px' }}
-                  />
+                {/* Motif et diagnostic : ils sont enregistrés sur la
+                    consultation que l'ordonnance crée. Le motif ne se saisit
+                    qu'à la création, puisqu'une modification ne recrée pas la
+                    consultation d'origine. */}
+                <div className="modal-grid" style={{ gap: '1rem' }}>
+                  {!editingPrescriptionId && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                        MOTIF DE CONSULTATION
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="ex. : Fièvre et maux de gorge"
+                        value={motif}
+                        onChange={(e) => setMotif(e.target.value)}
+                        className="input-control"
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '8px' }}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                      DIAGNOSTIC
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ex. : Angine bactérienne"
+                      value={diagnostic}
+                      onChange={(e) => setDiagnostic(e.target.value)}
+                      className="input-control"
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px' }}
+                    />
+                  </div>
                 </div>
 
                 {/* Prescribed Medications Dynamic Lines with CATALOGUE & FORME GALÉNIQUE */}
@@ -1012,7 +1011,8 @@ export const OrdonnancesPage: React.FC = () => {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {medicationLines.map((line) => {
-                      const isCustom = line.medication_name === 'Autre (Saisir manuellement)';
+                      const isCustom = line.medication_id === null;
+                      const catalogEntry = line.medication_id ? catalog.find(m => m.id === line.medication_id) : null;
 
                       return (
                         <div
@@ -1028,36 +1028,39 @@ export const OrdonnancesPage: React.FC = () => {
                           }}
                         >
                           <div className="rx-med-line-grid">
-                            {/* NOM DÉROULANT OU AUTRE */}
+                            {/* Le catalogue est celui de la clinique : c'est
+                                ce rattachement qui permet à la dispensation de
+                                décrémenter le stock. */}
                             <div>
                               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
-                                NOM DU MÉDICAMENT *
+                                MÉDICAMENT *
                               </span>
                               <select
-                                value={line.medication_name}
-                                onChange={(e) => handleUpdateMedicationLine(line.id, 'medication_name', e.target.value)}
+                                value={line.medication_id === null ? 'custom' : String(line.medication_id)}
+                                onChange={(e) => handleUpdateMedicationLine(line.id, 'medication_id', e.target.value === 'custom' ? null : Number(e.target.value))}
                                 style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.8rem', backgroundColor: 'var(--bg-secondary)' }}
                               >
-                                {MEDICATION_CATALOG.map((m, idx) => (
-                                  <option key={idx} value={m}>{m}</option>
+                                {catalog.map((m) => (
+                                  <option key={m.id} value={String(m.id)}>
+                                    {m.name}{m.dosage ? ` ${m.dosage}` : ''}{m.form ? ` — ${m.form}` : ''}
+                                  </option>
                                 ))}
+                                <option value="custom">Hors catalogue (saisie libre)</option>
                               </select>
                             </div>
 
-                            {/* FORME GALÉNIQUE */}
+                            {/* DURÉE */}
                             <div>
                               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
-                                FORME GALÉNIQUE
+                                DURÉE
                               </span>
-                              <select
-                                value={line.form}
-                                onChange={(e) => handleUpdateMedicationLine(line.id, 'form', e.target.value)}
+                              <input
+                                type="text"
+                                placeholder="ex. : 5 jours"
+                                value={line.duration}
+                                onChange={(e) => handleUpdateMedicationLine(line.id, 'duration', e.target.value)}
                                 style={{ width: '100%', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.8rem', backgroundColor: 'var(--bg-secondary)' }}
-                              >
-                                {GALENIC_FORMS.map((f, idx) => (
-                                  <option key={idx} value={f}>{f}</option>
-                                ))}
-                              </select>
+                              />
                             </div>
 
                             {/* POSOLOGIE */}
@@ -1117,18 +1120,24 @@ export const OrdonnancesPage: React.FC = () => {
                             </button>
                           </div>
 
-                          {/* IF "AUTRE" IS SELECTED: SHOW MANUAL TEXT INPUT */}
-                          {isCustom && (
+                          {isCustom ? (
                             <div style={{ marginTop: '4px' }}>
                               <input
                                 type="text"
-                                placeholder="Saisir le nom spécifique du médicament (ex: Spasfon 80mg, Rocephine 1g)..."
-                                value={line.custom_name || ''}
+                                placeholder="Nom et dosage du médicament (ex. : Spasfon 80mg)..."
+                                value={line.custom_name}
                                 onChange={(e) => handleUpdateMedicationLine(line.id, 'custom_name', e.target.value)}
-                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--brand-fill)', fontSize: '0.825rem', backgroundColor: 'var(--brand-soft)' }}
+                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--brand-line)', fontSize: '0.825rem', backgroundColor: 'var(--brand-soft)', color: 'var(--text-primary)' }}
                                 required
                               />
+                              <span style={{ display: 'block', marginTop: '4px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                Hors catalogue : la délivrance ne décrémentera aucun stock.
+                              </span>
                             </div>
+                          ) : catalogEntry && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              Stock actuel : {catalogEntry.stock_quantity ?? 0}
+                            </span>
                           )}
                         </div>
                       );
@@ -1186,7 +1195,7 @@ export const OrdonnancesPage: React.FC = () => {
               </div>
               {dispenseModalPresc.items.map(it => (
                 <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '0.825rem' }}>
-                  <span>• {it.medication_name}{it.form ? ` (${it.form})` : ''}</span>
+                  <span>• {it.medication_name}</span>
                   <span style={{ fontWeight: 700, color: 'var(--brand-soft-ink)' }}>{it.quantity_prescribed} unités</span>
                 </div>
               ))}

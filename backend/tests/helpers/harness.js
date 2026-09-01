@@ -24,7 +24,8 @@ function stubModule(relativePath, exports) {
 }
 
 // Reproduit la partie de l'API PostgREST utilisée par les routes :
-// .from().select().eq().maybeSingle() / .single() / .insert() / .update(),
+// .from().select().eq().maybeSingle() / .single() / .insert() / .update() /
+// .delete(),
 // le tout « thenable » pour fonctionner avec await.
 function queryBuilder(table) {
   const state = { op: 'select', filters: [], payload: null, singleRow: false, count: false, head: false };
@@ -45,13 +46,33 @@ function queryBuilder(table) {
   const run = () => {
     const rows = db[table];
 
+    // `nextId` evite la collision apres un delete : `rows.length + 1` reprend
+    // un identifiant deja pris des qu'une ligne a disparu. La valeur reste
+    // celle d'avant tant qu'aucune suppression n'a eu lieu.
+    const nextId = () => {
+      let candidate = rows.length + 1;
+      while (rows.some((r) => String(r.id) === String(candidate))) candidate += 1;
+      return candidate;
+    };
+
     if (state.op === 'insert') {
-      const row = { id: rows.length + 1, ...state.payload };
-      rows.push(row);
-      return { data: state.singleRow ? row : [row], error: null };
+      // PostgREST accepte un tableau et insere autant de lignes ; le faux ne
+      // gerait qu'un objet et transformait le tableau en `{0: {...}}`.
+      const payloads = Array.isArray(state.payload) ? state.payload : [state.payload];
+      const inserted = payloads.map((payload) => {
+        const row = { id: nextId(), ...payload };
+        rows.push(row);
+        return row;
+      });
+      return { data: state.singleRow ? inserted[0] : inserted, error: null };
     }
 
     const hits = rows.filter(rowMatches);
+
+    if (state.op === 'delete') {
+      hits.forEach((row) => rows.splice(rows.indexOf(row), 1));
+      return { data: hits, error: null };
+    }
 
     if (state.op === 'update') {
       hits.forEach((row) => Object.assign(row, state.payload));
@@ -94,6 +115,7 @@ function queryBuilder(table) {
     lt(column, value) { state.filters.push([column, value, 'lt']); return builder; },
     insert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
     update(payload) { state.op = 'update'; state.payload = payload; return builder; },
+    delete() { state.op = 'delete'; return builder; },
     upsert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
     maybeSingle() { state.singleRow = true; return builder; },
     single() { state.singleRow = true; return builder; },
