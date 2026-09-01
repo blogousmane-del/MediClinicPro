@@ -24,9 +24,9 @@ interface PatientDetailPageProps {
 }
 
 const REFERRAL_AVAILABILITY_META: Record<string, { label: string; color: string }> = {
-  available: { label: 'Disponible', color: 'var(--success, #16a34a)' },
-  busy: { label: 'Occupé', color: '#f59e0b' },
-  away: { label: 'Absent', color: '#94a3b8' }
+  available: { label: 'Disponible', color: 'var(--success, var(--success))' },
+  busy: { label: 'Occupé', color: 'var(--warning)' },
+  away: { label: 'Absent', color: 'var(--text-muted)' }
 };
 
 export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId, onBack }) => {
@@ -304,11 +304,11 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
           <title>Impression MediClinic</title>
           <style>
             body { font-family: sans-serif; padding: 30px; color: #333; line-height: 1.6; }
-            .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 15px; margin-bottom: 20px; }
-            .title { font-size: 1.5rem; font-weight: bold; color: #0d9488; }
-            .patient-box { background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
-            .details { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-            .footer { text-align: center; margin-top: 50px; font-size: 0.8rem; color: #888; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+            .header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px; }
+            .title { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+            .patient-box { background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+            .details { border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+            .footer { text-align: center; margin-top: 50px; font-size: 0.8rem; color: #888; border-top: 1px solid var(--border); padding-top: 10px; }
           </style>
         </head>
         <body>

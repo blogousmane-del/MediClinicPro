@@ -62,8 +62,8 @@ export const PasswordChangeForm: React.FC = () => {
       {!currentUser?.passwordSet && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: '10px',
-          backgroundColor: 'var(--primary-light, #e6f4ea)', border: '1px solid #bbf7d0',
-          borderRadius: '10px', padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#1e4d40'
+          backgroundColor: 'var(--brand-soft)', border: '1px solid var(--brand-line)',
+          borderRadius: '10px', padding: '0.85rem 1rem', fontSize: '0.85rem', color: 'var(--brand-soft-ink)'
         }}>
           <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: '1px' }} />
           <span>
@@ -112,7 +112,7 @@ export const PasswordChangeForm: React.FC = () => {
       <button
         type="submit"
         className="btn btn-primary"
-        style={{ alignSelf: 'flex-start', backgroundColor: '#1e4d40', borderRadius: '10px' }}
+        style={{ alignSelf: 'flex-start', backgroundColor: 'var(--brand-fill)', borderRadius: 'var(--radius-sm)' }}
         disabled={isSavingPassword}
       >
         {isSavingPassword ? 'Enregistrement...' : (currentUser?.passwordSet ? 'Mettre à jour le mot de passe' : 'Définir le mot de passe')}

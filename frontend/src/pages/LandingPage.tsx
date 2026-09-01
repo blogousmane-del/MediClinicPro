@@ -16,7 +16,21 @@ import {
   LayoutDashboard,
   FileText,
   Star,
-  Zap
+  Zap,
+  Activity,
+  ArrowLeft,
+  Bell,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  Clock,
+  MapPin,
+  MonitorSmartphone,
+  Search,
+  Settings,
+  Stethoscope,
+  User,
+  UserPlus
 } from 'lucide-react';
 
 const marqueeModules = [
@@ -35,8 +49,89 @@ const featurePills = [
   { icon: FlaskConical, label: 'Résultats labo' },
   { icon: Pill, label: 'Pharmacie' },
   { icon: Receipt, label: 'Facturation' },
-  { icon: BarChart3, label: 'Rapports BI' }
+  // « Rapports BI » annonçait un module de reporting qui n'existe pas côté
+  // clinique : la seule page chiffrée est Comptabilité (Sidebar.tsx). Les
+  // rapports d'analyse sont réservés à la console de l'exploitant.
+  { icon: BarChart3, label: 'Recettes & dépenses' }
 ];
+
+// ---------------------------------------------------------------------------
+// Aperçu de l'interface — contenu de la maquette statique reproduisant l'écran
+// Banani « Nouveau Rendez-vous » (new_screen11.jsx + NewAppointmentMobile.jsx).
+// Plan : .planning/banani/landing-app-preview.md
+//
+// Ces noms viennent du mock Banani : ce sont des personnes INVENTÉES. Le bloc
+// affiche un badge « Données d'exemple » visible, dans le flux du texte — sans
+// lui, un visiteur lirait ces lignes comme de vrais dossiers patients.
+// ---------------------------------------------------------------------------
+const previewDoctors = [
+  { name: 'Dr. Yao Bernard', specialty: 'Médecine générale' },
+  { name: 'Dr. Soro Mariam', specialty: 'Pédiatrie' },
+  { name: 'Dr. Coulibaly A.', specialty: 'Cardiologie' },
+  { name: 'Dr. Koné Inès', specialty: 'Gynécologie' }
+];
+
+const previewRecentPatients = [
+  { name: 'Brahima Ouattara', folder: 'P003' },
+  { name: 'Fatou Diomandé', folder: 'P018' },
+  { name: 'Raïssa Gnahore', folder: 'P031' }
+];
+
+const previewSlots = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+  '11:00', '11:30', '14:00', '14:30', '15:00', '15:30'
+];
+const PREVIEW_TAKEN_SLOTS = [0, 2, 5];
+const PREVIEW_SELECTED_SLOT = 8;
+const PREVIEW_SELECTED_DOCTOR = 2;
+
+// Juillet 2025, semaines commençant le lundi — repris tel quel du mock.
+const previewCalendarWeeks: (number | null)[][] = [
+  [null, 1, 2, 3, 4, 5, 6],
+  [7, 8, 9, 10, 11, 12, 13],
+  [14, 15, 16, 17, 18, 19, 20],
+  [21, 22, 23, 24, 25, 26, 27],
+  [28, 29, 30, 31, null, null, null]
+];
+const PREVIEW_CAL_SELECTED = 14;
+const PREVIEW_CAL_OFF = 9;
+
+const previewPriorities = [
+  { label: 'Normal', dot: '#3D6B5E' },
+  { label: 'Urgent', dot: '#fb923c' },
+  { label: 'Critique', dot: '#ef4444' }
+];
+
+const previewRecap = [
+  { icon: User, value: 'Brahima Ouattara' },
+  { icon: Stethoscope, value: 'Dr. Coulibaly A.' },
+  { icon: Calendar, value: 'Lun 14 juillet 2025' },
+  { icon: Clock, value: '14:00' },
+  { icon: MapPin, value: 'Salle 3' }
+];
+
+// Les deux maquettes Banani n'écrivent pas les mêmes libellés (le mobile
+// abrège : « Récents » au lieu de « Patients récents »). Chacune est suivie à
+// sa propre largeur ; la bascule est en CSS (.ap-t-m / .ap-t-d) faute de
+// pouvoir remplacer du texte autrement.
+const PreviewLabel: React.FC<{ mobile: string; desktop: string }> = ({ mobile, desktop }) => (
+  <>
+    <span className="ap-t-m">{mobile}</span>
+    <span className="ap-t-d">{desktop}</span>
+  </>
+);
+
+// Initiales dans un rond — pattern établi dans ce dépôt, en remplacement des
+// photos générées des maquettes Banani.
+const previewInitials = (name: string): string =>
+  name
+    .replace(/^Dr\.\s*/, '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase();
 
 // Repli hors ligne du catalogue. Les vrais chiffres sont chargés au montage
 // depuis GET /settings/public/plans, qui lit backend/utils/plans.js — seule
@@ -217,7 +312,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               transition: 'all 0.2s ease'
             }}
           >
-            Prendre un rendez-vous
+            Essai gratuit
           </button>
         </div>
 
@@ -290,7 +385,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               fontSize: '0.95rem'
             }}
           >
-            Prendre un rendez-vous
+            Essai gratuit
           </button>
         </div>
       )}
@@ -353,7 +448,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               maxWidth: '500px',
               margin: '0 0 2rem 0'
             }}>
-              Du soin quotidien aux insights de santé avancés, notre plateforme est conçue pour les cliniques d'Abidjan et de toute la Côte d'Ivoire.
+              Dossiers patients, rendez-vous, ordonnances, pharmacie, laboratoire et caisse dans un seul outil, conçu pour les cliniques d'Abidjan et de toute la Côte d'Ivoire.
             </p>
 
             {/* CTA Buttons */}
@@ -542,19 +637,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Données isolées par clinique</div>
           </div>
 
+          {/* Quatre faits vérifiables dans le code, et rien d'autre. Ce
+              bandeau portait « Tous les modules inclus » et « Support en
+              français » (du remplissage), plus « Abonnement par Mobile Money
+              ou carte » : une promesse que ce dépôt ne peut pas tenir seul,
+              puisqu'elle dépend des moyens réellement activés sur la boutique
+              Chariow de l'exploitant. */}
           <div className="landing-highlight">
-            <LayoutDashboard size={22} color="#5eead4" style={{ marginBottom: '6px' }} />
-            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Tous les modules inclus</div>
+            <Clock size={22} color="#5eead4" style={{ marginBottom: '6px' }} />
+            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Essai 7 jours, sans carte bancaire</div>
           </div>
 
           <div className="landing-highlight">
             <Receipt size={22} color="#5eead4" style={{ marginBottom: '6px' }} />
-            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Abonnement par Mobile Money ou carte</div>
+            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Tarifs en FCFA, sans conversion</div>
           </div>
 
           <div className="landing-highlight">
             <Users size={22} color="#5eead4" style={{ marginBottom: '6px' }} />
-            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Support en français</div>
+            <div style={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 600 }}>Interface et assistance en français</div>
           </div>
         </div>
       </section>
@@ -612,7 +713,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               lineHeight: 1.6,
               margin: '0 0 2rem 0'
             }}>
-              Réduisez les attentes, automatisez les plannings, suivez les médicaments, réduisez les erreurs et envoyez des ordonnances en un instant.
+              Le planning des praticiens, le stock de la pharmacie, les résultats du laboratoire et les encaissements du jour partagent le même dossier patient.
             </p>
 
             {/* Feature Pills */}
@@ -652,9 +753,455 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 cursor: 'pointer'
               }}
             >
-              <span>Toutes les fonctionnalités</span>
+              {/* Le libellé décrit l'action réelle : ce bouton ouvre le
+                  formulaire d'inscription, il n'ouvre aucune page de
+                  fonctionnalités. */}
+              <span>Commencer l'essai gratuit</span>
               <ArrowRight size={16} />
             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Aperçu de l'interface — maquette statique, aucun appel API.
+             Reproduction de l'écran Banani « Nouveau Rendez-vous ». La vraie
+             page vit dans pages/Appointments/NewAppointmentPage.tsx et n'est
+             pas touchée ici. */}
+      <section id="apercu" style={{
+        backgroundColor: '#f8fafc',
+        borderTop: '1px solid #e2e8f0',
+        padding: '4.5rem 1.5rem',
+        display: 'flex',
+        justifyContent: 'center'
+      }}>
+        <div style={{ maxWidth: '1200px', width: '100%' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '10px' }}>
+              <MonitorSmartphone size={14} color="#1e4d40" />
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', color: '#1e4d40' }}>
+                Aperçu
+              </span>
+            </div>
+            {/* overflowWrap : à 200 % de taille de police navigateur, ce titre
+                passe à 72px et « l'interface » (360px) dépasse les 279px
+                disponibles à 375px. Sans césure il était rogné par
+                l'overflowX:hidden de la racine, donc invisible et sans barre
+                de défilement pour le récupérer. */}
+            <h2 style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-secondary)', margin: '0 0 1rem', overflowWrap: 'break-word' }}>
+              Voyez l'interface avant de vous inscrire
+            </h2>
+            <p style={{ color: '#64748b', maxWidth: '620px', margin: '0 auto 1.25rem', fontSize: '1rem' }}>
+              La prise de rendez-vous telle qu'elle se présente à votre secrétariat : recherche du patient, médecin, créneau, motif et priorité sur un seul écran.
+            </p>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '7px',
+              padding: '5px 14px',
+              borderRadius: '9999px',
+              backgroundColor: '#fff7ed',
+              border: '1px solid #ffedd5',
+              color: '#9a3412',
+              fontSize: '0.78rem',
+              fontWeight: 700
+            }}>
+              Données d'exemple — patients et médecins fictifs
+            </span>
+          </div>
+
+          {/* Maquette inerte : aria-hidden + pointer-events:none, et aucun
+              élément focusable à l'intérieur (que des div/span). */}
+          <div className="app-preview landing-reveal" aria-hidden="true">
+
+            {/* Barre latérale (desktop uniquement) */}
+            <div className="ap-sidebar">
+              <div style={{ padding: '20px 20px 18px', borderBottom: '1px solid var(--ap-sidebar-muted)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '28px', height: '28px', borderRadius: 'var(--ap-r-md)',
+                    backgroundColor: 'var(--ap-sidebar-accent)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                  }}>
+                    <Activity size={15} color="#ffffff" />
+                  </div>
+                  <span style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>MediClinic</span>
+                </div>
+                <p style={{ fontSize: '11px', color: 'var(--ap-sidebar-accent)', margin: '5px 0 0' }}>Votre clinique</p>
+              </div>
+
+              <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', padding: '16px 12px' }}>
+                {marqueeModules.map(mod => {
+                  const Icon = mod.icon;
+                  const active = mod.label === 'Rendez-vous';
+                  return (
+                    <span
+                      key={mod.label}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '10px 12px', borderRadius: 'var(--ap-r-md)',
+                        fontSize: '13px', fontWeight: 500,
+                        backgroundColor: active ? 'var(--ap-sidebar-accent)' : 'transparent',
+                        color: active ? '#ffffff' : 'var(--ap-sidebar-fg)'
+                      }}
+                    >
+                      <Icon size={16} />
+                      {mod.label}
+                    </span>
+                  );
+                })}
+              </nav>
+
+              <div style={{ padding: '12px 12px 20px', borderTop: '1px solid var(--ap-sidebar-muted)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', fontSize: '13px' }}>
+                  <Settings size={16} />
+                  Paramètres
+                </span>
+              </div>
+            </div>
+
+            <div className="ap-main">
+
+              {/* Barre du haut (desktop) */}
+              <div className="ap-topbar ap-desktop-only">
+                <div>
+                  <p style={{ fontSize: '22px', fontWeight: 600, margin: 0 }}>Nouveau rendez-vous</p>
+                  <p style={{ fontSize: '13px', color: 'var(--ap-muted-fg)', margin: '2px 0 0' }}>Lundi 14 juillet 2025</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', width: '256px',
+                    padding: '8px 12px', backgroundColor: 'var(--ap-input)',
+                    border: '1px solid var(--ap-border)', borderRadius: 'var(--ap-r-md)'
+                  }}>
+                    <Search size={15} color="var(--ap-muted-fg)" />
+                    <span style={{ fontSize: '13px', color: 'var(--ap-muted-fg)' }}>Rechercher un patient…</span>
+                  </div>
+                  <div style={{
+                    width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: 'var(--ap-input)', border: '1px solid var(--ap-border)', borderRadius: 'var(--ap-r-md)'
+                  }}>
+                    <Bell size={16} />
+                  </div>
+                </div>
+              </div>
+
+              {/* En-tête mobile */}
+              <div className="ap-mobile-header ap-mobile-only">
+                <ArrowLeft size={18} />
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>Nouveau RDV</span>
+                <span style={{ width: '18px' }} />
+              </div>
+
+              <div className="ap-body">
+
+                {/* Colonne formulaire */}
+                <div className="ap-form-col">
+
+                  {/* Titre + CTA (desktop) */}
+                  <div className="ap-desktop-only ap-page-head" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <p style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>Nouveau rendez-vous</p>
+                      <p style={{ fontSize: '13px', color: 'var(--ap-muted-fg)', margin: '2px 0 0' }}>
+                        Remplissez les informations ci-dessous pour planifier la consultation
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      <span className="ap-btn ap-btn-ghost">Annuler</span>
+                      <span className="ap-btn"><Check size={14} />Confirmer le rendez-vous</span>
+                    </div>
+                  </div>
+
+                  {/* Carte Patient */}
+                  <div className="ap-card">
+                    <div className="ap-card-head">
+                      <User size={14} color="var(--ap-primary)" />
+                      <h3 className="ap-card-title">Patient</h3>
+                    </div>
+                    <div className="ap-card-body">
+                      <div className="ap-group">
+                        <span className="ap-label">
+                          <PreviewLabel mobile="Rechercher" desktop="Rechercher un patient existant" />
+                        </span>
+                        <div className="ap-field">
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--ap-muted-fg)', minWidth: 0 }}>
+                            <Search size={13} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <PreviewLabel mobile="Nom ou dossier…" desktop="Nom, prénom ou numéro de dossier…" />
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="ap-group">
+                        <span className="ap-label-plain">
+                          <PreviewLabel mobile="Récents" desktop="Patients récents" />
+                        </span>
+                        <div className="ap-recent">
+                          {previewRecentPatients.map((p, i) => (
+                            <span key={p.folder} className={i === 0 ? 'ap-chip ap-chip-on' : 'ap-chip'}>
+                              <span className="ap-avatar" style={{ width: '24px', height: '24px', fontSize: '9px' }}>
+                                {previewInitials(p.name)}
+                              </span>
+                              <span style={{ minWidth: 0 }}>
+                                <span style={{ display: 'block', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {p.name}
+                                </span>
+                                <span style={{ display: 'block', color: 'var(--ap-muted-fg)' }}>{p.folder}</span>
+                              </span>
+                              {i === 0 && <Check size={12} style={{ flexShrink: 0 }} />}
+                            </span>
+                          ))}
+                          <span className="ap-chip ap-chip-new">
+                            <UserPlus size={13} />
+                            Nouveau patient
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="ap-selected-patient">
+                        <span className="ap-avatar" style={{ width: '38px', height: '38px', fontSize: '13px' }}>BO</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: '13px', fontWeight: 700 }}>Brahima Ouattara</span>
+                          <span style={{ display: 'block', fontSize: '11px', color: 'var(--ap-muted-fg)' }}>
+                            <PreviewLabel mobile="52 ans · P003" desktop="52 ans · P003 · +225 06 XX XX XX" />
+                          </span>
+                        </span>
+                        <span style={{
+                          flexShrink: 0, fontSize: '11px', fontWeight: 500, padding: '2px 8px',
+                          borderRadius: 'var(--ap-r-md)', backgroundColor: '#ffedd5', color: '#c2410c'
+                        }}>
+                          HTA
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carte Type & Médecin */}
+                  <div className="ap-card">
+                    <div className="ap-card-head">
+                      <Stethoscope size={14} color="var(--ap-primary)" />
+                      <h3 className="ap-card-title">
+                        <PreviewLabel mobile="Consultation" desktop="Type de consultation & Médecin" />
+                      </h3>
+                    </div>
+                    <div className="ap-card-body">
+                      <div className="ap-group">
+                        <span className="ap-label">
+                          <PreviewLabel mobile="Type" desktop="Type de consultation" />
+                        </span>
+                        <div className="ap-field">
+                          <span>Cardiologie</span>
+                          <ChevronDown size={13} color="var(--ap-muted-fg)" />
+                        </div>
+                      </div>
+                      <div className="ap-group">
+                        <span className="ap-label">
+                          <PreviewLabel mobile="Salle" desktop="Salle / Espace" />
+                        </span>
+                        <div className="ap-field">
+                          <span>Salle 3</span>
+                          <ChevronDown size={13} color="var(--ap-muted-fg)" />
+                        </div>
+                      </div>
+                      <div className="ap-group">
+                        <span className="ap-label">
+                          <PreviewLabel mobile="Médecin" desktop="Médecin assigné" />
+                        </span>
+                        <div className="ap-doctors">
+                          {previewDoctors.map((doc, i) => {
+                            const on = i === PREVIEW_SELECTED_DOCTOR;
+                            return (
+                              <span key={doc.name} className={on ? 'ap-doctor ap-doctor-on' : 'ap-doctor'}>
+                                <span className="ap-avatar" style={{ width: '30px', height: '30px', fontSize: '11px' }}>
+                                  {previewInitials(doc.name)}
+                                </span>
+                                <span style={{ fontSize: '11px', fontWeight: 600, lineHeight: 1.2, color: on ? 'var(--ap-primary)' : 'inherit' }}>
+                                  {doc.name}
+                                </span>
+                                <span style={{ fontSize: '11px', color: 'var(--ap-muted-fg)' }}>{doc.specialty}</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carte Date & Heure — mobile uniquement (le desktop a le
+                      calendrier dans le rail, conformément aux deux mocks) */}
+                  <div className="ap-card ap-mobile-only">
+                    <div className="ap-card-head">
+                      <Calendar size={14} color="var(--ap-primary)" />
+                      <h3 className="ap-card-title">Date &amp; Heure</h3>
+                    </div>
+                    <div className="ap-card-body">
+                      <div className="ap-group">
+                        <span className="ap-label">Date</span>
+                        <div className="ap-field">
+                          <span>Lun 14 juillet 2025</span>
+                          <ChevronDown size={12} color="var(--ap-muted-fg)" />
+                        </div>
+                      </div>
+                      <div className="ap-group">
+                        <span className="ap-label-plain">Heure disponible</span>
+                        <div className="ap-slots">
+                          {previewSlots.map((slot, i) => (
+                            <span
+                              key={slot}
+                              className={
+                                i === PREVIEW_SELECTED_SLOT ? 'ap-slot ap-slot-on'
+                                  : PREVIEW_TAKEN_SLOTS.includes(i) ? 'ap-slot ap-slot-off'
+                                    : 'ap-slot'
+                              }
+                            >
+                              {slot}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carte Notes */}
+                  <div className="ap-card">
+                    <div className="ap-card-head">
+                      <FileText size={14} color="var(--ap-primary)" />
+                      <h3 className="ap-card-title">
+                        <PreviewLabel mobile="Notes" desktop="Notes & motif de consultation" />
+                      </h3>
+                    </div>
+                    <div className="ap-card-body">
+                      <div className="ap-group">
+                        <span className="ap-label">Motif</span>
+                        <div className="ap-field"><span>Suivi tension artérielle</span></div>
+                      </div>
+                      <div className="ap-group">
+                        <span className="ap-label">
+                          <PreviewLabel mobile="Complémentaires" desktop="Notes complémentaires" />
+                        </span>
+                        <div className="ap-field ap-field-tall">
+                          <span style={{ color: 'var(--ap-muted-fg)' }}>
+                            <PreviewLabel mobile="Détails…" desktop="Informations supplémentaires…" />
+                          </span>
+                        </div>
+                      </div>
+                      <div className="ap-group ap-group-priority">
+                        <span className="ap-label">Priorité</span>
+                        <div className="ap-priorities">
+                          {previewPriorities.map((p, i) => (
+                            <span key={p.label} className={i === 0 ? 'ap-priority ap-priority-on' : 'ap-priority'}>
+                              <span className="ap-dot" style={{ backgroundColor: p.dot }} />
+                              {p.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rail : calendrier (desktop), créneaux, récapitulatif */}
+                <div className="ap-rail">
+
+                  <div className="ap-card ap-desktop-only" style={{ flexDirection: 'column' }}>
+                    <div className="ap-card-head" style={{ justifyContent: 'space-between' }}>
+                      <span style={{
+                        width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: 'var(--ap-input)', border: '1px solid var(--ap-border)', borderRadius: 'var(--ap-r-md)'
+                      }}>
+                        <ChevronLeft size={12} />
+                      </span>
+                      <span style={{ fontSize: '13px', fontWeight: 600 }}>Juillet 2025</span>
+                      <span style={{
+                        width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: 'var(--ap-input)', border: '1px solid var(--ap-border)', borderRadius: 'var(--ap-r-md)'
+                      }}>
+                        <ChevronRight size={12} />
+                      </span>
+                    </div>
+                    <div className="ap-card-body">
+                      <div className="ap-cal-grid">
+                        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
+                          <span key={i} style={{ fontSize: '11px', fontWeight: 500, color: 'var(--ap-muted-fg)', padding: '4px 0' }}>{d}</span>
+                        ))}
+                        {previewCalendarWeeks.flat().map((day, i) => {
+                          if (day === null) return <span key={i} className="ap-cal-day ap-cal-day-empty" />;
+                          const cls = day === PREVIEW_CAL_SELECTED ? 'ap-cal-day ap-cal-day-on'
+                            : day === PREVIEW_CAL_OFF ? 'ap-cal-day ap-cal-day-off'
+                              : 'ap-cal-day';
+                          return (
+                            <span key={i} className={cls} style={i < 7 ? { color: 'var(--ap-muted-fg)' } : undefined}>
+                              {day}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="ap-card ap-desktop-only" style={{ flexDirection: 'column' }}>
+                    <div className="ap-card-head">
+                      <Clock size={13} color="var(--ap-primary)" />
+                      <span style={{ fontSize: '13px', fontWeight: 600 }}>Créneaux disponibles</span>
+                    </div>
+                    <div className="ap-card-body" style={{ gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--ap-muted-fg)' }}>Lundi 14 juillet 2025</span>
+                      <div className="ap-slots">
+                        {previewSlots.map((slot, i) => (
+                          <span
+                            key={slot}
+                            className={
+                              i === PREVIEW_SELECTED_SLOT ? 'ap-slot ap-slot-on'
+                                : PREVIEW_TAKEN_SLOTS.includes(i) ? 'ap-slot ap-slot-off'
+                                  : 'ap-slot'
+                            }
+                          >
+                            {slot}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--ap-muted-fg)' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: 'var(--ap-primary)' }} />
+                          Sélectionné
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--ap-muted-fg)' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: 'var(--ap-input)', border: '1px solid var(--ap-border)', opacity: 0.4 }} />
+                          Occupé
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="ap-recap">
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--ap-bg)', opacity: 0.6 }}>
+                      Récapitulatif
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {previewRecap.map(row => {
+                        const Icon = row.icon;
+                        return (
+                          <span key={row.value} className="ap-recap-row">
+                            <Icon size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
+                            {row.value}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <span className="ap-btn ap-desktop-only" style={{ fontSize: '12px', marginTop: '2px' }}>
+                      <CheckCircle2 size={13} />
+                      Confirmer
+                    </span>
+                  </div>
+
+                  {/* CTA empilés — mobile uniquement */}
+                  <div className="ap-ctas ap-mobile-only" style={{ flexDirection: 'column' }}>
+                    <span className="ap-btn"><CheckCircle2 size={14} />Confirmer le RDV</span>
+                    <span className="ap-btn ap-btn-ghost">Annuler</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -780,7 +1327,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             <div style={{ flex: 1, borderTop: '1px solid #e2e8f0' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', whiteSpace: 'nowrap' }}>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                Tous les plans incluent : accès web & mobile, mises à jour incluses, changement de plan à tout moment
+                Tous les plans incluent : utilisation sur ordinateur et sur mobile, mises à jour incluses, changement de plan à tout moment
               </span>
             </div>
             <div style={{ flex: 1, borderTop: '1px solid #e2e8f0' }} />

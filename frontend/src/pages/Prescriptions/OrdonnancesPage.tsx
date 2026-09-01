@@ -355,16 +355,16 @@ export const OrdonnancesPage: React.FC = () => {
         <head>
           <title>Ordonnance Médicale - ${presc.patient_name}</title>
           <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #1e293b; }
-            .header { border-bottom: 2px solid #1e4d40; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; }
-            .clinic-title { font-size: 1.4rem; font-weight: bold; color: #1e4d40; }
-            .doctor-info { font-size: 0.9rem; color: #64748b; margin-top: 4px; }
-            .patient-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; }
-            .rx-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; color: #1e4d40; }
-            .item-row { border-bottom: 1px solid #f1f5f9; padding: 10px 0; }
-            .item-name { font-weight: bold; font-size: 1rem; color: #0f172a; }
-            .item-posology { font-size: 0.875rem; color: #475569; margin-top: 2px; }
-            .footer { margin-top: 50px; text-align: right; font-weight: bold; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: var(--text-primary); }
+            .header { border-bottom: 2px solid var(--brand-fill); padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; }
+            .clinic-title { font-size: 1.4rem; font-weight: bold; color: var(--brand-fill); }
+            .doctor-info { font-size: 0.9rem; color: var(--text-muted); margin-top: 4px; }
+            .patient-box { background-color: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; }
+            .rx-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--brand-fill); }
+            .item-row { border-bottom: 1px solid var(--bg-tertiary); padding: 10px 0; }
+            .item-name { font-weight: bold; font-size: 1rem; color: var(--text-primary); }
+            .item-posology { font-size: 0.875rem; color: var(--text-secondary); margin-top: 2px; }
+            .footer { margin-top: 50px; text-align: right; font-weight: bold; border-top: 1px solid var(--border); padding-top: 20px; }
           </style>
         </head>
         <body>
@@ -375,7 +375,7 @@ export const OrdonnancesPage: React.FC = () => {
             </div>
             <div style="text-align: right;">
               <div>Date: ${presc.date}</div>
-              <div style="font-weight: bold; color: #1e4d40;">Prescripteur: ${presc.doctor_name}</div>
+              <div style="font-weight: bold; color: var(--brand-fill);">Prescripteur: ${presc.doctor_name}</div>
             </div>
           </div>
 
@@ -393,7 +393,7 @@ export const OrdonnancesPage: React.FC = () => {
             </div>
           `).join('')}
 
-          ${presc.notes ? `<div style="margin-top: 20px; font-style: italic; color: #64748b;"><strong>Notes :</strong> ${presc.notes}</div>` : ''}
+          ${presc.notes ? `<div style="margin-top: 20px; font-style: italic; color: var(--text-muted);"><strong>Notes :</strong> ${presc.notes}</div>` : ''}
 
           <div class="footer">
             Signature & Cachet du Médecin<br/><br/><br/>
@@ -485,7 +485,7 @@ export const OrdonnancesPage: React.FC = () => {
             alignItems: 'center',
             gap: '8px',
             padding: '10px 20px',
-            backgroundColor: '#1e4d40',
+            backgroundColor: 'var(--brand-fill)',
             color: '#ffffff',
             border: 'none',
             borderRadius: '10px',
@@ -510,7 +510,7 @@ export const OrdonnancesPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: filterStatus === 'all' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterStatus === 'all' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterStatus === 'all' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -526,7 +526,7 @@ export const OrdonnancesPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border)',
-              backgroundColor: filterStatus === 'validee' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterStatus === 'validee' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterStatus === 'validee' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -542,7 +542,7 @@ export const OrdonnancesPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border)',
-              backgroundColor: filterStatus === 'remise' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterStatus === 'remise' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterStatus === 'remise' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -558,7 +558,7 @@ export const OrdonnancesPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border)',
-              backgroundColor: filterStatus === 'partielle' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterStatus === 'partielle' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterStatus === 'partielle' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -584,7 +584,7 @@ export const OrdonnancesPage: React.FC = () => {
               backgroundColor: 'var(--bg-secondary)',
               fontSize: '0.825rem',
               color: 'var(--text-primary)',
-              outline: 'none',
+              
               boxSizing: 'border-box'
             }}
           />
@@ -605,8 +605,8 @@ export const OrdonnancesPage: React.FC = () => {
           if (presc.status === 'remise') {
             statusPill = (
               <span style={{
-                backgroundColor: '#e6f4ea',
-                color: '#1e4d40',
+                backgroundColor: 'var(--brand-soft)',
+                color: 'var(--brand-fill)',
                 padding: '4px 12px',
                 borderRadius: '8px',
                 fontSize: '0.78rem',
@@ -622,8 +622,8 @@ export const OrdonnancesPage: React.FC = () => {
           } else if (presc.status === 'partielle') {
             statusPill = (
               <span style={{
-                backgroundColor: '#ffedd5',
-                color: '#ea580c',
+                backgroundColor: 'var(--warning-surface)',
+                color: 'var(--warning-ink)',
                 padding: '4px 12px',
                 borderRadius: '8px',
                 fontSize: '0.78rem',
@@ -639,7 +639,7 @@ export const OrdonnancesPage: React.FC = () => {
           } else {
             statusPill = (
               <span style={{
-                backgroundColor: '#10b981',
+                backgroundColor: 'var(--success)',
                 color: '#ffffff',
                 padding: '4px 12px',
                 borderRadius: '8px',
@@ -677,7 +677,7 @@ export const OrdonnancesPage: React.FC = () => {
                     width: '42px',
                     height: '42px',
                     borderRadius: '50%',
-                    backgroundColor: '#cbd5e1',
+                    backgroundColor: 'var(--border-strong)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -726,7 +726,7 @@ export const OrdonnancesPage: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {presc.items.map((it) => {
                     const ratio = it.quantity_dispensed / it.quantity_prescribed;
-                    const barColor = ratio >= 1 ? '#10b981' : ratio > 0 ? '#ea580c' : '#cbd5e1';
+                    const barColor = ratio >= 1 ? 'var(--success)' : ratio > 0 ? 'var(--warning-ink)' : 'var(--border-strong)';
 
                     return (
                       <div
@@ -801,7 +801,7 @@ export const OrdonnancesPage: React.FC = () => {
                       alignItems: 'center',
                       gap: '6px',
                       padding: '8px 16px',
-                      backgroundColor: '#1e4d40',
+                      backgroundColor: 'var(--brand-fill)',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '8px',
@@ -862,9 +862,9 @@ export const OrdonnancesPage: React.FC = () => {
                         alignItems: 'center',
                         gap: '6px',
                         padding: '8px 16px',
-                        backgroundColor: '#e6f4ea',
-                        color: '#1e4d40',
-                        border: '1px solid #bbf7d0',
+                        backgroundColor: 'var(--brand-soft)',
+                        color: 'var(--brand-fill)',
+                        border: '1px solid var(--brand-line)',
                         borderRadius: '8px',
                         fontWeight: 700,
                         fontSize: '0.825rem',
@@ -983,7 +983,7 @@ export const OrdonnancesPage: React.FC = () => {
                         alignItems: 'center',
                         gap: '4px',
                         padding: '6px 12px',
-                        backgroundColor: '#1e4d40',
+                        backgroundColor: 'var(--brand-fill)',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '6px',
@@ -1097,7 +1097,7 @@ export const OrdonnancesPage: React.FC = () => {
                               type="button"
                               onClick={() => handleRemoveMedicationLine(line.id)}
                               className="rx-med-line-remove"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}
                               title="Supprimer la ligne"
                             >
                               <Trash2 size={16} />
@@ -1112,7 +1112,7 @@ export const OrdonnancesPage: React.FC = () => {
                                 placeholder="Saisir le nom spécifique du médicament (ex: Spasfon 80mg, Rocephine 1g)..."
                                 value={line.custom_name || ''}
                                 onChange={(e) => handleUpdateMedicationLine(line.id, 'custom_name', e.target.value)}
-                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #1e4d40', fontSize: '0.825rem', backgroundColor: '#e6f4ea' }}
+                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--brand-fill)', fontSize: '0.825rem', backgroundColor: 'var(--brand-soft)' }}
                                 required
                               />
                             </div>
@@ -1143,7 +1143,7 @@ export const OrdonnancesPage: React.FC = () => {
                 <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary">
                   Annuler
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: '#1e4d40' }}>
+                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: 'var(--brand-fill)' }}>
                   {isSaving ? 'Enregistrement...' : '✓ Générer & Enregistrer l\'ordonnance'}
                 </button>
               </div>
@@ -1174,14 +1174,14 @@ export const OrdonnancesPage: React.FC = () => {
               {dispenseModalPresc.items.map(it => (
                 <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '0.825rem' }}>
                   <span>• {it.medication_name} ({it.form || 'Comprimé'})</span>
-                  <span style={{ fontWeight: 700, color: '#1e4d40' }}>{it.quantity_prescribed} unités</span>
+                  <span style={{ fontWeight: 700, color: 'var(--brand-fill)' }}>{it.quantity_prescribed} unités</span>
                 </div>
               ))}
             </div>
 
             <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
               <button type="button" onClick={() => setDispenseModalPresc(null)} className="btn btn-secondary">Annuler</button>
-              <button onClick={() => handleConfirmDispense(dispenseModalPresc)} className="btn btn-primary" style={{ backgroundColor: '#1e4d40' }}>
+              <button onClick={() => handleConfirmDispense(dispenseModalPresc)} className="btn btn-primary" style={{ backgroundColor: 'var(--brand-fill)' }}>
                 ✓ Confirmer la délivrance
               </button>
             </div>

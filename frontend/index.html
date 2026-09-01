@@ -7,6 +7,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1e4d40" />
 
+    <!-- Polices : chargées ici, plus par un @import en tête de index.css. Un
+         @import sérialise la requête derrière le CSS et bloque le rendu ; le
+         preconnect ouvre la connexion à gstatic pendant que le HTML s'analyse.
+         DM Sans a été retiré : trois familles étaient chargées pour deux
+         usages réels. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
+
     <title>MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire</title>
     <!-- Prix : 9 000 FCFA = plan Clinique, le moins cher des plans payants
          (backend/utils/plans.js). Ces métadonnées annonçaient « à partir de

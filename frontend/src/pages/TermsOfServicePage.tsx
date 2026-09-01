@@ -170,7 +170,10 @@ export const TermsOfServicePage: React.FC<TermsOfServicePageProps> = ({ onBack, 
             <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Mail size={14} color="var(--tp-primary)" />
-                <span style={{ fontSize: '0.85rem', color: 'var(--tp-primary)' }}>blog.ousmane@gmail.com</span>
+                {/* Adresse au domaine : une boîte personnelle dans des CGU
+                    coûte la signature d'une clinique. Elle doit rester
+                    relevée — une adresse morte ici est pire que l'ancienne. */}
+                <a href="mailto:contact@mediclinicpro.com" style={{ fontSize: '0.85rem', color: 'var(--tp-primary)' }}>contact@mediclinicpro.com</a>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Phone size={14} color="var(--tp-muted)" />

@@ -198,7 +198,7 @@ export const DepositsPage: React.FC = () => {
     backgroundColor: 'var(--bg-primary)',
     fontSize: '0.85rem',
     color: 'var(--text-primary)',
-    outline: 'none',
+    
     boxSizing: 'border-box'
   };
   const labelStyle: React.CSSProperties = {
@@ -240,7 +240,7 @@ export const DepositsPage: React.FC = () => {
           cursor: pointer;
           white-space: nowrap;
         }
-        .dep-tab.active { background-color: #1e4d40; color: #fff; border-color: #1e4d40; }
+        .dep-tab.active { background-color: var(--brand-fill); color: #fff; border-color: var(--brand-fill); }
         .dep-tab.inactive { background-color: var(--bg-secondary); color: var(--text-secondary); }
 
         .dep-form-grid {
@@ -305,7 +305,7 @@ export const DepositsPage: React.FC = () => {
         }
         .dep-payment-option.active {
           border-color: var(--primary);
-          background-color: var(--primary-light, #e6f4ea);
+          background-color: var(--primary-light, var(--brand-soft));
           color: var(--primary);
         }
       `}</style>
@@ -392,12 +392,12 @@ export const DepositsPage: React.FC = () => {
                   {(selectedPatient.antecedents || selectedPatient.allergies) && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
                       {selectedPatient.antecedents && (
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#ea580c', backgroundColor: '#fff7ed', padding: '3px 8px', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--warning-ink)', backgroundColor: 'var(--warning-surface)', padding: '3px 8px', borderRadius: '6px' }}>
                           {selectedPatient.antecedents}
                         </span>
                       )}
                       {selectedPatient.allergies && (
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#dc2626', backgroundColor: '#fef2f2', padding: '3px 8px', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--danger)', backgroundColor: 'var(--danger-surface)', padding: '3px 8px', borderRadius: '6px' }}>
                           Allergie : {selectedPatient.allergies}
                         </span>
                       )}
@@ -414,7 +414,7 @@ export const DepositsPage: React.FC = () => {
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Actes / soins prévus</h3>
                 <button
                   onClick={handleAddItem}
-                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', backgroundColor: '#1e4d40', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', backgroundColor: 'var(--brand-fill)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   <Plus size={13} />
                   <span>Ajouter</span>
@@ -445,7 +445,7 @@ export const DepositsPage: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleRemoveItem(item.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title="Supprimer"
                     >
                       <Trash2 size={15} />
@@ -493,10 +493,10 @@ export const DepositsPage: React.FC = () => {
 
             {/* RIGHT: deposit amount + payment */}
             <div className="dep-panel">
-              <div style={{ backgroundColor: '#162a26', borderRadius: '14px', padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <span style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Dépôt suggéré (50% du total)</span>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: '#ffffff' }}>
-                  {suggestedDeposit.toLocaleString('fr-FR')} <span style={{ fontSize: '1rem', fontWeight: 600, color: '#94a3b8' }}>FCFA</span>
+              <div style={{ backgroundColor: 'var(--sidebar-bg)', borderRadius: '14px', padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--sidebar-fg)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Dépôt suggéré (50% du total)</span>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--sidebar-fg-strong)' }}>
+                  {suggestedDeposit.toLocaleString('fr-FR')} <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--sidebar-fg)' }}>FCFA</span>
                 </div>
               </div>
 
@@ -546,9 +546,9 @@ export const DepositsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', backgroundColor: '#fff7ed', border: '1px solid #ffedd5', borderRadius: '10px', padding: '10px 12px' }}>
-                <AlertTriangle size={15} color="#ea580c" style={{ flexShrink: 0, marginTop: '1px' }} />
-                <p style={{ fontSize: '0.78rem', color: '#9a3412', margin: 0, lineHeight: 1.4 }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', backgroundColor: 'var(--warning-surface)', border: '1px solid var(--warning-surface)', borderRadius: '10px', padding: '10px 12px' }}>
+                <AlertTriangle size={15} color="var(--warning-ink)" style={{ flexShrink: 0, marginTop: '1px' }} />
+                <p style={{ fontSize: '0.78rem', color: 'var(--warning-ink)', margin: 0, lineHeight: 1.4 }}>
                   Le dépôt ne couvre pas nécessairement la totalité des frais. Le solde sera réglé via un encaissement classique (Comptabilité).
                 </p>
               </div>
@@ -558,7 +558,7 @@ export const DepositsPage: React.FC = () => {
                 disabled={isSubmitting}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  padding: '12px 18px', backgroundColor: '#1e4d40', color: '#fff',
+                  padding: '12px 18px', backgroundColor: 'var(--brand-fill)', color: '#fff',
                   border: 'none', borderRadius: '10px', fontWeight: 700, fontSize: '0.9rem',
                   cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: isSubmitting ? 0.6 : 1
                 }}

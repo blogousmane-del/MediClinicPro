@@ -91,7 +91,7 @@ export const OnboardingPage: React.FC = () => {
   return (
     <div style={{
       backgroundColor: '#0b0f19',
-      backgroundImage: 'radial-gradient(circle at 50% 120%, rgba(13, 148, 136, 0.1), rgba(11, 15, 25, 0))',
+      backgroundImage: 'radial-gradient(circle at 50% 120%, hsla(163, 40%, 48%, 0.12), rgba(11, 15, 25, 0))',
       color: '#f9fafb',
       minHeight: '100vh',
       display: 'flex',
@@ -116,8 +116,8 @@ export const OnboardingPage: React.FC = () => {
           transition: all 0.2s ease !important;
         }
         .onboard-input:focus {
-          border-color: #14b8a6 !important;
-          box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+          border-color: hsl(163, 40%, 48%) !important;
+          box-shadow: 0 0 0 3px hsla(163, 40%, 48%, 0.18) !important;
           background-color: #05080f !important;
         }
         .onboard-input::placeholder {
@@ -137,8 +137,8 @@ export const OnboardingPage: React.FC = () => {
           border-radius: 8px !important;
         }
         .onboard-phone .PhoneInput--focus {
-          border-color: #14b8a6 !important;
-          box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+          border-color: hsl(163, 40%, 48%) !important;
+          box-shadow: 0 0 0 3px hsla(163, 40%, 48%, 0.18) !important;
         }
         .onboard-phone .PhoneInputCountry {
           border-right: 1px solid #1f2937 !important;
@@ -201,7 +201,7 @@ export const OnboardingPage: React.FC = () => {
               style={{
                 padding: '1.25rem',
                 textAlign: 'center',
-                borderBottom: step === s.n ? '3px solid rgb(13, 148, 136)' : 'none',
+                borderBottom: step === s.n ? '3px solid hsl(163, 40%, 48%)' : 'none',
                 color: step === s.n ? 'white' : '#6b7280',
                 display: 'flex',
                 alignItems: 'center',
@@ -211,7 +211,7 @@ export const OnboardingPage: React.FC = () => {
                 fontWeight: step === s.n ? 600 : 400
               }}
             >
-              <s.icon size={16} color={step >= s.n ? 'rgb(13, 148, 136)' : '#6b7280'} />
+              <s.icon size={16} color={step >= s.n ? 'hsl(163, 40%, 48%)' : '#6b7280'} />
               <span>{s.label}</span>
             </div>
           ))}
@@ -436,7 +436,7 @@ export const OnboardingPage: React.FC = () => {
                       type="checkbox"
                       checked={modules[mod.id]}
                       onChange={e => setModules({ ...modules, [mod.id]: e.target.checked })}
-                      style={{ marginTop: '4px', width: '18px', height: '18px', accentColor: 'rgb(13, 148, 136)' }}
+                      style={{ marginTop: '4px', width: '18px', height: '18px', accentColor: 'hsl(163, 40%, 48%)' }}
                     />
                     <div>
                       <div style={{ fontWeight: 600, color: 'white', fontSize: '0.95rem' }}>{mod.label}</div>

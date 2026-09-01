@@ -170,7 +170,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
     <div style={{
       minHeight: '100vh',
       display: 'flex',
-      backgroundColor: '#f2f6f4',
+      backgroundColor: 'var(--bg-primary)',
       fontFamily: 'var(--font-primary, "Outfit", sans-serif)',
       boxSizing: 'border-box'
     }}>
@@ -182,8 +182,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
         }
         .auth-left-panel {
           width: 44%;
-          background: linear-gradient(165deg, #132a24 0%, #1a3c33 100%);
-          color: #ffffff;
+          background: linear-gradient(165deg, var(--brand-900) 0%, var(--brand-700) 100%);
+          color: var(--brand-fill-fg);
           padding: 3rem;
           display: flex;
           flex-direction: column;
@@ -193,7 +193,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
         }
         .auth-right-panel {
           flex: 1;
-          background-color: #f2f6f4;
+          background-color: var(--bg-primary);
           display: flex;
           flex-direction: column;
           justify-content: center;
@@ -217,7 +217,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
         .auth-input-label {
           font-size: 0.725rem;
           font-weight: 700;
-          color: #5a6e67;
+          color: var(--text-secondary);
           text-transform: uppercase;
           letter-spacing: 0.04em;
         }
@@ -230,31 +230,31 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
           width: 100%;
           padding: 11px 14px 11px 40px;
           border-radius: 10px;
-          border: 1px solid #d8e2dc;
-          background-color: #eaf1ed;
+          border: 1px solid var(--border);
+          background-color: var(--bg-tertiary);
           font-size: 0.9rem;
-          color: #172a24;
+          color: var(--text-primary);
           outline: none;
           transition: all 0.2s ease;
           box-sizing: border-box;
         }
         .auth-field-wrapper input:focus {
-          border-color: #1e4d40;
-          background-color: #ffffff;
+          border-color: var(--brand-fill);
+          background-color: var(--bg-secondary);
           box-shadow: 0 0 0 3px rgba(30, 77, 64, 0.12);
         }
         .auth-icon-left {
           position: absolute;
           left: 13px;
-          color: #7a8f87;
+          color: var(--text-muted);
           pointer-events: none;
         }
         .auth-btn-primary {
           width: 100%;
           padding: 12px;
           border-radius: 10px;
-          background-color: #1e4d40;
-          color: #ffffff;
+          background-color: var(--brand-fill);
+          color: var(--brand-fill-fg);
           border: none;
           font-size: 0.95rem;
           font-weight: 700;
@@ -267,16 +267,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
           box-shadow: 0 4px 12px rgba(30, 77, 64, 0.2);
         }
         .auth-btn-primary:hover {
-          background-color: #163a30;
+          background-color: var(--brand-fill-hover);
           transform: translateY(-1px);
         }
         .auth-btn-secondary {
           width: 100%;
           padding: 11px;
           border-radius: 10px;
-          background-color: #ffffff;
-          color: #2c423b;
-          border: 1px solid #d0ded7;
+          background-color: var(--bg-secondary);
+          color: var(--text-primary);
+          border: 1px solid var(--border);
           font-size: 0.875rem;
           font-weight: 600;
           cursor: pointer;
@@ -287,8 +287,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
           transition: all 0.2s ease;
         }
         .auth-btn-secondary:hover {
-          background-color: #f7faf8;
-          border-color: #b5cbc0;
+          background-color: var(--bg-primary);
+          border-color: var(--brand-line);
         }
 
         /* Responsive Breakpoints */
@@ -309,7 +309,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <img src="/logo-icon.svg" alt="MediClinic" width={34} height={34} style={{ display: 'block', flexShrink: 0 }} />
-            <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em', color: '#ffffff' }}>
+            <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em', color: 'var(--brand-fill-fg)' }}>
               MediClinic
             </span>
           </div>
@@ -319,18 +319,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
             <h1 style={{
               fontSize: '2.2rem',
               fontWeight: 800,
-              color: '#ffffff',
+              color: 'var(--brand-fill-fg)',
               lineHeight: 1.2,
               marginBottom: '1rem',
               fontFamily: 'var(--font-secondary, "Plus Jakarta Sans", sans-serif)'
             }}>
               La gestion de votre clinique,<br />
-              <span style={{ color: '#34d399' }}>simplifiée.</span>
+              <span style={{ color: 'var(--brand-300)' }}>simplifiée.</span>
             </h1>
 
             <p style={{
               fontSize: '0.9rem',
-              color: '#a3c2b8',
+              color: 'var(--sidebar-fg)',
               lineHeight: 1.6,
               marginBottom: '2.2rem'
             }}>
@@ -351,9 +351,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <CheckCircle2 size={15} color="#34d399" />
+                    <CheckCircle2 size={15} color="var(--brand-300)" />
                   </div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#e2f1ec' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--brand-100)' }}>
                     {label}
                   </span>
                 </div>
@@ -362,7 +362,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
           </div>
 
           {/* Footer copyright */}
-          <div style={{ fontSize: '0.78rem', color: '#7a9f93' }}>
+          <div style={{ fontSize: '0.78rem', color: 'var(--sidebar-muted)' }}>
             © 2026 MediClinic · Côte d'Ivoire
           </div>
         </div>
@@ -379,7 +379,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               left: '1.75rem',
               background: 'none',
               border: 'none',
-              color: '#5a6e67',
+              color: 'var(--text-secondary)',
               fontSize: '0.85rem',
               fontWeight: 600,
               cursor: 'pointer',
@@ -399,13 +399,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               <h2 style={{
                 fontSize: '1.75rem',
                 fontWeight: 800,
-                color: '#132a24',
+                color: 'var(--text-primary)',
                 margin: 0,
                 fontFamily: 'var(--font-secondary, "Plus Jakarta Sans", sans-serif)'
               }}>
                 {isForgotView ? 'Récupération' : activeTab === 'register' ? 'Créer un compte' : 'Connexion'}
               </h2>
-              <p style={{ color: '#688077', fontSize: '0.875rem', marginTop: '4px', margin: 0 }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '4px', margin: 0 }}>
                 {isForgotView
                   ? 'Entrez votre email pour réinitialiser votre mot de passe'
                   : activeTab === 'register'
@@ -419,7 +419,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               <div style={{
                 display: 'flex',
                 gap: '8px',
-                backgroundColor: '#e3ebe7',
+                backgroundColor: 'var(--bg-tertiary)',
                 padding: '4px',
                 borderRadius: '10px'
               }}>
@@ -431,8 +431,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                     padding: '7px',
                     borderRadius: '7px',
                     border: 'none',
-                    backgroundColor: activeTab === 'login' ? '#ffffff' : 'transparent',
-                    color: activeTab === 'login' ? '#132a24' : '#688077',
+                    backgroundColor: activeTab === 'login' ? 'var(--bg-secondary)' : 'transparent',
+                    color: activeTab === 'login' ? 'var(--text-primary)' : 'var(--text-muted)',
                     fontWeight: 700,
                     fontSize: '0.85rem',
                     cursor: 'pointer',
@@ -450,8 +450,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                     padding: '7px',
                     borderRadius: '7px',
                     border: 'none',
-                    backgroundColor: activeTab === 'register' ? '#ffffff' : 'transparent',
-                    color: activeTab === 'register' ? '#132a24' : '#688077',
+                    backgroundColor: activeTab === 'register' ? 'var(--bg-secondary)' : 'transparent',
+                    color: activeTab === 'register' ? 'var(--text-primary)' : 'var(--text-muted)',
                     fontWeight: 700,
                     fontSize: '0.85rem',
                     cursor: 'pointer',
@@ -490,7 +490,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                   type="button"
                   onClick={() => setIsForgotView(false)}
                   style={{
-                    background: 'none', border: 'none', color: '#1e4d40',
+                    background: 'none', border: 'none', color: 'var(--primary)',
                     fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
                   }}
                 >
@@ -539,7 +539,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                         right: '12px',
                         background: 'none',
                         border: 'none',
-                        color: '#7a8f87',
+                        color: 'var(--text-muted)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center'
@@ -558,7 +558,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#1e4d40',
+                      color: 'var(--primary)',
                       fontSize: '0.8rem',
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -585,9 +585,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                 {GOOGLE_CLIENT_ID && (
                   <>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '2px 0' }}>
-                      <div style={{ flex: 1, height: '1px', backgroundColor: '#d8e2dc' }} />
-                      <span style={{ fontSize: '0.78rem', color: '#8aa097', fontWeight: 600 }}>ou</span>
-                      <div style={{ flex: 1, height: '1px', backgroundColor: '#d8e2dc' }} />
+                      <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }} />
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>ou</span>
+                      <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <div ref={googleButtonRef} />
@@ -600,7 +600,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                   textAlign: 'center',
                   marginTop: '6px',
                   fontSize: '0.8rem',
-                  color: '#4b635b',
+                  color: 'var(--text-secondary)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -662,7 +662,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
                 <div className="auth-input-group">
                   <label className="auth-input-label">TÉLÉPHONE (MOBILE MONEY) *</label>
-                  <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #d8e2dc', padding: '4px' }}>
+                  <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '4px' }}>
                     <PhoneInput value={phone} onChange={setPhone} disabled={isSubmitting} required />
                   </div>
                 </div>
@@ -690,8 +690,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
             {/* Bottom Security Badge */}
             <div style={{
-              backgroundColor: '#e6f0eb',
-              border: '1px solid #cce0d6',
+              backgroundColor: 'var(--brand-soft)',
+              border: '1px solid var(--brand-line)',
               borderRadius: '10px',
               padding: '9px 12px',
               display: 'flex',
@@ -700,10 +700,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               gap: '8px',
               fontSize: '0.75rem',
               fontWeight: 600,
-              color: '#1a4035',
+              color: 'var(--brand-soft-ink)',
               marginTop: '0.5rem'
             }}>
-              <ShieldCheck size={16} color="#10b981" />
+              <ShieldCheck size={16} color="var(--success)" />
               <span>Connexion chiffrée et données protégées</span>
             </div>
 

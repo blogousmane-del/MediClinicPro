@@ -158,7 +158,7 @@ export const LaboratoryPage: React.FC = () => {
                 backgroundColor: 'var(--bg-secondary)',
                 fontSize: '0.85rem',
                 color: 'var(--text-primary)',
-                outline: 'none',
+                
                 boxSizing: 'border-box'
               }}
             />
@@ -183,7 +183,7 @@ export const LaboratoryPage: React.FC = () => {
                 position: 'absolute',
                 top: '-4px',
                 right: '-4px',
-                backgroundColor: '#ef4444',
+                backgroundColor: 'var(--danger)',
                 color: 'white',
                 fontSize: '0.7rem',
                 fontWeight: 700,
@@ -219,7 +219,7 @@ export const LaboratoryPage: React.FC = () => {
               alignItems: 'center',
               gap: '6px',
               padding: '8px 16px',
-              backgroundColor: activeTab === 'completed' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: activeTab === 'completed' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: activeTab === 'completed' ? '#ffffff' : 'var(--text-primary)',
               border: '1px solid var(--border)',
               borderRadius: '10px',
@@ -269,7 +269,7 @@ export const LaboratoryPage: React.FC = () => {
             key={ex.id}
             style={{
               backgroundColor: 'var(--bg-secondary)',
-              border: ex.urgent ? '1px solid #fca5a5' : '1px solid var(--border)',
+              border: ex.urgent ? '1px solid var(--danger-ink)' : '1px solid var(--border)',
               borderRadius: '16px',
               padding: '1.5rem',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
@@ -286,7 +286,7 @@ export const LaboratoryPage: React.FC = () => {
                   width: '10px',
                   height: '10px',
                   borderRadius: '50%',
-                  backgroundColor: ex.urgent ? '#dc2626' : '#d97706',
+                  backgroundColor: ex.urgent ? 'var(--danger)' : 'var(--warning-ink)',
                   flexShrink: 0
                 }} />
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
@@ -342,7 +342,7 @@ export const LaboratoryPage: React.FC = () => {
                 </span>
                 <span style={{
                   fontWeight: 700,
-                  color: ex.urgent ? '#dc2626' : ex.priority === 'Haute' ? '#ea580c' : 'var(--text-primary)'
+                  color: ex.urgent ? 'var(--danger)' : ex.priority === 'Haute' ? 'var(--warning-ink)' : 'var(--text-primary)'
                 }}>
                   {ex.priority}
                 </span>
@@ -380,7 +380,7 @@ export const LaboratoryPage: React.FC = () => {
                       alignItems: 'center',
                       gap: '8px',
                       padding: '10px 20px',
-                      backgroundColor: '#dc2626',
+                      backgroundColor: 'var(--danger)',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '10px',
@@ -401,7 +401,7 @@ export const LaboratoryPage: React.FC = () => {
                       alignItems: 'center',
                       gap: '8px',
                       padding: '10px 20px',
-                      backgroundColor: '#d97706',
+                      backgroundColor: 'var(--warning-ink)',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '10px',
@@ -423,7 +423,7 @@ export const LaboratoryPage: React.FC = () => {
                     alignItems: 'center',
                     gap: '8px',
                     padding: '10px 24px',
-                    backgroundColor: '#1e4d40',
+                    backgroundColor: 'var(--brand-fill)',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '10px',
@@ -466,7 +466,7 @@ export const LaboratoryPage: React.FC = () => {
             alignItems: 'center',
             gap: '8px',
             padding: '10px 20px',
-            backgroundColor: '#1e4d40',
+            backgroundColor: 'var(--brand-fill)',
             color: '#ffffff',
             border: 'none',
             borderRadius: '10px',
@@ -494,7 +494,7 @@ export const LaboratoryPage: React.FC = () => {
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border)', padding: '12px', borderRadius: '10px', fontSize: '0.85rem' }}>
                   <strong>Patient :</strong> {selectedExam.patient_name}<br/>
-                  <strong>Examen prescrit :</strong> <span style={{ color: '#1e4d40', fontWeight: 'bold' }}>{selectedExam.test_name}</span><br/>
+                  <strong>Examen prescrit :</strong> <span style={{ color: 'var(--brand-fill)', fontWeight: 'bold' }}>{selectedExam.test_name}</span><br/>
                   <strong>Prescripteur :</strong> {selectedExam.doctor_name}
                 </div>
 
@@ -513,7 +513,7 @@ export const LaboratoryPage: React.FC = () => {
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setSelectedExam(null)} className="btn btn-secondary">Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: '#1e4d40' }}>
+                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: 'var(--brand-fill)' }}>
                   {isSaving ? 'Enregistrement...' : 'Enregistrer et Transmettre'}
                 </button>
               </div>

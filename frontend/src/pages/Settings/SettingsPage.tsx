@@ -473,9 +473,9 @@ export const SettingsPage: React.FC = () => {
           flex-shrink: 0;
         }
         .settings-tab-btn.active {
-          background-color: #1e4d40;
+          background-color: var(--brand-fill);
           color: #ffffff;
-          border-color: #1e4d40;
+          border-color: var(--brand-fill);
         }
         .settings-tab-btn.inactive {
           background-color: var(--bg-secondary);
@@ -578,7 +578,7 @@ export const SettingsPage: React.FC = () => {
                 position: 'absolute',
                 top: '-4px',
                 right: '-4px',
-                backgroundColor: '#ef4444',
+                backgroundColor: 'var(--danger)',
                 color: 'white',
                 fontSize: '0.68rem',
                 fontWeight: 700,
@@ -641,8 +641,8 @@ export const SettingsPage: React.FC = () => {
             {/* Header — centered eyebrow + title, matches Banani's "Abonnement — Choisir un plan" screen */}
             <div style={{ textAlign: 'center', maxWidth: '560px', margin: '0 auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '10px' }}>
-                <Star size={14} color="#1e4d40" fill="#1e4d40" />
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#1e4d40', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <Star size={14} color="var(--brand-fill)" fill="var(--brand-fill)" />
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-fill)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Nos formules
                 </span>
               </div>
@@ -668,12 +668,12 @@ export const SettingsPage: React.FC = () => {
             {!loading && plansCatalog && currentPlanId === 'starter' && (
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
-                backgroundColor: '#fff7e6', border: '1px solid #f0c987', borderRadius: '14px', padding: '1rem 1.25rem',
+                backgroundColor: 'var(--warning-surface)', border: '1px solid var(--warning)', borderRadius: '14px', padding: '1rem 1.25rem',
                 maxWidth: '900px', margin: '0 auto', width: '100%', boxSizing: 'border-box'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Zap size={18} color="#b8860b" style={{ flexShrink: 0 }} />
-                  <p style={{ fontWeight: 700, color: '#7a5b12', margin: 0, fontSize: '0.85rem' }}>
+                  <Zap size={18} color="var(--warning-ink)" style={{ flexShrink: 0 }} />
+                  <p style={{ fontWeight: 700, color: 'var(--warning-ink)', margin: 0, fontSize: '0.85rem' }}>
                     {trialDaysLeft !== null && `Il vous reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai. `}
                     Passez au plan Hôpital pour débloquer les utilisateurs et les rôles illimités.
                   </p>
@@ -681,7 +681,7 @@ export const SettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedPaidPlan('hopital')}
-                  style={{ backgroundColor: '#1e4d40', color: '#ffffff', border: 'none', borderRadius: '10px', padding: '9px 16px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  style={{ backgroundColor: 'var(--brand-fill)', color: '#ffffff', border: 'none', borderRadius: '10px', padding: '9px 16px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
                   Passer au plan Hôpital
                 </button>
@@ -708,8 +708,8 @@ export const SettingsPage: React.FC = () => {
                       key={planId}
                       style={{
                         position: 'relative',
-                        backgroundColor: isHighlighted ? '#e6f4ea' : 'var(--bg-secondary)',
-                        border: isHighlighted ? '1px solid #1e4d40' : '1px solid var(--border)',
+                        backgroundColor: isHighlighted ? 'var(--brand-soft)' : 'var(--bg-secondary)',
+                        border: isHighlighted ? '1px solid var(--brand-fill)' : '1px solid var(--border)',
                         borderRadius: '16px',
                         padding: '1.5rem 1.25rem',
                         boxShadow: isHighlighted ? '0 4px 14px rgba(30, 77, 64, 0.1)' : '0 2px 8px rgba(0,0,0,0.02)',
@@ -721,8 +721,8 @@ export const SettingsPage: React.FC = () => {
                       {isCurrent && (
                         <span style={{
                           position: 'absolute', top: '1.1rem', right: '1.1rem',
-                          fontSize: '0.65rem', fontWeight: 800, color: '#1e4d40',
-                          backgroundColor: '#bbf7d0', padding: '3px 9px', borderRadius: '999px',
+                          fontSize: '0.65rem', fontWeight: 800, color: 'var(--brand-fill)',
+                          backgroundColor: 'var(--brand-line)', padding: '3px 9px', borderRadius: '999px',
                           textTransform: 'uppercase', letterSpacing: '0.03em'
                         }}>
                           Plan actuel
@@ -733,12 +733,12 @@ export const SettingsPage: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: isCurrent ? '5.5rem' : 0 }}>
                         <span style={{
                           fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '6px',
-                          backgroundColor: isHighlighted ? '#1e4d40' : (planId === 'clinique' ? '#d4e0dc' : 'var(--bg-primary)'),
-                          color: isHighlighted ? '#ffffff' : '#1e4d40'
+                          backgroundColor: isHighlighted ? 'var(--brand-fill)' : (planId === 'clinique' ? 'var(--brand-line)' : 'var(--bg-primary)'),
+                          color: isHighlighted ? '#ffffff' : 'var(--brand-fill)'
                         }}>
                           {meta.badge}
                         </span>
-                        {isHighlighted && <Zap size={14} color="#1e4d40" />}
+                        {isHighlighted && <Zap size={14} color="var(--brand-fill)" />}
                       </div>
 
                       {/* Price block */}
@@ -770,7 +770,7 @@ export const SettingsPage: React.FC = () => {
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               backgroundColor: row.ok ? 'rgba(30, 77, 64, 0.12)' : 'var(--bg-primary)'
                             }}>
-                              {row.ok ? <Check size={10} color="#1e4d40" /> : <X size={10} color="var(--text-muted)" />}
+                              {row.ok ? <Check size={10} color="var(--brand-fill)" /> : <X size={10} color="var(--text-muted)" />}
                             </span>
                             <span style={{
                               fontSize: '0.82rem', lineHeight: 1.25,
@@ -806,7 +806,7 @@ export const SettingsPage: React.FC = () => {
                             className="btn"
                             style={{
                               width: '100%',
-                              backgroundColor: isSelectedForRenewal ? '#1e4d40' : (isHighlighted ? '#1e4d40' : 'var(--bg-primary)'),
+                              backgroundColor: isSelectedForRenewal ? 'var(--brand-fill)' : (isHighlighted ? 'var(--brand-fill)' : 'var(--bg-primary)'),
                               color: isSelectedForRenewal || isHighlighted ? '#ffffff' : 'var(--text-primary)',
                               border: isSelectedForRenewal || isHighlighted ? 'none' : '1px solid var(--border)',
                               borderRadius: '10px',
@@ -992,7 +992,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', backgroundColor: '#1e4d40', borderRadius: '10px' }} disabled={isSavingClinic}>
+            <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', backgroundColor: 'var(--brand-fill)', borderRadius: '10px' }} disabled={isSavingClinic}>
               {isSavingClinic ? 'Sauvegarde...' : 'Enregistrer les paramètres'}
             </button>
           </form>
@@ -1002,7 +1002,7 @@ export const SettingsPage: React.FC = () => {
         {activeSubTab === 'users' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-              <button onClick={() => setIsUserModalOpen(true)} className="btn btn-primary page-cta-btn" style={{ gap: '6px', backgroundColor: '#1e4d40', borderRadius: '10px' }}>
+              <button onClick={() => setIsUserModalOpen(true)} className="btn btn-primary page-cta-btn" style={{ gap: '6px', backgroundColor: 'var(--brand-fill)', borderRadius: '10px' }}>
                 <Plus size={16} />
                 <span>Ajouter un collaborateur</span>
               </button>
@@ -1095,7 +1095,7 @@ export const SettingsPage: React.FC = () => {
                 <textarea value={ticketMessage} onChange={e => setTicketMessage(e.target.value)} className="input-control" rows={4} required />
               </div>
 
-              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', backgroundColor: '#1e4d40', borderRadius: '10px' }} disabled={isSubmittingTicket}>
+              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', backgroundColor: 'var(--brand-fill)', borderRadius: '10px' }} disabled={isSubmittingTicket}>
                 {isSubmittingTicket ? 'Envoi...' : 'Envoyer le ticket'}
               </button>
             </form>
@@ -1220,7 +1220,7 @@ export const SettingsPage: React.FC = () => {
                                   padding: '5px 10px',
                                   borderRadius: '8px',
                                   border: `1px solid ${entry.off ? 'var(--border)' : 'var(--primary)'}`,
-                                  backgroundColor: entry.off ? 'transparent' : 'var(--primary-light, #e6f4ea)',
+                                  backgroundColor: entry.off ? 'transparent' : 'var(--primary-light, var(--brand-soft))',
                                   color: entry.off ? 'var(--text-muted)' : 'var(--primary)',
                                   fontWeight: 600,
                                   fontSize: '0.75rem',
@@ -1265,7 +1265,7 @@ export const SettingsPage: React.FC = () => {
 
                 <div className="modal-footer">
                   <button type="button" onClick={() => setIsUserModalOpen(false)} className="btn btn-secondary">Annuler</button>
-                  <button type="submit" className="btn btn-primary" disabled={isSavingUser} style={{ backgroundColor: '#1e4d40' }}>
+                  <button type="submit" className="btn btn-primary" disabled={isSavingUser} style={{ backgroundColor: 'var(--brand-fill)' }}>
                     {isSavingUser ? 'Création...' : 'Créer le compte'}
                   </button>
                 </div>

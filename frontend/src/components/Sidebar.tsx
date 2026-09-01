@@ -93,8 +93,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
         style={{
           width: 'var(--sidebar-width, 240px)',
           height: '100vh',
-          backgroundColor: '#162a26',
-          color: '#9bb0a9',
+          backgroundColor: 'var(--sidebar-bg)',
+          color: 'var(--sidebar-fg)',
           position: 'fixed',
           left: 0,
           top: 0,
@@ -127,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               <span style={{
                 fontWeight: 700,
                 fontSize: '1.25rem',
-                color: '#ffffff',
+                color: 'var(--sidebar-fg-strong)',
                 fontFamily: 'var(--font-secondary, "Plus Jakarta Sans", sans-serif)',
                 letterSpacing: '-0.02em'
               }}>
@@ -141,13 +141,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 width: '12px',
                 height: '12px',
                 borderRadius: '50%',
-                border: '2px solid #10b981',
+                border: '2px solid var(--success)',
                 backgroundColor: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--success)' }} />
               </div>
 
               {/* Logout — moved up next to the logo/close button so it's
@@ -159,15 +159,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#9bb0a9',
+                  color: 'var(--sidebar-fg)',
                   cursor: 'pointer',
                   padding: '4px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                onMouseLeave={(e) => e.currentTarget.style.color = '#9bb0a9'}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--sidebar-fg)'}
               >
                 <LogOut size={18} />
               </button>
@@ -180,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#9bb0a9',
+                  color: 'var(--sidebar-fg)',
                   display: 'none',
                   padding: '4px'
                 }}
@@ -198,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             <div style={{
               fontSize: '0.85rem',
               fontWeight: 800,
-              color: '#ffffff',
+              color: 'var(--sidebar-fg-strong)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase'
             }}>
@@ -207,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
             <div style={{
               fontSize: '0.725rem',
               fontWeight: 500,
-              color: '#6b8078',
+              color: 'var(--sidebar-muted)',
               marginTop: '2px',
               letterSpacing: '0.03em',
               textTransform: 'uppercase'
@@ -252,8 +252,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                     padding: '11px 16px',
                     borderRadius: '10px',
                     border: 'none',
-                    backgroundColor: isActive ? '#1c4436' : 'transparent',
-                    color: isActive ? '#ffffff' : locked ? '#5f736c' : '#9bb0a9',
+                    backgroundColor: isActive ? 'var(--sidebar-active)' : 'transparent',
+                    color: isActive ? 'var(--sidebar-fg-strong)' : locked ? 'var(--sidebar-muted)' : 'var(--sidebar-fg)',
                     textAlign: 'left',
                     width: '100%',
                     cursor: 'pointer',
@@ -263,21 +263,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.color = '#ffffff';
+                      e.currentTarget.style.color = 'var(--sidebar-fg-strong)';
                       e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.color = '#9bb0a9';
+                      e.currentTarget.style.color = 'var(--sidebar-fg)';
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
                 >
                   {/* Show icon when item is active or settings */}
-                  {isActive && <Icon size={18} color="#ffffff" />}
+                  {isActive && <Icon size={18} color="var(--sidebar-fg-strong)" />}
                   <span style={{ flex: 1 }}>{item.label}</span>
-                  {locked && <Lock size={14} color="#6b8078" />}
+                  {locked && <Lock size={14} color="var(--sidebar-muted)" />}
                 </button>
               );
             })}
@@ -306,12 +306,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               width: '36px',
               height: '36px',
               borderRadius: '50%',
-              backgroundColor: '#1f3a33',
+              backgroundColor: 'var(--sidebar-surface)',
               border: '1.5px solid rgba(255, 255, 255, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
+              color: 'var(--sidebar-fg-strong)',
               fontWeight: 700,
               fontSize: '0.875rem',
               flexShrink: 0
@@ -324,7 +324,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               <div style={{
                 fontSize: '0.85rem',
                 fontWeight: 800,
-                color: '#ffffff',
+                color: 'var(--sidebar-fg-strong)',
                 textTransform: 'uppercase',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -334,7 +334,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
               </div>
               <div style={{
                 fontSize: '0.725rem',
-                color: '#6b8078',
+                color: 'var(--sidebar-muted)',
                 marginTop: '1px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',

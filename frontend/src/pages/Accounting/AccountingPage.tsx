@@ -194,16 +194,16 @@ export const AccountingPage: React.FC = () => {
           <title>Facture ${invoiceNumber}</title>
           <style>
             body { font-family: sans-serif; padding: 30px; color: #333; line-height: 1.6; }
-            .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 15px; margin-bottom: 20px; }
-            .title { font-size: 1.5rem; font-weight: bold; color: #0d9488; }
-            .patient-box { background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+            .header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px; }
+            .title { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+            .patient-box { background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 0.9rem; }
-            th { background: #f3f4f6; text-align: left; }
+            th, td { border: 1px solid var(--border); padding: 8px; font-size: 0.9rem; }
+            th { background: var(--bg-tertiary); text-align: left; }
             .totals { margin-left: auto; width: 280px; }
             .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
             .grand-total { font-weight: bold; font-size: 1.1rem; border-top: 1px solid #333; margin-top: 6px; padding-top: 8px; }
-            .footer { text-align: center; margin-top: 40px; font-size: 0.8rem; color: #888; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+            .footer { text-align: center; margin-top: 40px; font-size: 0.8rem; color: #888; border-top: 1px solid var(--border); padding-top: 10px; }
           </style>
         </head>
         <body>
@@ -261,7 +261,7 @@ export const AccountingPage: React.FC = () => {
     backgroundColor: 'var(--bg-primary)',
     fontSize: '0.85rem',
     color: 'var(--text-primary)',
-    outline: 'none',
+    
     boxSizing: 'border-box'
   };
 
@@ -340,9 +340,9 @@ export const AccountingPage: React.FC = () => {
           transition: background 0.2s, color 0.2s;
         }
         .acc-tab.active {
-          background-color: #1e4d40;
+          background-color: var(--brand-fill);
           color: #fff;
-          border-color: #1e4d40;
+          border-color: var(--brand-fill);
         }
         .acc-tab.inactive {
           background-color: var(--bg-secondary);
@@ -499,7 +499,7 @@ export const AccountingPage: React.FC = () => {
               </div>
               <span style={{
                 position: 'absolute', top: '-4px', right: '-4px',
-                backgroundColor: '#ef4444', color: 'white', fontSize: '0.68rem',
+                backgroundColor: 'var(--danger)', color: 'white', fontSize: '0.68rem',
                 fontWeight: 700, width: '17px', height: '17px', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 border: '2px solid var(--bg-primary)'
@@ -658,7 +658,7 @@ export const AccountingPage: React.FC = () => {
                     onClick={handleAddService}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
-                      padding: '7px 12px', backgroundColor: '#1e4d40', color: '#ffffff',
+                      padding: '7px 12px', backgroundColor: 'var(--brand-fill)', color: '#ffffff',
                       border: 'none', borderRadius: '8px', fontWeight: 700,
                       fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap'
                     }}
@@ -750,7 +750,7 @@ export const AccountingPage: React.FC = () => {
                               title="Supprimer"
                               style={{
                                 background: 'none', border: 'none', cursor: 'pointer',
-                                color: '#ef4444', padding: '6px', display: 'flex',
+                                color: 'var(--danger)', padding: '6px', display: 'flex',
                                 alignItems: 'center', justifyContent: 'center'
                               }}
                             >
@@ -773,7 +773,7 @@ export const AccountingPage: React.FC = () => {
                     <span>TVA (18%)</span>
                     <span style={{ fontWeight: 600 }}>{tva.toLocaleString()} FCFA</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#1e4d40', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-fill)', marginTop: '4px' }}>
                     <span>Total</span>
                     <span>{total.toLocaleString()} FCFA</span>
                   </div>
@@ -791,7 +791,7 @@ export const AccountingPage: React.FC = () => {
                       width: '100%', padding: '10px 12px', borderRadius: '10px',
                       border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)',
                       fontSize: '0.85rem', color: 'var(--text-primary)',
-                      outline: 'none', resize: 'none', boxSizing: 'border-box'
+                      resize: 'none', boxSizing: 'border-box'
                     }}
                   />
                 </div>
@@ -819,8 +819,8 @@ export const AccountingPage: React.FC = () => {
                   disabled={isSubmittingInvoice}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                    padding: '10px 18px', backgroundColor: '#e6f4ea', color: '#1e4d40',
-                    border: '1px solid #bbf7d0', borderRadius: '10px',
+                    padding: '10px 18px', backgroundColor: 'var(--brand-soft)', color: 'var(--brand-fill)',
+                    border: '1px solid var(--brand-line)', borderRadius: '10px',
                     fontWeight: 700, fontSize: '0.875rem', cursor: isSubmittingInvoice ? 'not-allowed' : 'pointer',
                     opacity: isSubmittingInvoice ? 0.6 : 1
                   }}
@@ -834,7 +834,7 @@ export const AccountingPage: React.FC = () => {
                   disabled={isSubmittingInvoice}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                    padding: '10px 22px', backgroundColor: '#1e4d40', color: '#ffffff',
+                    padding: '10px 22px', backgroundColor: 'var(--brand-fill)', color: '#ffffff',
                     border: 'none', borderRadius: '10px', fontWeight: 700,
                     fontSize: '0.875rem', cursor: isSubmittingInvoice ? 'not-allowed' : 'pointer',
                     boxShadow: '0 2px 8px rgba(30,77,64,0.25)',

@@ -328,7 +328,7 @@ export const PharmacyPage: React.FC = () => {
               position: 'absolute',
               top: '-4px',
               right: '-4px',
-              backgroundColor: '#ef4444',
+              backgroundColor: 'var(--danger)',
               color: 'white',
               fontSize: '0.7rem',
               fontWeight: 700,
@@ -364,7 +364,7 @@ export const PharmacyPage: React.FC = () => {
               alignItems: 'center',
               gap: '8px',
               padding: '10px 20px',
-              backgroundColor: '#1e4d40',
+              backgroundColor: 'var(--brand-fill)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '10px',
@@ -390,7 +390,7 @@ export const PharmacyPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: filterTab === 'all' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterTab === 'all' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterTab === 'all' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -406,7 +406,7 @@ export const PharmacyPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border)',
-              backgroundColor: filterTab === 'critical' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterTab === 'critical' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterTab === 'critical' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -422,7 +422,7 @@ export const PharmacyPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border)',
-              backgroundColor: filterTab === 'expiring' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterTab === 'expiring' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterTab === 'expiring' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -448,7 +448,7 @@ export const PharmacyPage: React.FC = () => {
               backgroundColor: 'var(--bg-secondary)',
               fontSize: '0.825rem',
               color: 'var(--text-primary)',
-              outline: 'none',
+              
               boxSizing: 'border-box'
             }}
           />
@@ -463,7 +463,7 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #1e4d40',
+          borderTop: '4px solid var(--brand-fill)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
@@ -479,12 +479,12 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #ef4444',
+          borderTop: '4px solid var(--danger)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ef4444' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--danger)' }}>
             {criticalCount}
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>
@@ -495,12 +495,12 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #ea580c',
+          borderTop: '4px solid var(--warning-ink)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ea580c' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--warning-ink)' }}>
             {expiringCount}
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>
@@ -511,12 +511,12 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #10b981',
+          borderTop: '4px solid var(--success)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10b981' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success)' }}>
             {avgMarginPct}%
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>
@@ -540,7 +540,7 @@ export const PharmacyPage: React.FC = () => {
           if (med.status === 'Critique') {
             statusBadge = (
               <span style={{
-                backgroundColor: '#ef4444',
+                backgroundColor: 'var(--danger)',
                 color: '#ffffff',
                 padding: '4px 14px',
                 borderRadius: '8px',
@@ -557,7 +557,7 @@ export const PharmacyPage: React.FC = () => {
           } else if (med.status === 'Faible') {
             statusBadge = (
               <span style={{
-                backgroundColor: '#ea580c',
+                backgroundColor: 'var(--warning-ink)',
                 color: '#ffffff',
                 padding: '4px 14px',
                 borderRadius: '8px',
@@ -574,7 +574,7 @@ export const PharmacyPage: React.FC = () => {
           } else {
             statusBadge = (
               <span style={{
-                backgroundColor: '#10b981',
+                backgroundColor: 'var(--success)',
                 color: '#ffffff',
                 padding: '4px 14px',
                 borderRadius: '8px',
@@ -615,8 +615,8 @@ export const PharmacyPage: React.FC = () => {
 
                     {/* Form Tag */}
                     <span style={{
-                      backgroundColor: '#f1f5f9',
-                      color: '#475569',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      color: 'var(--text-secondary)',
                       padding: '2px 8px',
                       borderRadius: '6px',
                       fontSize: '0.725rem',
@@ -628,9 +628,9 @@ export const PharmacyPage: React.FC = () => {
                     {/* Expire bientôt Tag */}
                     {med.near_expiry && (
                       <span style={{
-                        backgroundColor: '#fff7ed',
-                        color: '#ea580c',
-                        border: '1px solid #ffedd5',
+                        backgroundColor: 'var(--warning-surface)',
+                        color: 'var(--warning-ink)',
+                        border: '1px solid var(--warning-surface)',
                         padding: '2px 8px',
                         borderRadius: '6px',
                         fontSize: '0.725rem',
@@ -651,7 +651,7 @@ export const PharmacyPage: React.FC = () => {
                   <div style={{
                     fontSize: '1.75rem',
                     fontWeight: 800,
-                    color: med.status === 'Critique' ? '#ef4444' : med.status === 'Faible' ? '#ea580c' : '#10b981'
+                    color: med.status === 'Critique' ? 'var(--danger)' : med.status === 'Faible' ? 'var(--warning-ink)' : 'var(--success)'
                   }}>
                     {med.stock_quantity}
                   </div>
@@ -697,7 +697,7 @@ export const PharmacyPage: React.FC = () => {
 
                   <div>
                     <span>Marge</span>
-                    <div style={{ fontWeight: 700, color: '#10b981', marginTop: '2px' }}>{med.margin}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--success)', marginTop: '2px' }}>{med.margin}</div>
                   </div>
 
                   <div>
@@ -801,7 +801,7 @@ export const PharmacyPage: React.FC = () => {
                         value={customName}
                         onChange={e => setCustomName(e.target.value)}
                         className="input-control"
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#e6f4ea', border: '1px solid #1e4d40' }}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: 'var(--brand-soft)', border: '1px solid var(--brand-fill)' }}
                         required
                       />
                     </div>
@@ -941,7 +941,7 @@ export const PharmacyPage: React.FC = () => {
                       padding: '10px 12px',
                       borderRadius: '10px',
                       marginTop: '4px',
-                      backgroundColor: 'var(--bg-secondary, #f0f4f2)',
+                      backgroundColor: 'var(--bg-secondary, var(--brand-soft))',
                       border: '1px solid var(--border)',
                       fontSize: '0.9rem',
                       fontWeight: 600,
@@ -1023,7 +1023,7 @@ export const PharmacyPage: React.FC = () => {
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={handleCloseModal} className="btn btn-secondary">Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: '#1e4d40' }}>
+                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: 'var(--brand-fill)' }}>
                   {isSaving ? 'Enregistrement...' : '✓ Enregistrer le produit'}
                 </button>
               </div>
