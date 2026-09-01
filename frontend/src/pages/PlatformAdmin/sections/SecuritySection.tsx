@@ -208,7 +208,7 @@ export const SecuritySection: React.FC = () => {
               <div className="card">
                 <h3 style={{ margin: '0 0 8px', fontSize: '1rem' }}>Derniers échecs</h3>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                  <table style={{ width: '100%', minWidth: '520px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                     <thead>
                       <tr style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
                         <th style={{ padding: '6px 8px' }}>Date</th>
@@ -264,7 +264,7 @@ export const SecuritySection: React.FC = () => {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+            <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
                   <th style={{ padding: '6px 8px' }}>Date</th>
