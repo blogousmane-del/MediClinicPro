@@ -37,7 +37,9 @@ WHERE email IN (
 -- Paramètres > Utilisateurs est l'explication la plus plausible. Son
 -- `password_hash` est identique à celui d'aminata@mediclinic.com, dont le mot
 -- de passe est publié dans CLAUDE.md : le compte se connecte réellement.
--- Rejouer ce script suffit à le refermer.
+-- Refermé le même jour, seconde sonde : les sept sont à `active = 0`.
+-- La leçon tient : cette fermeture peut régresser sans bruit, il faut la
+-- revérifier plutôt que la supposer acquise.
 --
 -- Depuis le correctif du 2026-08-09, middleware/auth.js relit users.active à
 -- chaque requête : la désactivation prend effet immédiatement, sans attendre
