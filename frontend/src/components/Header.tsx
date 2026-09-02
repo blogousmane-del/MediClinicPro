@@ -11,9 +11,9 @@ interface HeaderProps {
 }
 
 const AVAILABILITY_OPTIONS: { value: 'available' | 'busy' | 'away'; label: string; color: string }[] = [
-  { value: 'available', label: 'Disponible', color: 'var(--success, #16a34a)' },
-  { value: 'busy', label: 'Occupé', color: '#f59e0b' },
-  { value: 'away', label: 'Absent', color: '#94a3b8' }
+  { value: 'available', label: 'Disponible', color: 'var(--success)' },
+  { value: 'busy', label: 'Occupé', color: 'var(--warning)' },
+  { value: 'away', label: 'Absent', color: 'var(--text-muted)' }
 ];
 
 interface NotificationItem {
@@ -131,8 +131,8 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
         HTML, la valeur vient d'un champ libre. */}
     {maintenanceMessage && (
       <div style={{
-        backgroundColor: 'var(--warning-light, hsl(38 92% 92%))',
-        color: 'var(--warning-dark, hsl(30 80% 25%))',
+        backgroundColor: 'var(--warning-surface)',
+        color: 'var(--warning-ink)',
         padding: '8px 1.25rem',
         fontSize: '0.82rem',
         lineHeight: 1.4,
@@ -184,7 +184,10 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleSidebar }) => {
           style={{
             fontSize: '1.15rem',
             fontWeight: 600,
-            textTransform: 'capitalize',
+            // Pas de `capitalize` : en français il met une majuscule à chaque
+            // mot, y compris aux articles — « Dépôts De Garantie ». Les titres
+            // arrivent déjà correctement capitalisés depuis App.tsx.
+
             fontFamily: 'var(--font-secondary)',
             margin: 0
           }}

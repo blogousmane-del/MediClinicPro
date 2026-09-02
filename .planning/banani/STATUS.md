@@ -1,6 +1,6 @@
 # Banani implementation status
 
-Last updated: 2026-08-09 (Platform Admin pixel-parity pass — see the entry at the bottom)
+Last updated: 2026-08-11 (aperçu produit sur la landing page — voir l'entrée en bas)
 
 Full import requested by user 2026-07-22 — all 25 pages + 16 shared components. After comparing Banani's mocks against the existing app, most existing pages turned out to already be more capable than Banani's static designs (theme-aware, role-gated, live-data-wired). User decision: light visual/icon polish on existing pages, keep all logic; full builds only for genuinely new/missing content.
 
@@ -227,3 +227,149 @@ rencontrés — des fixtures incomplètes font planter le Dashboard traversé av
 la console et emportent tout l'arbre React (page blanche, barre latérale
 comprise), et le lien d'entrée s'atteint via le bouton `aria-label="Menu
 principal"` sous 900px.
+
+## 2026-08-11 — Aperçu de l'interface sur la Landing Page (Nouveau Rendez-vous)
+Plan : `landing-app-preview.md`.
+
+**Le piège de la sélection périmée s'est reproduit, troisième fois.** La
+sélection Banani pointait encore sur `new_screen11.jsx` + `NewAppointmentMobile.jsx`
+— les mêmes qu'au 2026-08-02, déjà livrés en page applicative
+(`NewAppointmentPage.tsx`). L'utilisateur n'a pas décrit d'écran, seulement
+« ajoute cette page dans mon landing page ». Confirmé par questions groupées
+avant tout code : la sélection était bien voulue, et la forme retenue est un
+**aperçu produit statique**, pas une démo cliquable ni un formulaire public.
+
+Ce que ça donne : nouvelle section `#apercu` dans `LandingPage.tsx`, entre
+`#features` et `#pricing`, contenant une reproduction inerte de l'écran.
+`aria-hidden="true"`, `pointer-events: none`, et **aucun `<button>`/`<a>` à
+l'intérieur** — que des `div`/`span`, donc zéro arrêt de tabulation et zéro CTA
+mort. Aucun appel API ajouté. La vraie page RDV n'est pas touchée.
+
+Palette Banani figée et scopée sur `.app-preview` (préfixe `--ap-*`), même
+procédé que `.terms-page` et `.platform-admin-shell` : la landing est en thème
+clair fixe, la maquette ne suit pas `[data-theme]`.
+
+Chaque maquette est suivie à sa propre largeur, parce que les deux ne montrent
+pas la même chose : sous 1024px, en-tête mobile + champ Date compact + créneaux
+sur 4 colonnes + CTA empilés ; au-dessus, barre latérale + barre du haut +
+mini-calendrier dans un rail de 288px + paire Annuler/Confirmer en en-tête. Les
+libellés diffèrent aussi entre les deux mocks (« Récents » contre « Patients
+récents », « Notes » contre « Notes & motif de consultation ») — bascule par
+`.ap-t-m`/`.ap-t-d`, le CSS ne pouvant pas remplacer du texte.
+
+Écarts assumés :
+1. `DM Sans` (police Banani) non importée — la maquette hérite de
+   `var(--font-primary)`. Une famille Google Fonts pour un seul bloc décoratif
+   alourdirait le bundle que chaque clinique télécharge, souvent en mobile.
+2. Photos générées remplacées par des initiales dans un rond, comme partout
+   ailleurs dans ce dépôt.
+3. Nom de clinique de la barre latérale : « Votre clinique » au lieu du
+   « Clinique Saint-Luc » inventé du mock. L'entrée active passe de « Tableau de
+   bord » à « Rendez-vous » — le mock Banani est incohérent avec lui-même là.
+4. Les noms de patients/médecins du mock sont conservés mais couverts par un
+   badge **« Données d'exemple — patients et médecins fictifs »** affiché dans le
+   flux du texte, au-dessus du cadre. Sans lui, un visiteur lirait ces lignes
+   comme de vrais dossiers.
+
+**Piège CSS rencontré, à retenir.** Les bascules `.ap-desktop-only` /
+`.ap-mobile-only` posent un `display`, mais `.ap-card`/`.ap-btn`/`.ap-ctas` en
+posent un aussi et sont déclarés plus bas dans `index.css` : à spécificité
+égale, la dernière règle gagne, donc les cartes « desktop » restaient visibles à
+375px. Corrigé en préfixant les bascules par `.app-preview`.
+
+Vérifié : `tsc -b`, `oxlint` (aucun avertissement sur `LandingPage.tsx`) et
+`npm run build` propres — bundle principal +0,14 kB gzip. Captures Playwright à
+375/768/1280px, plus trois assertions automatiques par largeur : pas de
+défilement horizontal du document, aucun élément focusable dans `.app-preview`,
+et les bonnes bascules visibles (0 desktop / 3 mobile sous 1024, l'inverse
+au-dessus). Ordre des sections vérifié : `features > apercu > pricing`.
+
+**Méthode de capture, complément à l'entrée du 2026-08-09** : une capture
+`fullPage` sans défilement préalable montre la moitié de la landing vide et fait
+croire à une régression — `.landing-reveal` démarre à `opacity: 0` et n'apparaît
+qu'au passage de l'IntersectionObserver. Faire défiler la page par paliers avant
+la capture.
+
+Non fait, hors périmètre demandé : ajouter « Aperçu » à la barre de navigation
+(actuellement Fonctionnalités / Tarifs).
+
+### 2026-08-11 addendum — audit de la passe ci-dessus
+Passe de mesure Playwright sur 12 largeurs (320 → 1920px) plutôt que les trois
+habituelles, avec assertions programmatiques par largeur : défilement horizontal
+du document, défilement interne de la maquette, et **comptage des enfants dont
+le rectangle sort du cadre** — `.app-preview` porte `overflow: hidden` (pour le
+rayon de bordure), qui masquerait silencieusement un débordement.
+
+**Un vrai défaut trouvé, entre 1024 et ~1150px** : l'en-tête « Nouveau
+rendez-vous » posait un groupe de boutons en `flexShrink: 0` (~285px) face à une
+colonne formulaire de 374px seulement à 1024px (224px de barre latérale + 288px
+de rail + marges mangent le reste). Le titre se coupait sur trois lignes et le
+sous-titre sur un mot par ligne. Invisible aux trois largeurs de contrôle
+usuelles, qui sautent précisément cette zone. Corrigé par `.ap-page-head`
+(`flex-wrap: wrap` + `flex: 1 1 260px` sur le bloc texte) : les boutons passent
+sous le titre au lieu de l'écraser. **À retenir : 375/768/1280 laisse un trou
+entre le point de bascule et la première largeur vérifiée.**
+
+Deux autres corrections issues de l'audit :
+- `.ap-doctors` repasse à 2 colonnes entre 1024 et 1279px — « Dr. Coulibaly A. »
+  se coupait sur trois lignes dans des cartes de 85px. Le mock Banani est dessiné
+  à 1440px, où la question ne se pose pas.
+- `.ap-form-col` gagne `flex: 1`. Elle remplissait déjà, mais par accident : son
+  contenu le plus large dépassait la place disponible, donc elle rétrécissait
+  jusqu'au bord. Raccourcir le sous-titre aurait suffi à ouvrir un vide.
+
+Deux écarts de teinte corrigés : badge « HTA » en `#c2410c` (orange-700 du mock,
+au lieu d'orange-800), et la couleur du texte des avatars passe par une variable
+`--ap-secondary-fg` au lieu d'un hexadécimal en dur — toutes les autres couleurs
+Banani étaient déjà des variables.
+
+Re-vérifié après correction : mêmes 12 largeurs, aucun débordement, aucun
+élément rogné, aucun focusable dans la maquette ; `tsc -b`, `oxlint` (zéro
+avertissement sur `LandingPage.tsx`) et `npm run build` propres.
+
+### 2026-08-11 addendum 2 — second audit (axes non couverts par le premier)
+Le premier audit ne portait que sur la largeur. Celui-ci couvre structure du
+document, mouvement réduit, couleurs forcées, zoom texte navigateur et mot long.
+
+**Corrigé — titre de section rogné à 200 % de taille de police.** Le zoom texte
+du navigateur (distinct du zoom page) porte `#apercu h2` de 36 à 72px : à 375px,
+« l'interface » mesure alors 360px pour 279px disponibles. Le mot dépassait, et
+l'`overflowX: hidden` de la racine de `LandingPage.tsx` le rognait **sans barre
+de défilement pour aller le lire** — invisible à tout contrôle qui ne teste que
+la largeur de fenêtre. `overflowWrap: 'break-word'` ajouté.
+
+**Défaut préexistant repéré au même endroit, non corrigé (hors périmètre) :**
+le « Choisissez votre plan » de `#pricing` déborde plus fort encore (371px pour
+279px) dans les mêmes conditions, pour la même raison. Correctif identique d'une
+ligne — `overflowWrap: 'break-word'` sur ce `h2` — laissé à décider.
+
+Vérifié sain, sans correction nécessaire :
+- Plan du document : `h1` puis `h2` sans saut de niveau. Les 4 `h3` de la
+  maquette sont bien dans le sous-arbre `aria-hidden` et n'entrent pas dans le
+  plan.
+- Mouvement réduit : `.app-preview` s'affiche à `opacity: 1` sans défilement
+  (l'`IntersectionObserver` de `.landing-reveal` ne la laisse pas invisible).
+- Mot très long injecté à 320px : aucun élément ne sort du cadre, aucun
+  débordement de page.
+
+Deux limites acceptées, avec leur raison :
+1. **Couleurs forcées (contraste élevé Windows)** : la mise en page tient et
+   tout reste lisible, mais les états « sélectionné » (médecin, créneau 14:00,
+   patient, priorité Normal) ne se distinguent plus — ils ne reposent que sur
+   une couleur de fond, que ce mode remplace. Sans conséquence : la maquette est
+   décorative et `aria-hidden`, aucune information n'y est portée uniquement par
+   ces états.
+2. **La maquette ne suit pas la taille de police du navigateur** (tout est en px,
+   à dessein — c'est une capture d'écran à échelle fixe ; la passer en rem
+   ferait éclater le rail et la barre latérale, tous deux en px). Rien n'est
+   perdu : ce que la maquette montre est dit en toutes lettres dans le titre et
+   le paragraphe au-dessus, eux en rem.
+
+**Coût mesuré** : la maquette pèse 370 nœuds DOM sur les 828 de la landing, soit
+45 %. À surveiller si la page en gagne d'autres — le public visé est souvent en
+connexion mobile.
+
+**Note SEO** : les 1 254 caractères de la maquette (noms de patients fictifs
+compris) restent indexables — `aria-hidden` masque pour les lecteurs d'écran,
+pas pour les moteurs. Le badge « Données d'exemple » couvre un visiteur humain,
+pas un extrait de résultat de recherche.

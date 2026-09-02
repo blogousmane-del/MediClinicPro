@@ -26,16 +26,6 @@ import {
   X
 } from 'lucide-react';
 
-// Date du jour en toutes lettres, comme le sous-titre de la maquette. Calculée
-// à chaque rendu du module plutôt que figée : la console reste ouverte des
-// heures, mais jamais au point de traverser deux jours sans rechargement.
-const todayLabel = new Date().toLocaleDateString('fr-FR', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric'
-});
-
 interface NewClinicPayload {
   clinicName: string;
   adminName: string;
@@ -221,16 +211,29 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
   };
 
   const handleCreateClinic = async (payload: NewClinicPayload) => {
+    // Seule cette ligne peut échouer d'une façon que le formulaire doit
+    // afficher : c'est elle qui porte les refus de validation.
     await api.post('/platform/clinics', payload);
     showToast('success', 'Clinique créée', `« ${payload.clinicName} » a été enregistrée avec son administrateur.`);
     setShowNewClinic(false);
-    // La nouvelle clinique doit apparaître immédiatement dans la liste, et les
-    // compteurs de la vue d'ensemble s'en trouvent changés : on relit la source
-    // plutôt que d'insérer la ligne à la main dans l'état local.
-    const result = await api.get('/platform/overview');
-    setOverview(result);
-    setPlatformUsers(null);
     setSection('clinics');
+
+    // Relecture séparée, et dans son propre try : la clinique est déjà créée à
+    // ce stade. Laisser une erreur de rechargement remonter au formulaire lui
+    // faisait afficher « La clinique n'a pas pu être créée » — sur un composant
+    // déjà démonté, donc invisible. L'opérateur voyait le succès, une liste
+    // périmée, et son second essai échouait sur « email déjà enregistré ».
+    try {
+      const result = await api.get('/platform/overview');
+      setOverview(result);
+      setPlatformUsers(null);
+    } catch {
+      showToast(
+        'error',
+        'Liste non actualisée',
+        "La clinique est bien créée, mais la liste n'a pas pu être rechargée. Rafraîchissez la page."
+      );
+    }
   };
 
   const handleToggleClinicOverride = async (clinicId: number, unlimited: boolean) => {
@@ -315,6 +318,18 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
   // section en préparation.
   const comingSoonItems: { label: string; icon: React.ElementType }[] = [];
 
+  // Date du jour en toutes lettres, comme le sous-titre de la maquette.
+  // Recalculée à chaque rendu, et surtout PAS au niveau du module : une
+  // constante de module est évaluée une fois au chargement du bundle, et cette
+  // console reste ouverte des heures — après minuit elle affichait la veille.
+  // Un useMemo serait pire encore, il figerait la valeur exprès.
+  const todayLabel = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+
   const sectionTitles: Record<Section, string> = {
     overview: "Vue d'ensemble",
     clinics: 'Cliniques enregistrées',
@@ -333,8 +348,8 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
       <aside className="platform-admin-sidebar" style={{
         width: '240px',
         minHeight: '100vh',
-        backgroundColor: '#243333',
-        color: '#E8EDEC',
+        backgroundColor: 'var(--sidebar-bg)',
+        color: 'var(--sidebar-fg)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -344,7 +359,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
           <div className="platform-admin-sidebar-header" style={{ padding: '1.25rem 1.25rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <img src="/logo-icon.svg" alt="MediClinic" width={28} height={28} />
-              <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#E8EDEC', fontFamily: "'DM Sans', sans-serif" }}>MediClinic</span>
+              <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--sidebar-fg-strong)', fontFamily: 'var(--font-secondary)' }}>MediClinic</span>
             </div>
             <div style={{
               marginTop: '10px',
@@ -352,7 +367,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
               padding: '3px 10px',
               borderRadius: '6px',
               backgroundColor: 'rgba(61, 107, 94, 0.2)',
-              color: '#5FA290',
+              color: 'var(--brand-400)',
               fontSize: '0.7rem',
               fontWeight: 700,
               letterSpacing: '0.04em'
@@ -377,7 +392,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
                     borderRadius: '8px',
                     border: 'none',
                     backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: isActive ? '#E8EDEC' : 'rgba(232,237,236,0.6)',
+                    color: isActive ? 'var(--sidebar-fg-strong)' : 'var(--sidebar-fg)',
                     fontWeight: isActive ? 700 : 500,
                     fontSize: '0.875rem',
                     textAlign: 'left',
@@ -471,7 +486,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
             type="button"
             onClick={() => setShowNewClinic(v => !v)}
             className="page-cta-btn"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: 'none', backgroundColor: '#3D6B5E', color: '#FFFFFF', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'var(--brand-fill-fg)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
           >
             {showNewClinic ? <X size={14} /> : <Plus size={14} />}
             {showNewClinic ? 'Fermer' : 'Nouvelle clinique'}
@@ -600,14 +615,14 @@ const NewClinicForm: React.FC<{
       </div>
 
       {error && (
-        <p style={{ fontSize: '0.8rem', color: '#C0392B', margin: 0 }}>{error}</p>
+        <p style={{ fontSize: '0.8rem', color: 'var(--danger)', margin: 0 }}>{error}</p>
       )}
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <button
           type="submit"
           disabled={submitting}
-          style={{ padding: '9px 16px', borderRadius: '8px', border: 'none', backgroundColor: '#3D6B5E', color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.7 : 1 }}
+          style={{ padding: '9px 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'var(--brand-fill-fg)', fontSize: '0.82rem', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? 0.7 : 1 }}
         >
           {submitting ? 'Création…' : 'Créer la clinique'}
         </button>
@@ -652,13 +667,21 @@ const SystemHealthPanel: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const emailLabels: Record<HealthConfig['email']['channel'], HealthLine> = {
+  const emailLabels: Record<string, HealthLine> = {
     resend: { label: 'E-mail', status: 'Opérationnel — Resend', ok: true },
     smtp: { label: 'E-mail', status: 'Opérationnel — SMTP', ok: true },
     // Aucun email ne part réellement dans ce mode : il est écrit dans les
     // journaux du serveur. C'est exactement l'état « Dégradé » de la maquette.
     console: { label: 'E-mail', status: 'Dégradé — journal console', ok: false }
   };
+
+  // Le canal vient du serveur : c'est une chaîne, pas une garantie. Un
+  // quatrième fournisseur ajouté un jour à platform-config.js rendrait cette
+  // recherche indéfinie, et `line.label` lèverait en plein rendu — sans
+  // périmètre d'erreur au-dessus, toute la console plateforme deviendrait
+  // blanche pour une ligne d'état.
+  const emailLine = (channel: string): HealthLine =>
+    emailLabels[channel] || { label: 'E-mail', status: `Canal inconnu — ${channel}`, ok: false };
 
   const lines: HealthLine[] = config
     ? [
@@ -669,7 +692,7 @@ const SystemHealthPanel: React.FC = () => {
           status: config.database.connected ? 'Opérationnel' : 'Injoignable',
           ok: config.database.connected
         },
-        emailLabels[config.email.channel],
+        emailLine(config.email.channel),
         {
           label: 'Limitation de débit',
           status: config.rateLimit.backend === 'redis'
@@ -706,11 +729,11 @@ const SystemHealthPanel: React.FC = () => {
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                backgroundColor: line.ok ? '#3D8A6A' : '#D4813A',
+                backgroundColor: line.ok ? 'var(--success)' : 'var(--warning)',
                 flexShrink: 0,
                 marginTop: '5px'
               }} />
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: line.ok ? '#3D8A6A' : '#D4813A', textAlign: 'right' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: line.ok ? 'var(--success)' : 'var(--warning)', textAlign: 'right' }}>
                 {line.status}
               </span>
             </div>
@@ -782,7 +805,7 @@ const OverviewSection: React.FC<{
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                 <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</span>
                 <div className="stat-icon-box">
-                  <Icon size={15} color="#3D6B5E" />
+                  <Icon size={15} color="var(--primary)" />
                 </div>
               </div>
               {/* Valeur et unité séparées, comme dans la maquette : le montant
@@ -793,7 +816,7 @@ const OverviewSection: React.FC<{
                 {s.unit && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', paddingBottom: '2px' }}>{s.unit}</span>}
               </div>
               {s.delta && (
-                <span style={{ fontSize: '0.7rem', color: '#3D6B5E', fontWeight: 600 }}>{s.delta}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>{s.delta}</span>
               )}
             </div>
           );
@@ -812,7 +835,7 @@ const OverviewSection: React.FC<{
               <button
                 type="button"
                 onClick={onViewClinics}
-                style={{ background: 'none', border: 'none', color: '#3D6B5E', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0, flexShrink: 0 }}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0, flexShrink: 0 }}
               >
                 Voir toutes ({clinics.length}) →
               </button>
@@ -834,7 +857,7 @@ const OverviewSection: React.FC<{
                 {expiringSoon.map(c => (
                   <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                     <span>{c.name}</span>
-                    <span style={{ color: 'var(--warning, #d4813a)', fontWeight: 600 }}>{formatDate(c.subscriptionExpiresAt)}</span>
+                    <span style={{ color: 'var(--warning, var(--warning))', fontWeight: 600 }}>{formatDate(c.subscriptionExpiresAt)}</span>
                   </div>
                 ))}
               </div>
@@ -866,7 +889,7 @@ const OverviewSection: React.FC<{
             )}
             <button
               onClick={onViewTickets}
-              style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#3D6B5E', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
             >
               Voir tous les tickets →
             </button>
@@ -911,9 +934,13 @@ const clinicStatusBadge = (c: { status: 'active' | 'expired'; suspended?: boolea
     : { label: 'Expiré', className: 'badge-danger' };
 };
 
+// minWidth sur chaque tableau : sans plancher, un tableau en width:100% se
+// tasse jusqu'à sa largeur mini-contenu et les cellules se coupent en colonnes
+// d'un mot par ligne. Avec le plancher, .table-container fait ce pour quoi il
+// est là — un défilement horizontal — et les colonnes restent lisibles.
 const ClinicsTable: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
   <div className="table-container">
-    <table style={{ width: '100%' }}>
+    <table className="platform-table" style={{ width: '100%', minWidth: '620px' }}>
       <thead>
         <tr>
           <th>Clinique</th>
@@ -931,15 +958,15 @@ const ClinicsTable: React.FC<{ clinics: ClinicOverview[] }> = ({ clinics }) => (
               <strong>{c.name}</strong>
               {c.address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.address}</div>}
             </td>
-            <td>
+            <td data-label="Plan">
               <span className={`badge ${planBadges[c.plan] || 'badge-info'}`}>{planLabels[c.plan] || c.plan}</span>
             </td>
-            <td style={{ textAlign: 'center' }}>{c.practitioners}</td>
-            <td style={{ textAlign: 'center' }}>{c.patients}</td>
-            <td>
+            <td data-label="Praticiens" style={{ textAlign: 'center' }}>{c.practitioners}</td>
+            <td data-label="Patients" style={{ textAlign: 'center' }}>{c.patients}</td>
+            <td data-label="Statut">
               <span className={`badge ${clinicStatusBadge(c).className}`}>{clinicStatusBadge(c).label}</span>
             </td>
-            <td>{formatDate(c.createdAt)}</td>
+            <td data-label="Inscrite le">{formatDate(c.createdAt)}</td>
           </tr>
         ))}
         {clinics.length === 0 && (
@@ -995,7 +1022,7 @@ const ClinicsSection: React.FC<{
               style={{
                 padding: '6px 14px',
                 border: '1px solid var(--border)',
-                backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
+                backgroundColor: statusFilter === p.value ? 'var(--primary)' : 'var(--bg-secondary)',
                 color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
                 fontSize: '0.8rem',
                 fontWeight: 700,
@@ -1010,7 +1037,7 @@ const ClinicsSection: React.FC<{
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="table-container">
-          <table style={{ width: '100%' }}>
+          <table className="platform-table" style={{ width: '100%', minWidth: '860px' }}>
             <thead>
               <tr>
                 <th>Clinique</th>
@@ -1033,13 +1060,13 @@ const ClinicsSection: React.FC<{
                         <strong>{c.name}</strong>
                         {c.address && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.address}</div>}
                       </td>
-                      <td><span className={`badge ${planBadges[c.plan] || 'badge-info'}`}>{planLabels[c.plan] || c.plan}</span></td>
-                      <td style={{ textAlign: 'center' }}>{c.practitioners}</td>
-                      <td style={{ textAlign: 'center' }}>{c.patients}</td>
-                      <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
-                      <td>{c.unlimitedStaff && <span className="badge badge-success">Illimité</span>}</td>
-                      <td>{formatDate(c.createdAt)}</td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td data-label="Plan"><span className={`badge ${planBadges[c.plan] || 'badge-info'}`}>{planLabels[c.plan] || c.plan}</span></td>
+                      <td data-label="Praticiens" style={{ textAlign: 'center' }}>{c.practitioners}</td>
+                      <td data-label="Patients" style={{ textAlign: 'center' }}>{c.patients}</td>
+                      <td data-label="Statut"><span className={`badge ${badge.className}`}>{badge.label}</span></td>
+                      <td data-label="Personnel">{c.unlimitedStaff && <span className="badge badge-success">Illimité</span>}</td>
+                      <td data-label="Inscrite le">{formatDate(c.createdAt)}</td>
+                      <td data-label="" style={{ textAlign: 'right' }}>
                         <button
                           onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
                           className="btn btn-outline"
@@ -1157,7 +1184,7 @@ const UsersSection: React.FC<{
               style={{
                 padding: '6px 14px',
                 border: '1px solid var(--border)',
-                backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
+                backgroundColor: statusFilter === p.value ? 'var(--primary)' : 'var(--bg-secondary)',
                 color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
                 fontSize: '0.8rem',
                 fontWeight: 700,
@@ -1172,7 +1199,7 @@ const UsersSection: React.FC<{
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="table-container">
-          <table style={{ width: '100%' }}>
+          <table className="platform-table" style={{ width: '100%', minWidth: '760px' }}>
             <thead>
               <tr>
                 <th>Nom</th>
@@ -1187,15 +1214,15 @@ const UsersSection: React.FC<{
               {filtered.map(u => (
                 <tr key={u.id}>
                   <td><strong>{u.name}</strong></td>
-                  <td>{u.email}</td>
-                  <td>{roleLabels[u.role] || u.role}</td>
-                  <td>{u.clinicName}</td>
-                  <td>
+                  <td data-label="Email">{u.email}</td>
+                  <td data-label="Rôle">{roleLabels[u.role] || u.role}</td>
+                  <td data-label="Clinique">{u.clinicName}</td>
+                  <td data-label="Statut">
                     <span className={`badge ${u.active ? 'badge-success' : 'badge-danger'}`}>
                       {u.active ? 'Actif' : 'Inactif'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td data-label="" style={{ textAlign: 'right' }}>
                     {u.id !== currentUserId && (
                       <button
                         onClick={() => onToggleActive(u.id, !u.active)}
@@ -1251,11 +1278,11 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
               <button
                 key={p.value}
                 onClick={() => setStatusFilter(p.value)}
+                className="filter-pill"
                 style={{
                   padding: '6px 14px',
-                  borderRadius: '999px',
                   border: '1px solid var(--border)',
-                  backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
+                  backgroundColor: statusFilter === p.value ? 'var(--primary)' : 'var(--bg-secondary)',
                   color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
                   fontSize: '0.8rem',
                   fontWeight: 700,
@@ -1268,7 +1295,7 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
           </div>
         </div>
         <div className="table-container">
-          <table style={{ width: '100%' }}>
+          <table className="platform-table" style={{ width: '100%' }}>
             <thead>
               <tr>
                 <th>Clinique</th>
@@ -1280,12 +1307,12 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
               {filteredClinics.map(c => (
                 <tr key={c.id}>
                   <td><strong>{c.name}</strong></td>
-                  <td>
+                  <td data-label="Statut">
                     <span className={`badge ${c.subscriptionStatus === 'expired' ? 'badge-danger' : 'badge-success'}`}>
                       {c.subscriptionStatus === 'expired' ? 'Expiré' : 'Actif'}
                     </span>
                   </td>
-                  <td>{formatDate(c.subscriptionExpiresAt)}</td>
+                  <td data-label="Expire le">{formatDate(c.subscriptionExpiresAt)}</td>
                 </tr>
               ))}
               {filteredClinics.length === 0 && (
@@ -1301,7 +1328,7 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
           <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Historique des paiements d'abonnement</h2>
         </div>
         <div className="table-container">
-          <table style={{ width: '100%' }}>
+          <table className="platform-table" style={{ width: '100%', minWidth: '720px' }}>
             <thead>
               <tr>
                 <th>Clinique</th>
@@ -1315,12 +1342,12 @@ const SubscriptionsSection: React.FC<{ data: SubscriptionsData | null }> = ({ da
             <tbody>
               {data.payments.map(p => (
                 <tr key={p.id}>
-                  <td>{p.clinicName}</td>
-                  <td>{p.months} mois</td>
-                  <td>{p.amount.toLocaleString()} FCFA</td>
-                  <td style={{ textTransform: 'capitalize' }}>{p.provider}</td>
-                  <td><span className={`badge ${statusBadges[p.status] || 'badge-info'}`}>{statusLabels[p.status] || p.status}</span></td>
-                  <td>{formatDate(p.paidAt || p.createdAt)}</td>
+                  <td><strong>{p.clinicName}</strong></td>
+                  <td data-label="Durée">{p.months} mois</td>
+                  <td data-label="Montant">{p.amount.toLocaleString()} FCFA</td>
+                  <td data-label="Fournisseur" style={{ textTransform: 'capitalize' }}>{p.provider}</td>
+                  <td data-label="Statut"><span className={`badge ${statusBadges[p.status] || 'badge-info'}`}>{statusLabels[p.status] || p.status}</span></td>
+                  <td data-label="Date">{formatDate(p.paidAt || p.createdAt)}</td>
                 </tr>
               ))}
               {data.payments.length === 0 && (
@@ -1368,7 +1395,7 @@ const TicketsSection: React.FC<{
             style={{
               padding: '6px 14px',
               border: '1px solid var(--border)',
-              backgroundColor: statusFilter === p.value ? '#3D6B5E' : 'var(--bg-secondary)',
+              backgroundColor: statusFilter === p.value ? 'var(--primary)' : 'var(--bg-secondary)',
               color: statusFilter === p.value ? '#ffffff' : 'var(--text-secondary)',
               fontSize: '0.8rem',
               fontWeight: 700,
@@ -1382,7 +1409,7 @@ const TicketsSection: React.FC<{
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="table-container">
-          <table style={{ width: '100%' }}>
+          <table className="platform-table" style={{ width: '100%', minWidth: '720px' }}>
             <thead>
               <tr>
                 <th>Sujet</th>
@@ -1401,11 +1428,11 @@ const TicketsSection: React.FC<{
                 <React.Fragment key={`${t.id}-${t.status}`}>
                   <tr>
                     <td><strong>{t.subject}</strong></td>
-                    <td>{t.clinicName}</td>
-                    <td>{ticketCategoryLabels[t.category] || t.category}</td>
-                    <td><span className={`badge ${ticketStatusBadges[t.status] || 'badge-info'}`}>{ticketStatusLabels[t.status] || t.status}</span></td>
-                    <td>{formatDate(t.createdAt)}</td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td data-label="Clinique">{t.clinicName}</td>
+                    <td data-label="Catégorie">{ticketCategoryLabels[t.category] || t.category}</td>
+                    <td data-label="Statut"><span className={`badge ${ticketStatusBadges[t.status] || 'badge-info'}`}>{ticketStatusLabels[t.status] || t.status}</span></td>
+                    <td data-label="Créé le">{formatDate(t.createdAt)}</td>
+                    <td data-label="" style={{ textAlign: 'right' }}>
                       <button
                         onClick={() => { setExpandedId(expandedId === t.id ? null : t.id); setNoteDraft(t.resolutionNote || ''); }}
                         className="btn btn-outline"

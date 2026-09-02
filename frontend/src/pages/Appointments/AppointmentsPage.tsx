@@ -385,7 +385,7 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({ triggerOpenM
                 {/* Avatar */}
                 <div style={{
                   width: '48px', height: '48px', borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--primary-light, #e6f4ea)', color: 'var(--primary)',
+                  backgroundColor: 'var(--primary-light, var(--brand-soft))', color: 'var(--primary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 800, fontSize: '1.1rem', flexShrink: 0
                 }}>

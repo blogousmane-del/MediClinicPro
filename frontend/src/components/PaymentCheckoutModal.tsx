@@ -124,7 +124,7 @@ export const PaymentCheckoutModal: React.FC<PaymentCheckoutModalProps> = ({
           )}
           {state === 'paid' && (
             <>
-              <CheckCircle2 size={40} style={{ color: 'var(--success, #10b981)', marginBottom: '1rem' }} />
+              <CheckCircle2 size={40} style={{ color: 'var(--success, var(--success))', marginBottom: '1rem' }} />
               <p style={{ fontWeight: 700 }}>Paiement confirmé</p>
             </>
           )}

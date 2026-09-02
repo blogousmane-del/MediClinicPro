@@ -47,10 +47,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }}>
         {toasts.map(toast => {
           const colors = {
-            success: { bg: '#e6f4ea', border: '#10b981', color: '#065f46' },
-            error: { bg: '#fce8e6', border: '#ef4444', color: '#c5221f' },
-            warning: { bg: '#fef7e0', border: '#f59e0b', color: '#b06000' },
-            info: { bg: '#e8f0fe', border: '#3b82f6', color: '#174ea6' }
+            success: { bg: 'var(--brand-soft)', border: 'var(--success)', color: 'var(--brand-soft-ink)' },
+            error: { bg: 'var(--danger-surface)', border: 'var(--danger)', color: 'var(--danger)' },
+            warning: { bg: 'var(--warning-surface)', border: 'var(--warning)', color: 'var(--warning-ink)' },
+            info: { bg: 'var(--info-surface)', border: 'var(--info)', color: 'var(--info-ink)' }
           }[toast.type];
 
           return (

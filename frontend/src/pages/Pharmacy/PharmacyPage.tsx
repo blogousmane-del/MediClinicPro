@@ -6,7 +6,6 @@ import { SkeletonCards } from '../../components/Skeleton';
 import {
   Search,
   Plus,
-  Bell,
   AlertTriangle,
   CheckCircle2,
   MoreHorizontal,
@@ -114,13 +113,13 @@ export const PharmacyPage: React.FC = () => {
   const [form, setForm] = useState<string>('Comprimé');
   const [manufacturer, setManufacturer] = useState<string>('');
   const [unit, setUnit] = useState<string>('');
-  const [quantity, setQuantity] = useState<string>('50');
+  const [quantity, setQuantity] = useState<string>('');
   const [minStockThreshold, setMinStockThreshold] = useState<string>('10');
-  const [pricePurchase, setPricePurchase] = useState<string>('850');
-  const [priceSale, setPriceSale] = useState<string>('1200');
-  const [expiryDate, setExpiryDate] = useState<string>('2026-12-31');
-  const [batchNumber, setBatchNumber] = useState<string>('U3KFJT');
-  const [supplier, setSupplier] = useState<string>('Pharmaliv');
+  const [pricePurchase, setPricePurchase] = useState<string>('');
+  const [priceSale, setPriceSale] = useState<string>('');
+  const [expiryDate, setExpiryDate] = useState<string>('');
+  const [batchNumber, setBatchNumber] = useState<string>('');
+  const [supplier, setSupplier] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [editingCurrentStock, setEditingCurrentStock] = useState<number>(0);
 
@@ -161,9 +160,9 @@ export const PharmacyPage: React.FC = () => {
       setMinStockThreshold(medItem.min_stock_threshold != null ? medItem.min_stock_threshold.toString() : '10');
       setPricePurchase(medItem.price_purchase ? medItem.price_purchase.toString() : '850');
       setPriceSale(medItem.price_sale ? medItem.price_sale.toString() : '1200');
-      setExpiryDate(medItem.expiry || '2026-12-31');
-      setBatchNumber(medItem.ref ? medItem.ref.replace('#', '') : 'U3KFJT');
-      setSupplier(medItem.supplier || 'Pharmaliv');
+      setExpiryDate(medItem.expiry || '');
+      setBatchNumber(medItem.ref && medItem.ref !== 'N/A' ? medItem.ref.replace('#', '') : '');
+      setSupplier(medItem.supplier || '');
     } else {
       setEditingMedId(null);
       setEditingCurrentStock(0);
@@ -173,13 +172,13 @@ export const PharmacyPage: React.FC = () => {
       setForm('Comprimé');
       setManufacturer('');
       setUnit('');
-      setQuantity('50');
+      setQuantity('');
       setMinStockThreshold('10');
-      setPricePurchase('850');
-      setPriceSale('1200');
-      setExpiryDate('2026-12-31');
-      setBatchNumber('U3KFJT');
-      setSupplier('Pharmaliv');
+      setPricePurchase('');
+      setPriceSale('');
+      setExpiryDate('');
+      setBatchNumber('');
+      setSupplier('');
     }
     setIsModalOpen(true);
   };
@@ -214,9 +213,11 @@ export const PharmacyPage: React.FC = () => {
         minStockThreshold: minStockThreshold ? parseInt(minStockThreshold) : 10,
         pricePurchase: parseFloat(pricePurchase),
         priceSale: parseFloat(priceSale),
-        expiryDate: expiryDate || '2026-12-31',
-        batchNumber: batchNumber || 'U3KFJT',
-        supplier: supplier || 'Pharmaliv'
+        // Aucun repli inventé : un lot et une péremption faux valent moins
+        // que rien du tout sur une fiche de stock.
+        expiryDate: expiryDate || null,
+        batchNumber: batchNumber || null,
+        supplier: supplier || null
       };
 
       await api.post('/pharmacy/replenish', payload);
@@ -249,13 +250,12 @@ export const PharmacyPage: React.FC = () => {
       form: m.form || 'Comprimé',
       ref: m.batch_number ? `#${m.batch_number}` : 'N/A',
       supplier: m.supplier || 'Non renseigné',
-      packaging: 'Boîte standard',
+      unit: m.unit || '',
       stock_min: m.min_stock_threshold,
       price_purchase: m.price_purchase,
       price_sale: m.price_sale,
       margin: `${marginPct}%`,
       expiry: m.expiry_date ? m.expiry_date.split('T')[0] : null,
-      replenish_time: 'Récemment',
       stock_quantity: m.stock_quantity,
       status,
       near_expiry: nearExpiry
@@ -264,7 +264,12 @@ export const PharmacyPage: React.FC = () => {
 
   // Filter items based on tab & search
   const filteredItems = itemsToRender.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.supplier.toLowerCase().includes(search.toLowerCase());
+    // `supplier` est nullable en base (supabase_schema.sql:116) : les lignes
+    // créées avant que POST /pharmacy/medications ne force '' peuvent le
+    // renvoyer à null, et `null.toLowerCase()` faisait planter la page entière,
+    // pas seulement la recherche.
+    const haystack = `${item.name || ''} ${item.supplier || ''}`.toLowerCase();
+    const matchesSearch = haystack.includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (filterTab === 'critical') return item.status === 'Critique' || item.status === 'Faible';
     if (filterTab === 'expiring') return item.near_expiry;
@@ -281,75 +286,12 @@ export const PharmacyPage: React.FC = () => {
   return (
     <div className="app-page">
       
-      {/* 1. Header Breadcrumb matching Image 2 */}
+      {/* En-tête de page : un seul titre, et rien de décoratif. */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
-            Gestion de la pharmacie
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-            Lundi 14 juillet 2025
-          </p>
-        </div>
-
-        <div className="page-header-actions">
-          <div className="page-search-box">
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Rechercher un patient..."
-              className="input-control"
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                fontSize: '0.85rem'
-              }}
-            />
-          </div>
-
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)'
-            }}>
-              <Bell size={18} />
-            </div>
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--bg-primary)'
-            }}>3</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Main Title & Action Button matching Image 2 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
             Inventaire pharmacie
-          </h2>
+          </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
             {itemsToRender.length} articles · Valeur stock : {totalStockValue.toLocaleString()} FCFA
           </p>
@@ -364,7 +306,7 @@ export const PharmacyPage: React.FC = () => {
               alignItems: 'center',
               gap: '8px',
               padding: '10px 20px',
-              backgroundColor: '#1e4d40',
+              backgroundColor: 'var(--brand-fill)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '10px',
@@ -390,7 +332,7 @@ export const PharmacyPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: filterTab === 'all' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterTab === 'all' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterTab === 'all' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -406,7 +348,7 @@ export const PharmacyPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border)',
-              backgroundColor: filterTab === 'critical' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterTab === 'critical' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterTab === 'critical' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -422,7 +364,7 @@ export const PharmacyPage: React.FC = () => {
               padding: '6px 16px',
               borderRadius: '8px',
               border: '1px solid var(--border)',
-              backgroundColor: filterTab === 'expiring' ? '#1e4d40' : 'var(--bg-secondary)',
+              backgroundColor: filterTab === 'expiring' ? 'var(--brand-fill)' : 'var(--bg-secondary)',
               color: filterTab === 'expiring' ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -448,7 +390,7 @@ export const PharmacyPage: React.FC = () => {
               backgroundColor: 'var(--bg-secondary)',
               fontSize: '0.825rem',
               color: 'var(--text-primary)',
-              outline: 'none',
+              
               boxSizing: 'border-box'
             }}
           />
@@ -463,7 +405,7 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #1e4d40',
+          borderTop: '4px solid var(--brand-fill)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
@@ -479,12 +421,12 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #ef4444',
+          borderTop: '4px solid var(--danger)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ef4444' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--danger)' }}>
             {criticalCount}
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>
@@ -495,12 +437,12 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #ea580c',
+          borderTop: '4px solid var(--warning-ink)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ea580c' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--warning-ink)' }}>
             {expiringCount}
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>
@@ -511,12 +453,12 @@ export const PharmacyPage: React.FC = () => {
         <div style={{
           backgroundColor: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
-          borderTop: '4px solid #10b981',
+          borderTop: '4px solid var(--success)',
           borderRadius: '14px',
           padding: '1.25rem 1.5rem',
           boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10b981' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success)' }}>
             {avgMarginPct}%
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 600 }}>
@@ -540,7 +482,7 @@ export const PharmacyPage: React.FC = () => {
           if (med.status === 'Critique') {
             statusBadge = (
               <span style={{
-                backgroundColor: '#ef4444',
+                backgroundColor: 'var(--danger)',
                 color: '#ffffff',
                 padding: '4px 14px',
                 borderRadius: '8px',
@@ -557,7 +499,7 @@ export const PharmacyPage: React.FC = () => {
           } else if (med.status === 'Faible') {
             statusBadge = (
               <span style={{
-                backgroundColor: '#ea580c',
+                backgroundColor: 'var(--warning-ink)',
                 color: '#ffffff',
                 padding: '4px 14px',
                 borderRadius: '8px',
@@ -574,7 +516,7 @@ export const PharmacyPage: React.FC = () => {
           } else {
             statusBadge = (
               <span style={{
-                backgroundColor: '#10b981',
+                backgroundColor: 'var(--success)',
                 color: '#ffffff',
                 padding: '4px 14px',
                 borderRadius: '8px',
@@ -615,8 +557,8 @@ export const PharmacyPage: React.FC = () => {
 
                     {/* Form Tag */}
                     <span style={{
-                      backgroundColor: '#f1f5f9',
-                      color: '#475569',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      color: 'var(--text-secondary)',
                       padding: '2px 8px',
                       borderRadius: '6px',
                       fontSize: '0.725rem',
@@ -628,9 +570,9 @@ export const PharmacyPage: React.FC = () => {
                     {/* Expire bientôt Tag */}
                     {med.near_expiry && (
                       <span style={{
-                        backgroundColor: '#fff7ed',
-                        color: '#ea580c',
-                        border: '1px solid #ffedd5',
+                        backgroundColor: 'var(--warning-surface)',
+                        color: 'var(--warning-ink)',
+                        border: '1px solid var(--warning-surface)',
                         padding: '2px 8px',
                         borderRadius: '6px',
                         fontSize: '0.725rem',
@@ -642,7 +584,7 @@ export const PharmacyPage: React.FC = () => {
                   </div>
 
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                    {med.supplier} · {med.packaging} · Réf. {med.ref}
+                    {med.supplier}{med.unit ? ` · ${med.unit}` : ''} · Réf. {med.ref}
                   </p>
                 </div>
 
@@ -651,7 +593,7 @@ export const PharmacyPage: React.FC = () => {
                   <div style={{
                     fontSize: '1.75rem',
                     fontWeight: 800,
-                    color: med.status === 'Critique' ? '#ef4444' : med.status === 'Faible' ? '#ea580c' : '#10b981'
+                    color: med.status === 'Critique' ? 'var(--danger)' : med.status === 'Faible' ? 'var(--warning-ink)' : 'var(--success)'
                   }}>
                     {med.stock_quantity}
                   </div>
@@ -697,17 +639,12 @@ export const PharmacyPage: React.FC = () => {
 
                   <div>
                     <span>Marge</span>
-                    <div style={{ fontWeight: 700, color: '#10b981', marginTop: '2px' }}>{med.margin}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--success)', marginTop: '2px' }}>{med.margin}</div>
                   </div>
 
                   <div>
                     <span>Expiration</span>
                     <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>{med.expiry}</div>
-                  </div>
-
-                  <div>
-                    <span>Réappro.</span>
-                    <div style={{ fontWeight: 700, color: 'var(--text-muted)', marginTop: '2px' }}>{med.replenish_time}</div>
                   </div>
                 </div>
 
@@ -801,7 +738,7 @@ export const PharmacyPage: React.FC = () => {
                         value={customName}
                         onChange={e => setCustomName(e.target.value)}
                         className="input-control"
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#e6f4ea', border: '1px solid #1e4d40' }}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: 'var(--brand-soft)', border: '1px solid var(--brand-fill)' }}
                         required
                       />
                     </div>
@@ -941,7 +878,7 @@ export const PharmacyPage: React.FC = () => {
                       padding: '10px 12px',
                       borderRadius: '10px',
                       marginTop: '4px',
-                      backgroundColor: 'var(--bg-secondary, #f0f4f2)',
+                      backgroundColor: 'var(--bg-secondary, var(--brand-soft))',
                       border: '1px solid var(--border)',
                       fontSize: '0.9rem',
                       fontWeight: 600,
@@ -1023,7 +960,7 @@ export const PharmacyPage: React.FC = () => {
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={handleCloseModal} className="btn btn-secondary">Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: '#1e4d40' }}>
+                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ backgroundColor: 'var(--brand-fill)' }}>
                   {isSaving ? 'Enregistrement...' : '✓ Enregistrer le produit'}
                 </button>
               </div>

@@ -10,7 +10,6 @@ import {
   Eye,
   Pencil,
   Trash2,
-  Bell,
   Check,
   X,
   User,
@@ -18,7 +17,6 @@ import {
   FileText,
   Lightbulb,
   ChevronRight,
-  ChevronLeft,
   Info
 } from 'lucide-react';
 
@@ -39,9 +37,9 @@ interface Patient {
 }
 
 const AVAILABILITY_META: Record<string, { label: string; color: string }> = {
-  available: { label: 'Disponible', color: 'var(--success, #16a34a)' },
-  busy: { label: 'Occupé', color: '#f59e0b' },
-  away: { label: 'Absent', color: '#94a3b8' }
+  available: { label: 'Disponible', color: 'var(--success, var(--success))' },
+  busy: { label: 'Occupé', color: 'var(--warning)' },
+  away: { label: 'Absent', color: 'var(--text-muted)' }
 };
 
 interface PatientsPageProps {
@@ -239,74 +237,12 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
   if (isCreating) {
     return (
       <div className="app-page">
-        {/* Top Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)', color: 'var(--text-primary)', margin: 0 }}>
-              Ajouter un patient
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-              Lundi 14 juillet 2025
-            </p>
-          </div>
 
-          <div className="page-header-actions">
-            <div className="page-search-box">
-              <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                type="text"
-                placeholder="Rechercher un patient..."
-                className="input-control"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 36px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  backgroundColor: 'var(--bg-secondary)',
-                  fontSize: '0.85rem'
-                }}
-              />
-            </div>
-
-            <div style={{ position: 'relative', cursor: 'pointer' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-secondary)'
-              }}>
-                <Bell size={18} />
-              </div>
-              <span style={{
-                position: 'absolute',
-                top: '-4px',
-                right: '-4px',
-                backgroundColor: '#ef4444',
-                color: 'white',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                width: '18px',
-                height: '18px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid var(--bg-primary)'
-              }}>3</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Title Banner */}
+        {/* En-tête du formulaire : un seul titre. */}
         <div>
-          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
             Nouveau patient
-          </h2>
+          </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px' }}>
             Enregistrer un patient dans votre clinique
           </p>
@@ -314,18 +250,18 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
 
         {/* Info Alert Box */}
         <div style={{
-          backgroundColor: '#e6f4ea',
-          border: '1px solid #bbf7d0',
+          backgroundColor: 'var(--brand-soft)',
+          border: '1px solid var(--brand-line)',
           borderRadius: '12px',
           padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          color: '#1e4d40',
+          color: 'var(--brand-soft-ink)',
           fontSize: '0.85rem',
           fontWeight: 500
         }}>
-          <Info size={18} color="#1e4d40" style={{ flexShrink: 0 }} />
+          <Info size={18} color="var(--brand-fill)" style={{ flexShrink: 0 }} />
           <span>Les informations de base permettront à l'équipe de retrouver rapidement le patient et de gérer ses consultations.</span>
         </div>
 
@@ -337,25 +273,25 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
               {/* Identité */}
               <div style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
-                  <User size={18} color="#1e4d40" />
+                  <User size={18} color="var(--brand-fill)" />
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Identité</h3>
                 </div>
 
                 <div className="grid-cols-2" style={{ gap: '1rem', marginBottom: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>PRÉNOM</label>
-                    <input type="text" placeholder="ex. : Kouassi" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} required />
+                    <input type="text" placeholder="ex. : Kouassi" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', boxSizing: 'border-box' }} required />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>NOM</label>
-                    <input type="text" placeholder="ex. : Adjobi" value={lastName} onChange={(e) => setLastName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} required />
+                    <input type="text" placeholder="ex. : Adjobi" value={lastName} onChange={(e) => setLastName(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', boxSizing: 'border-box' }} required />
                   </div>
                 </div>
 
                 <div className="grid-cols-2" style={{ gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>GENRE</label>
-                    <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}>
+                    <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', boxSizing: 'border-box' }}>
                       <option value="">Sélectionner</option>
                       <option value="M">Masculin</option>
                       <option value="F">Féminin</option>
@@ -363,7 +299,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>DATE DE NAISSANCE</label>
-                    <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                    <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
                   </div>
                 </div>
               </div>
@@ -371,7 +307,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
               {/* Contact */}
               <div style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
-                  <Phone size={18} color="#1e4d40" />
+                  <Phone size={18} color="var(--brand-fill)" />
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Contact</h3>
                 </div>
 
@@ -382,36 +318,36 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>EMAIL (OPTIONNEL)</label>
-                    <input type="email" placeholder="email@exemple.ci" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                    <input type="email" placeholder="email@exemple.ci" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
                   </div>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>ADRESSE</label>
-                  <input type="text" placeholder="ex. : Abidjan, Cocody" value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                  <input type="text" placeholder="ex. : Abidjan, Cocody" value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
               {/* Antécédents médicaux */}
               <div style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '16px', padding: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
-                  <FileText size={18} color="#1e4d40" />
+                  <FileText size={18} color="var(--brand-fill)" />
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Antécédents médicaux</h3>
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>NUMÉRO DE DOSSIER (OPTIONNEL)</label>
-                  <input type="text" placeholder="ex. : DOSS-2025-001" value={customFolderNum} onChange={(e) => setCustomFolderNum(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+                  <input type="text" placeholder="ex. : DOSS-2025-001" value={customFolderNum} onChange={(e) => setCustomFolderNum(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>ALLERGIES (OPTIONNEL)</label>
-                  <textarea placeholder="Lister les allergies connues..." value={allergies} onChange={(e) => setAllergies(e.target.value)} rows={2} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                  <textarea placeholder="Lister les allergies connues..." value={allergies} onChange={(e) => setAllergies(e.target.value)} rows={2} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', resize: 'none', boxSizing: 'border-box' }} />
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>NOTES (OPTIONNEL)</label>
-                  <textarea placeholder="Autres informations importantes..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                  <textarea placeholder="Autres informations importantes..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)', fontSize: '0.9rem', color: 'var(--text-primary)', resize: 'none', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
@@ -424,7 +360,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    backgroundColor: '#1e4d40',
+                    backgroundColor: 'var(--brand-fill)',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '10px',
@@ -472,9 +408,9 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#e6f4ea', border: '1px solid #bbf7d0', borderRadius: '16px', padding: '1.5rem', color: '#1e4d40' }}>
+              <div style={{ backgroundColor: 'var(--brand-soft)', border: '1px solid var(--brand-line)', borderRadius: '16px', padding: '1.5rem', color: 'var(--brand-soft-ink)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
-                  <Lightbulb size={18} color="#1e4d40" />
+                  <Lightbulb size={18} color="var(--brand-fill)" />
                   <span>Conseil</span>
                 </div>
                 <p style={{ fontSize: '0.825rem', lineHeight: 1.5, margin: 0, opacity: 0.9 }}>
@@ -507,7 +443,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
   return (
     <div className="app-page">
 
-      {/* 1. Header / Breadcrumb matching Image 1 */}
+
+      {/* En-tête de page : un seul titre, et la recherche qui marche. */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -516,90 +453,11 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
         gap: '1rem'
       }}>
         <div>
-          <h1 style={{
-            fontSize: '1.35rem',
-            fontWeight: 700,
-            fontFamily: 'var(--font-secondary)',
-            color: 'var(--text-primary)',
-            margin: 0
-          }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
             Registre des patients
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px', margin: 0 }}>
-            Lundi 14 juillet 2025
-          </p>
-        </div>
-
-        <div className="page-header-actions">
-          <div className="page-search-box">
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Rechercher un patient..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '10px',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-secondary)',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)'
-            }}>
-              <Bell size={18} />
-            </div>
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--bg-primary)'
-            }}>3</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Main Page Title & Top Button matching Image 1 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem'
-      }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
-            Registre des Patients
-          </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '2px', margin: 0 }}>
-            {patientRowsToRender.length} patients · Base de données centralisée
+            {patientRowsToRender.length} patient{patientRowsToRender.length > 1 ? 's' : ''} enregistré{patientRowsToRender.length > 1 ? 's' : ''}
           </p>
         </div>
 
@@ -612,7 +470,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
               alignItems: 'center',
               gap: '8px',
               padding: '10px 20px',
-              backgroundColor: '#1e4d40',
+              backgroundColor: 'var(--brand-fill)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '10px',
@@ -622,8 +480,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
               boxShadow: '0 2px 8px rgba(30, 77, 64, 0.25)',
               transition: 'var(--transition)'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#163a30'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1e4d40'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--brand-fill-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--brand-fill)'}
           >
             <UserPlus size={17} />
             <span>Ajouter un patient</span>
@@ -659,7 +517,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 padding: '6px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                backgroundColor: filterStatus === 'all' ? '#1e4d40' : 'var(--bg-primary)',
+                backgroundColor: filterStatus === 'all' ? 'var(--brand-fill)' : 'var(--bg-primary)',
                 color: filterStatus === 'all' ? '#ffffff' : 'var(--text-secondary)',
                 fontWeight: 600,
                 fontSize: '0.85rem',
@@ -676,7 +534,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 padding: '6px 16px',
                 borderRadius: '8px',
                 border: '1px solid var(--border)',
-                backgroundColor: filterStatus === 'active' ? '#1e4d40' : 'var(--bg-primary)',
+                backgroundColor: filterStatus === 'active' ? 'var(--brand-fill)' : 'var(--bg-primary)',
                 color: filterStatus === 'active' ? '#ffffff' : 'var(--text-secondary)',
                 fontWeight: 600,
                 fontSize: '0.85rem',
@@ -693,7 +551,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 padding: '6px 16px',
                 borderRadius: '8px',
                 border: '1px solid var(--border)',
-                backgroundColor: filterStatus === 'inactive' ? '#1e4d40' : 'var(--bg-primary)',
+                backgroundColor: filterStatus === 'inactive' ? 'var(--brand-fill)' : 'var(--bg-primary)',
                 color: filterStatus === 'inactive' ? '#ffffff' : 'var(--text-secondary)',
                 fontWeight: 600,
                 fontSize: '0.85rem',
@@ -721,7 +579,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 backgroundColor: 'var(--bg-primary)',
                 fontSize: '0.825rem',
                 color: 'var(--text-primary)',
-                outline: 'none',
+                
                 boxSizing: 'border-box'
               }}
             />
@@ -795,7 +653,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                           width: '32px',
                           height: '32px',
                           borderRadius: '50%',
-                          backgroundColor: '#cbd5e1',
+                          backgroundColor: 'var(--border-strong)',
                           overflow: 'hidden',
                           display: 'flex',
                           alignItems: 'center',
@@ -827,8 +685,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                     <td style={{ padding: '12px 16px' }}>
                       {isAllergyNone ? (
                         <span style={{
-                          backgroundColor: '#e6f4ea',
-                          color: '#1e4d40',
+                          backgroundColor: 'var(--brand-soft)',
+                          color: 'var(--brand-soft-ink)',
                           padding: '3px 10px',
                           borderRadius: '12px',
                           fontSize: '0.75rem',
@@ -838,8 +696,8 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                         </span>
                       ) : (
                         <span style={{
-                          backgroundColor: '#ffedd5',
-                          color: '#ea580c',
+                          backgroundColor: 'var(--warning-surface)',
+                          color: 'var(--warning-ink)',
                           padding: '3px 10px',
                           borderRadius: '12px',
                           fontSize: '0.75rem',
@@ -858,7 +716,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                     {/* Statut Pill */}
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{
-                        color: pat.status === 'Actif' ? '#0284c7' : '#94a3b8',
+                        color: pat.status === 'Actif' ? 'var(--info)' : 'var(--text-muted)',
                         fontWeight: 600,
                         fontSize: '0.8rem'
                       }}>
@@ -922,64 +780,16 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
           </table>
         </div>
 
-        {/* 5. Pagination Footer matching Image 1 */}
+        {/* Compteur de la liste. Les deux flèches et le « 1 » qui étaient ici
+            imitaient une pagination : aucun des deux boutons n'avait de
+            gestionnaire, et la liste n'est pas paginée. Un contrôle qui ne fait
+            rien coûte un clic et une hésitation à chaque passage. */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
           fontSize: '0.8rem',
           color: 'var(--text-muted)',
           paddingTop: '0.5rem'
         }}>
-          <span>
-            Affichage de 1 à {patientRowsToRender.length} sur {patientRowsToRender.length} patients
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <button style={{
-              background: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-              cursor: 'pointer'
-            }}>
-              <ChevronLeft size={16} />
-            </button>
-
-            <span style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              backgroundColor: '#1e4d40',
-              color: '#ffffff',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              1
-            </span>
-
-            <button style={{
-              background: 'none',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              width: '28px',
-              height: '28px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-              cursor: 'pointer'
-            }}>
-              <ChevronRight size={16} />
-            </button>
-          </div>
+          {patientRowsToRender.length} patient{patientRowsToRender.length > 1 ? 's' : ''} affiché{patientRowsToRender.length > 1 ? 's' : ''}
         </div>
 
       </div>
@@ -1049,7 +859,7 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                 onClick={handleOrientPatient}
                 disabled={!selectedDoctorId || isOrienting}
                 className="btn"
-                style={{ backgroundColor: '#1e4d40', color: '#ffffff' }}
+                style={{ backgroundColor: 'var(--brand-fill)', color: '#ffffff' }}
               >
                 {isOrienting ? 'Orientation...' : 'Orienter maintenant'}
               </button>

@@ -154,7 +154,7 @@ export const ReportsSection: React.FC = () => {
                 avant de rembourser.
               </Warn>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <table style={{ width: '100%', minWidth: '480px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                   <thead>
                     <tr style={{ color: 'var(--text-muted)' }}>
                       <Th>Clinique</Th><Th>Montant</Th><Th>Fournisseur</Th><Th>Initié le</Th>
@@ -254,7 +254,7 @@ export const ReportsSection: React.FC = () => {
               Cliquez sur un en-tête pour trier. Les consultations sont datées du rendez-vous, pas de la saisie.
             </Note>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <table style={{ width: '100%', minWidth: '660px', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                 <thead>
                   <tr style={{ color: 'var(--text-muted)' }}>
                     <Th>Clinique</Th>

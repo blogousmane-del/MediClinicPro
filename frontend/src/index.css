@@ -1,63 +1,138 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+/* ---------------------------------------------------------------------------
+   Système de design MediClinic — source unique de vérité.
+
+   Une seule famille de marque (le vert #1e4d40), une seule famille de neutres
+   (froids, slate), quatre couleurs sémantiques. Une couleur écrite en dur dans
+   un composant est un bug : elle ne suit pas le thème sombre et elle échappe à
+   toute correction ultérieure. L'audit du 2026-09-01 a trouvé six palettes
+   concurrentes et ~500 hex en dur, voir
+   docs/superpowers/plans/2026-09-01-audit-ui-ux-antislop.md.
+
+   Les polices sont chargées depuis index.html (preconnect + stylesheet) et non
+   plus par un @import ici : un @import en tête de feuille sérialise la requête
+   et bloque le rendu.
+   --------------------------------------------------------------------------- */
 
 :root {
-  /* Color Palette - Clinical Premium Theme (Mint / Teal accents) */
-  --primary-h: 171;
-  --primary-s: 77%;
-  --primary-l: 40%;
+  /* --- Échelle de marque, hsl(163 44% L) dérivée de #1e4d40 --------------- */
+  --brand-50:  hsl(163, 40%, 96%);
+  --brand-100: hsl(163, 38%, 91%);
+  --brand-200: hsl(163, 34%, 81%);
+  --brand-300: hsl(163, 36%, 66%);
+  --brand-400: hsl(163, 40%, 48%);
+  --brand-500: hsl(163, 44%, 36%);
+  --brand-600: hsl(163, 44%, 28%);
+  --brand-700: hsl(163, 44%, 21%); /* #1e4d40 — la couleur de marque */
+  --brand-800: hsl(163, 42%, 16%);
+  --brand-900: hsl(163, 40%, 11%);
+
+  /* --- Rôles de marque ---------------------------------------------------
+     Le remplissage et l'encre sont deux tokens distincts : une même valeur ne
+     peut pas servir à la fois de fond de bouton et de texte sur la page dans
+     les deux thèmes. Confondre les deux est exactement ce qui rendait les
+     pastilles illisibles en mode sombre. */
+  --brand-fill: var(--brand-700);
+  --brand-fill-hover: var(--brand-800);
+  --brand-fill-fg: #ffffff;
+  --brand-soft: var(--brand-50);
+  --brand-soft-ink: var(--brand-700);
+  --brand-line: var(--brand-200);
+
+  /* --primary reste l'ENCRE d'accent (texte, icônes, bordures) : c'est son
+     usage majoritaire dans le dépôt. Pour un fond, utiliser --brand-fill. */
+  --primary-h: 163;
+  --primary-s: 44%;
+  --primary-l: 24%;
   --primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
-  --primary-rgb: 13, 148, 136;
-  --primary-hover: hsl(var(--primary-h), var(--primary-s), 33%);
-  --primary-light: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.1);
-  --primary-light-hover: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.18);
+  --primary-rgb: 30, 77, 64;
+  --primary-hover: var(--brand-700);
+  --primary-light: var(--brand-50);
+  --primary-light-hover: var(--brand-100);
   --primary-glow: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.25);
 
-  --secondary: #0c121e; /* Slate-black 950 */
-  --secondary-rgb: 12, 18, 30;
-  
-  /* Background colors with a subtle clinical mint-fresh hue in light mode */
-  --bg-primary: #f2f8f6; 
+  --secondary: #0f172a;
+  --secondary-rgb: 15, 23, 42;
+
+  /* --- Neutres : une seule famille, froide ------------------------------- */
+  --bg-primary: #f7f9fb;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #e5effc; 
-  
-  --text-primary: #0a0f1d;
-  --text-secondary: #4a5568;
-  --text-muted: #8a99ad;
-  
-  --border: #e1eaf0;
+  --bg-tertiary: #eef2f7;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  /* #8a99ad ne donnait que 2,9:1 sur blanc, sous le minimum AA de 4,5:1, et
+     c'est le token le plus répandu de l'application (libellés de cartes,
+     sous-titres, métadonnées). #64748b donne 4,8:1. */
+  --text-muted: #64748b;
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
   --border-focus: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.4);
-  
+
   /* Glassmorphism system */
   --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(13, 148, 136, 0.08);
-  --glass-shadow: 0 8px 32px 0 rgba(13, 148, 136, 0.04);
+  --glass-border: rgba(30, 77, 64, 0.08);
+  --glass-shadow: 0 8px 32px 0 rgba(30, 77, 64, 0.04);
 
-  /* Status Colors */
+  /* --- Sémantiques -------------------------------------------------------
+     Chaque couleur a trois rôles : la teinte pleine (--x), le fond teinté
+     (--x-surface) et l'encre lisible sur ce fond (--x-ink). Les trois sont
+     redéfinis en thème sombre, ce que les anciens rgba() ne faisaient pas. */
   --success: #10b981;
+  --success-surface: hsl(152, 55%, 95%);
+  --success-ink: hsl(152, 60%, 24%);
   --success-light: rgba(16, 185, 129, 0.15);
   --warning: #f59e0b;
+  --warning-surface: hsl(38, 92%, 95%);
+  --warning-ink: hsl(30, 80%, 30%);
   --warning-light: rgba(245, 158, 11, 0.15);
   --danger: #ef4444;
+  --danger-surface: hsl(0, 86%, 96%);
+  --danger-ink: hsl(0, 65%, 40%);
   --danger-light: rgba(239, 68, 68, 0.15);
-  --info: #06b6d4;
-  --info-light: rgba(6, 182, 212, 0.15);
+  --info: #0284c7;
+  --info-surface: hsl(199, 89%, 95%);
+  --info-ink: hsl(201, 90%, 27%);
+  --info-light: rgba(2, 132, 199, 0.15);
 
   /* Shadows and Offsets */
-  --shadow-sm: 0 2px 4px 0 rgba(13, 148, 136, 0.02);
-  --shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.05), 0 8px 16px -6px rgba(13, 148, 136, 0.03);
-  --shadow-md: 0 20px 30px -10px rgba(13, 148, 136, 0.08), 0 10px 20px -8px rgba(13, 148, 136, 0.04);
-  --shadow-lg: 0 30px 50px -15px rgba(13, 148, 136, 0.12), 0 15px 30px -10px rgba(13, 148, 136, 0.06);
-  
-  /* Border Radius */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --shadow-sm: 0 2px 4px 0 rgba(15, 23, 42, 0.04);
+  --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 16px -6px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 20px 30px -10px rgba(15, 23, 42, 0.09), 0 10px 20px -8px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 30px 50px -15px rgba(15, 23, 42, 0.13), 0 15px 30px -10px rgba(15, 23, 42, 0.07);
+
+  /* --- Rayons : trois paliers utiles, plus la pastille ------------------- */
+  --radius-sm: 8px;   /* contrôles : champs, petits boutons */
+  --radius-md: 14px;  /* cartes, pastilles de statut */
+  --radius-lg: 20px;  /* conteneurs, modales */
+  --radius-xl: 28px;  /* images de la vitrine */
   --radius-full: 9999px;
-  
+
+  /* --- Échelle typographique --------------------------------------------
+     Six paliers. Les tailles improvisées (0,72 / 0,78 / 0,82 / 0,925 rem…)
+     sont à remplacer par ces tokens au fil des passages. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  /* --- Barre latérale ----------------------------------------------------
+     Elle reste sombre dans les deux thèmes, c'est un choix assumé. Ses valeurs
+     sont dérivées de la même échelle de marque : elle avait jusqu'ici son
+     propre vert (#162a26, #1c4436, #1f3a33) et ses propres gris verdâtres. */
+  --sidebar-bg: var(--brand-900);
+  --sidebar-surface: var(--brand-800);
+  --sidebar-active: var(--brand-700);
+  --sidebar-fg: hsl(163, 14%, 72%);
+  --sidebar-fg-strong: #ffffff;
+  --sidebar-muted: hsl(163, 12%, 50%);
+
   /* Fonts */
   --font-primary: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-secondary: 'Plus Jakarta Sans', sans-serif;
+  --font-secondary: 'Plus Jakarta Sans', 'Outfit', sans-serif;
 
   /* Skeleton loading (see components/Skeleton.tsx) */
   --skeleton-base: #e3ecf3;
@@ -76,14 +151,40 @@
   --bg-primary: #05080f; /* Rich deep black-blue */
   --bg-secondary: #0b111e; /* Sleek dark card container */
   --bg-tertiary: #131c2e; /* Slate/dark-blue accent background */
-  
+
   --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
-  --border: rgba(255, 255, 255, 0.07);
+  --text-secondary: #cbd5e1;
+  /* #64748b ne donnait que 3,95:1 sur --bg-secondary, sous le minimum AA. */
+  --text-muted: #94a3b8;
+
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.18);
   --border-focus: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.6);
-  
+
+  /* L'encre d'accent s'éclaircit, le remplissage reste un vert soutenu qui
+     porte encore du texte blanc. Les deux tokens divergent ici : c'est tout
+     l'intérêt de les avoir séparés. */
+  --primary-s: 40%;
+  --primary-l: 62%;
+  --brand-fill: hsl(163, 44%, 30%);
+  --brand-fill-hover: hsl(163, 44%, 36%);
+  --brand-fill-fg: #ffffff;
+  --brand-soft: hsl(163, 34%, 13%);
+  --brand-soft-ink: hsl(163, 42%, 72%);
+  --brand-line: hsl(163, 30%, 26%);
+  --primary-hover: hsl(163, 40%, 72%);
+  --primary-light: hsl(163, 34%, 13%);
+  --primary-light-hover: hsl(163, 32%, 17%);
+
+  --success-surface: hsl(152, 40%, 13%);
+  --success-ink: hsl(152, 50%, 64%);
+  --warning-surface: hsl(35, 45%, 14%);
+  --warning-ink: hsl(38, 80%, 65%);
+  --danger-surface: hsl(0, 40%, 15%);
+  --danger-ink: hsl(0, 80%, 74%);
+  --info-surface: hsl(201, 45%, 14%);
+  --info-ink: hsl(199, 80%, 68%);
+
   --glass-bg: rgba(11, 17, 30, 0.7);
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
@@ -129,6 +230,30 @@ button, input, select, textarea {
 a {
   text-decoration: none;
   color: inherit;
+}
+
+/* Focus clavier : une seule règle pour toute l'application. Il n'en existait
+   qu'une (.input-control), face à 21 « outline: none » — un utilisateur au
+   clavier perdait le curseur dès qu'il quittait un champ de formulaire.
+   :focus-visible ne s'affiche pas au clic à la souris, donc rien ne change
+   pour les autres. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Les éléments qui posent eux-mêmes « outline: none » en inline gardent une
+   marque visible via l'ombre portée. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--border-focus);
 }
 
 /* Typography Helpers */
@@ -439,9 +564,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-  color: white;
+  background-color: var(--brand-fill);
+  color: var(--brand-fill-fg);
   box-shadow: 0 4px 14px 0 rgba(var(--primary-rgb), 0.25);
+}
+.btn-primary:hover {
+  background-color: var(--brand-fill-hover);
 }
 .btn-primary:hover {
   transform: translateY(-2px);
@@ -1234,14 +1362,55 @@ h1, h2, h3, h4, h5, h6 {
    Deliberate one-page exception to the fixed-dark Landing/Auth shell (user
    decision, 2026-07-27 re-fetch): tokens copied verbatim from the Banani
    flow's shared style.css, same source as the Platform Admin token pass. */
+/* Vitrine : page publique, palette claire fixe pour la même raison que les CGU
+   (data-theme peut être resté sur « dark » sans personne de connecté). Les
+   valeurs viennent de la famille de marque, mais figées ici. La vitrine
+   portait jusqu'ici 149 couleurs écrites à la main, dont un violet #7c3aed
+   qui était le seul violet du produit. */
+.landing-page {
+  --lp-bg: #ffffff;
+  --lp-bg-alt: #f7f9fb;
+  --lp-fg: #0f172a;
+  --lp-muted: #64748b;
+  --lp-border: #e2e8f0;
+  --lp-border-strong: #cbd5e1;
+  --lp-brand: hsl(163, 44%, 21%);
+  --lp-brand-hover: hsl(163, 42%, 16%);
+  --lp-brand-ink: hsl(163, 44%, 24%);
+  --lp-brand-soft: hsl(163, 40%, 96%);
+  --lp-brand-line: hsl(163, 34%, 81%);
+  --lp-dark: hsl(163, 38%, 12%);
+  --lp-dark-fg: #e2e8f0;
+  --lp-dark-accent: hsl(163, 45%, 70%);
+  --lp-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.18);
+  /* Mise en garde « données d'exemple », priorités de la maquette : valeurs
+     figées, pas les tokens sémantiques de l'app, qui basculent en sombre. */
+  --lp-warn-bg: hsl(38, 92%, 95%);
+  --lp-warn-fg: hsl(30, 80%, 32%);
+  /* Le pied de page est sombre : --lp-muted (#64748b) n'y donnait que 3,75:1,
+     sous le seuil AA. Mesuré par Lighthouse sur la page construite. */
+  --lp-footer-fg: #a3b2c4;
+}
+
+/* Page CGU : elle est publique et sans en-tête d'application, donc elle porte
+   ses propres tokens plutôt que ceux du tableau de bord. Ils sont désormais
+   pris dans la même famille : elle avait son quatrième vert (#3D6B5E) et son
+   propre neutre papier. */
 .terms-page {
-  --tp-bg: #F4F3F0;
-  --tp-fg: #1E2A2A;
-  --tp-border: #D6D2CB;
-  --tp-input: #ECEAE5;
-  --tp-secondary: #D4E0DC;
-  --tp-primary: #3D6B5E;
-  --tp-muted: #7A8585;
+  /* Page publique : elle garde une palette claire fixe, indépendante du thème
+     de l'application (l'attribut data-theme peut rester à « dark » depuis une
+     session précédente alors que personne n'est connecté). Les valeurs sont
+     tirées de la même famille que le reste, mais écrites en dur ici, à dessein.
+     --tp-fg sert aussi de FOND au bandeau de titre (.terms-header) : le
+     brancher sur --text-primary rendait ce bandeau blanc, avec son titre blanc
+     dessus, dès que le thème sombre était actif. */
+  --tp-bg: #f7f9fb;
+  --tp-fg: #0f172a;
+  --tp-border: #e2e8f0;
+  --tp-input: #eef2f7;
+  --tp-secondary: var(--brand-50);
+  --tp-primary: hsl(163, 44%, 24%);
+  --tp-muted: #64748b;
   background-color: var(--tp-bg);
   color: var(--tp-fg);
   min-height: 100vh;
@@ -1395,10 +1564,6 @@ h1, h2, h3, h4, h5, h6 {
   .landing-hero-title {
     font-size: 2.25rem !important;
   }
-  .landing-stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 1.5rem !important;
-  }
   .landing-showcase-grid {
     grid-template-columns: 1fr !important;
     gap: 2.5rem !important;
@@ -1412,13 +1577,6 @@ h1, h2, h3, h4, h5, h6 {
   .landing-hero-title {
     font-size: 1.85rem !important;
   }
-  /* Keep a 2-column grid instead of collapsing to one tall stacked list —
-     a dense grid of small cards reads as "designed"; a full-width list of
-     rows reads as unstyled/unfinished. */
-  .landing-stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.75rem !important;
-  }
   .landing-feature-pills {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 0.6rem !important;
@@ -1427,39 +1585,322 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Very narrow phones: 2 columns get too cramped, drop to 1 */
 @media (max-width: 380px) {
-  .landing-stats-grid,
   .landing-feature-pills {
     grid-template-columns: 1fr !important;
   }
 }
 
-/* ===== Landing Page: Infinite Module Marquee ===== */
-@keyframes landing-marquee-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+/* Boutons de la vitrine. Le style plein et le style contour étaient recopiés
+   en inline à huit endroits, avec des rayons et des ombres qui avaient déjà
+   commencé à diverger (10px ici, 12px là). */
+.landing-cta,
+.landing-cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 26px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.landing-marquee-wrapper {
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+.landing-cta {
+  background-color: var(--lp-brand);
+  color: #ffffff;
+  border: 1px solid var(--lp-brand);
+  box-shadow: 0 6px 18px -6px rgba(15, 23, 42, 0.35);
 }
 
-.landing-marquee-track {
+.landing-cta:hover {
+  background-color: var(--lp-brand-hover);
+  border-color: var(--lp-brand-hover);
+}
+
+.landing-cta-ghost {
+  background-color: var(--lp-bg);
+  color: var(--lp-fg);
+  border: 1px solid var(--lp-border-strong);
+}
+
+.landing-cta-ghost:hover {
+  border-color: var(--lp-brand);
+}
+
+/* Variante posée sur le bandeau sombre de fin de page. */
+.landing-facts .landing-cta-ghost,
+.landing-closing .landing-cta-ghost {
+  background-color: transparent;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.landing-facts .landing-cta-ghost:hover,
+.landing-closing .landing-cta-ghost:hover {
+  border-color: #ffffff;
+}
+
+.landing-cta-sm {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+/* Bouton de navigation en texte simple (Connexion). */
+.landing-nav-link-btn {
+  background: none;
+  border: none;
+  color: var(--lp-fg);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 8px 16px;
+}
+
+/* Bandeau de clôture. */
+.landing-closing {
+  background-color: var(--lp-dark);
+  padding: 4rem 1.5rem;
   display: flex;
-  width: max-content;
-  gap: 1rem;
-  animation: landing-marquee-scroll 28s linear infinite;
+  justify-content: center;
+  text-align: center;
 }
 
-.landing-marquee-wrapper:hover .landing-marquee-track {
-  animation-play-state: paused;
+/* Cartes de tarifs. Le corps de la carte était écrit huit fois en inline, avec
+   des ternaires sur chaque propriété selon le plan mis en avant : la variante
+   tient maintenant dans une seule classe. */
+.landing-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 2rem 1.75rem;
+  text-align: left;
+  background-color: var(--lp-bg);
+  border: 1px solid var(--lp-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .landing-marquee-track {
-    animation: none;
+.landing-plan-on {
+  background-color: var(--lp-brand-soft);
+  border: 2px solid var(--lp-brand);
+  box-shadow: 0 12px 32px -14px rgba(15, 23, 42, 0.35);
+}
+
+.landing-plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--lp-brand);
+}
+
+.landing-plan-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background-color: var(--lp-bg-alt);
+  color: var(--lp-brand);
+}
+
+.landing-plan-on .landing-plan-badge {
+  background-color: var(--lp-brand);
+  color: #ffffff;
+}
+
+.landing-plan-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--lp-muted);
+  margin: 0 0 4px;
+}
+
+.landing-plan-price {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.landing-plan-amount {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--lp-fg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-plan-unit {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 2px;
+  font-size: 0.7rem;
+  color: var(--lp-muted);
+}
+
+.landing-plan-rows {
+  list-style: none;
+  margin: 0;
+  padding: 1.1rem 0 0;
+  border-top: 1px solid var(--lp-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1;
+}
+
+.landing-plan-rows li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--lp-fg);
+}
+
+.landing-plan-check {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background-color: var(--lp-brand-soft);
+  color: var(--lp-brand);
+}
+
+.landing-plan-on .landing-plan-check {
+  background-color: #ffffff;
+}
+
+/* Note commune sous les trois cartes de tarifs. */
+.landing-plans-note {
+  max-width: 720px;
+  margin: 2.25rem auto 0;
+  padding: 0.9rem 1.25rem;
+  background-color: var(--lp-bg-alt);
+  border: 1px solid var(--lp-border);
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+
+.landing-plans-note p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--lp-muted);
+}
+
+.landing-plans-note strong {
+  color: var(--lp-fg);
+  font-weight: 700;
+}
+
+/* ===== Landing Page: bandeau « modules + faits » =====
+   Remplace le carrousel infini et la bande de quatre colonnes icône-libellé.
+   Composition asymétrique : les modules réels à gauche, les faits à droite,
+   ce qui casse aussi l'alternance image-texte des deux sections précédentes. */
+.landing-facts {
+  background-color: var(--lp-dark);
+  color: var(--lp-dark-fg);
+  padding: 3rem 1.5rem;
+}
+
+.landing-facts-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+}
+
+@media (min-width: 900px) {
+  .landing-facts-inner {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 4rem;
+    align-items: start;
   }
+}
+
+.landing-facts-title {
+  font-family: var(--font-secondary);
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.2;
+  color: #ffffff;
+  margin: 0 0 0.75rem;
+  text-wrap: balance;
+}
+
+.landing-facts-lead {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--lp-dark-fg);
+  margin: 0 0 1.5rem;
+  max-width: 52ch;
+}
+
+.landing-module-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.landing-module-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.landing-module-list svg {
+  color: var(--lp-dark-accent);
+  flex-shrink: 0;
+}
+
+.landing-fact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-fact-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.85rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #ffffff;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.landing-fact-list li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.landing-fact-list svg {
+  color: var(--lp-dark-accent);
+  flex-shrink: 0;
 }
 
 /* ===== Landing Page: Entrance & Hover Micro-interactions ===== */
@@ -1524,15 +1965,6 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 8px 18px rgba(13, 148, 136, 0.12);
 }
 
-/* Marquee cards: subtle lift on hover (in addition to the wrapper's pause-on-hover) */
-.landing-marquee-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.landing-marquee-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
-}
-
 /* Nav / text links: sliding underline on hover */
 .landing-link {
   position: relative;
@@ -1585,44 +2017,6 @@ h1, h2, h3, h4, h5, h6 {
   transform: scale(1.08);
 }
 
-/* Stat/highlight icons: pop on hover */
-.landing-highlight svg {
-  transition: transform 0.2s ease;
-}
-.landing-highlight:hover svg {
-  transform: scale(1.15);
-}
-
-/* Stats grid: divider lines between items on desktop's single row */
-.landing-stats-grid > .landing-highlight {
-  padding: 0.25rem 1rem;
-}
-@media (min-width: 901px) {
-  .landing-stats-grid > .landing-highlight:not(:first-child) {
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
-  }
-}
-/* Tablet/mobile: a thin-divider text list reads as unstyled, not a designed
-   component — swap to tinted rounded chip cards (icon beside, not above,
-   the label) so a 2-column phone grid still looks intentional. */
-@media (max-width: 900px) {
-  .landing-stats-grid > .landing-highlight {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
-    text-align: left;
-    padding: 0.85rem 0.9rem;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-  }
-  .landing-stats-grid > .landing-highlight svg {
-    margin-bottom: 0 !important;
-    flex-shrink: 0;
-  }
-}
-
 /* Pricing section 3-card grid (Landing Page) — 1 col mobile, 3 cols 850px+.
    Separate from Settings' local .plan-cards-grid (same pattern, different
    file) to avoid touching that already-shipped page for this change. */
@@ -1637,8 +2031,468 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ===== Landing Page: Aperçu de l'interface (maquette statique) =====
+   Reproduction inerte de l'écran Banani « Nouveau Rendez-vous »
+   (new_screen11.jsx + NewAppointmentMobile.jsx), insérée dans la landing
+   comme vitrine produit. Voir .planning/banani/landing-app-preview.md.
+
+   Valeurs figées et scopées ici, comme .terms-page (--tp-*) et
+   .platform-admin-shell : la vitrine est en thème clair fixe, la maquette ne
+   doit pas suivre le [data-theme] de l'app.
+
+   Elles reproduisent maintenant la palette CLAIRE RÉELLE de l'application
+   (mêmes valeurs que le bloc :root en haut de ce fichier). Elles venaient de
+   la maquette Banani : vert-gris sur papier chaud, une palette qui n'existe
+   nulle part dans le produit. La section s'intitule « Voyez l'interface avant
+   de vous inscrire » : elle doit montrer l'interface, pas une autre. */
+.app-preview {
+  --ap-bg: #f7f9fb;
+  --ap-fg: #0f172a;
+  --ap-border: #e2e8f0;
+  --ap-input: #eef2f7;
+  --ap-primary: hsl(163, 44%, 24%);
+  --ap-primary-fg: #ffffff;
+  --ap-secondary: hsl(163, 40%, 96%);
+  --ap-secondary-fg: hsl(163, 44%, 21%);
+  --ap-muted: #eef2f7;
+  --ap-muted-fg: #64748b;
+  --ap-card: #ffffff;
+  --ap-sidebar: hsl(163, 40%, 11%);
+  --ap-sidebar-fg: hsl(163, 14%, 72%);
+  --ap-sidebar-muted: rgba(255, 255, 255, 0.12);
+  --ap-sidebar-accent: hsl(163, 44%, 21%);
+  --ap-r-md: 8px;
+  --ap-r-lg: 14px;
+
+  display: flex;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--ap-border);
+  border-radius: 16px;
+  background-color: var(--ap-bg);
+  color: var(--ap-fg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  text-align: left;
+  line-height: 1.4;
+  /* Décor, pas une commande : rien n'est cliquable ni sélectionnable, et le
+     bloc entier est aria-hidden côté JSX. Aucun <button>/<a> à l'intérieur,
+     donc aucun arrêt de tabulation non plus. */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Bascule mobile <-> desktop. Chaque maquette Banani est suivie à sa propre
+   largeur : le mock mobile a un champ Date compact, le desktop un vrai
+   mini-calendrier ; ce ne sont pas deux rendus du même bloc.
+
+   Sélecteurs préfixés par .app-preview à dessein : .ap-card/.ap-btn/.ap-ctas
+   posent aussi un `display` et sont déclarés plus bas, donc une bascule de
+   même spécificité perdrait — les cartes « desktop » resteraient visibles à
+   375px. */
+.app-preview .ap-desktop-only { display: none; }
+.app-preview .ap-mobile-only { display: flex; }
+
+/* Même bascule pour du texte en ligne : les deux maquettes n'emploient pas
+   les mêmes libellés (« Récents » contre « Patients récents », etc.), et le
+   CSS seul ne peut pas remplacer du texte. */
+.app-preview .ap-t-d { display: none; }
+.app-preview .ap-t-m { display: inline; }
+
+.ap-sidebar { display: none; }
+
+.ap-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ap-mobile-header {
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ap-border);
+}
+
+.ap-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.ap-form-col,
+.ap-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.ap-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--ap-card);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-r-lg);
+}
+
+.ap-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ap-border);
+}
+
+.ap-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.ap-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.ap-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ap-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.ap-label-plain {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ap-muted-fg);
+}
+
+.ap-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+  background-color: var(--ap-input);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-r-md);
+}
+
+.ap-field-tall { padding: 16px 12px; align-items: flex-start; }
+
+.ap-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ap-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 11px;
+  background-color: var(--ap-input);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-r-md);
+  min-width: 0;
+}
+
+.ap-chip-on {
+  background-color: var(--ap-secondary);
+  border-color: var(--ap-primary);
+  color: var(--ap-primary);
+}
+
+.ap-chip-new {
+  justify-content: center;
+  border-style: dashed;
+  background-color: var(--ap-bg);
+  color: var(--ap-muted-fg);
+}
+
+.ap-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background-color: var(--ap-secondary);
+  color: var(--ap-secondary-fg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ap-selected-patient {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background-color: var(--ap-secondary);
+  border: 1px solid rgba(61, 107, 94, 0.3);
+  border-radius: var(--ap-r-md);
+  min-width: 0;
+}
+
+.ap-doctors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ap-doctor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  text-align: center;
+  background-color: var(--ap-input);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-r-md);
+}
+
+.ap-doctor-on {
+  background-color: var(--ap-secondary);
+  border-color: var(--ap-primary);
+}
+
+.ap-slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.ap-slot {
+  padding: 6px 2px;
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  background-color: var(--ap-input);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-r-md);
+}
+
+.ap-slot-on {
+  background-color: var(--ap-primary);
+  border-color: var(--ap-primary);
+  color: var(--ap-primary-fg);
+}
+
+.ap-slot-off {
+  color: var(--ap-muted-fg);
+  border-color: transparent;
+  opacity: 0.4;
+}
+
+.ap-priorities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ap-priority {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  background-color: var(--ap-input);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-r-md);
+}
+
+.ap-priority-on {
+  background-color: var(--ap-secondary);
+  border-color: var(--ap-primary);
+  color: var(--ap-primary);
+}
+
+.ap-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.ap-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  text-align: center;
+}
+
+.ap-cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  font-size: 11px;
+  background-color: var(--ap-input);
+  border: 1px solid var(--ap-border);
+  border-radius: var(--ap-r-md);
+}
+
+.ap-cal-day-empty { background: none; border: none; }
+.ap-cal-day-off { background-color: var(--ap-muted); color: var(--ap-muted-fg); border-color: transparent; opacity: 0.4; }
+.ap-cal-day-on { background-color: var(--ap-primary); border-color: var(--ap-primary); color: var(--ap-primary-fg); font-weight: 700; }
+
+.ap-recap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background-color: var(--ap-fg);
+  border-radius: var(--ap-r-lg);
+}
+
+.ap-recap-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ap-bg);
+  opacity: 0.8;
+}
+
+.ap-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  background-color: var(--ap-primary);
+  color: var(--ap-primary-fg);
+  border: 1px solid var(--ap-primary);
+  border-radius: var(--ap-r-md);
+}
+
+.ap-btn-ghost {
+  background-color: var(--ap-input);
+  border-color: var(--ap-border);
+  color: var(--ap-fg);
+  font-weight: 500;
+  padding: 9px 16px;
+}
+
+.ap-ctas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ≥640px : les grilles serrées du mock mobile respirent avant la bascule
+   desktop, sinon 4 cartes médecin sur 2 colonnes occupent une tablette
+   entière pour rien. */
+@media (min-width: 640px) {
+  .ap-doctors { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ap-slots { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .ap-recent { flex-direction: row; flex-wrap: wrap; }
+  .ap-chip { flex: 1 1 180px; }
+}
+
+/* ≥1024px : mise en page du mock desktop — barre latérale, barre du haut,
+   colonne formulaire + rail de 288px. */
+@media (min-width: 1024px) {
+  .app-preview .ap-desktop-only { display: flex; }
+  .app-preview .ap-mobile-only { display: none; }
+  .app-preview .ap-t-d { display: inline; }
+  .app-preview .ap-t-m { display: none; }
+
+  .ap-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 224px;
+    flex-shrink: 0;
+    background-color: var(--ap-sidebar);
+    color: var(--ap-sidebar-fg);
+  }
+
+  .ap-topbar {
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--ap-border);
+  }
+
+  .ap-body {
+    flex-direction: row;
+    gap: 24px;
+    padding: 24px 32px;
+  }
+
+  .ap-form-col,
+  .ap-rail { gap: 20px; }
+
+  /* Sans `flex: 1` la colonne se dimensionne sur son contenu : elle remplit
+     aujourd'hui parce que son texte le plus long dépasse la place
+     disponible, ce qui est un accident, pas une règle. */
+  .ap-form-col { flex: 1; }
+
+  .ap-rail {
+    width: 288px;
+    flex-shrink: 0;
+  }
+
+  /* En-tête « Nouveau rendez-vous » + paire Annuler/Confirmer. À 1024px la
+     colonne formulaire ne fait que ~374px : sans enroulement, le groupe de
+     boutons (flex-shrink: 0, ~285px) écrasait le titre sur trois lignes et
+     le sous-titre sur un mot par ligne. Même famille de défaut que le nom de
+     clinique du journal d'activité corrigé le 2026-08-09. */
+  .ap-page-head { flex-wrap: wrap; gap: 12px; }
+  .ap-page-head > :first-child { flex: 1 1 260px; min-width: 0; }
+
+  .ap-card-head { padding: 14px 20px; }
+  .ap-card-body { padding: 20px; gap: 16px; }
+  .ap-field { font-size: 13px; padding: 10px 12px; }
+  .ap-chip { font-size: 12px; flex: 0 1 auto; }
+  .ap-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ap-priorities {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  /* Le mock desktop pose « Priorité » à gauche des puces, pas au-dessus. */
+  .ap-group-priority {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+/* Entre 1024 et 1279px, barre latérale (224px) et rail (288px) laissent une
+   colonne formulaire trop étroite pour quatre cartes médecin : « Dr. Coulibaly
+   A. » s'y coupait sur trois lignes. Le mock Banani est dessiné à 1440px, où
+   la question ne se pose pas. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .ap-doctors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Payment provider badges: lift on hover */
 .landing-payment-badge {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background-color: var(--lp-bg-alt);
+  border: 1px solid var(--lp-border);
+  color: var(--lp-fg);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .landing-payment-badge:hover {
@@ -1660,10 +2514,8 @@ h1, h2, h3, h4, h5, h6 {
   .landing-btn-lift:hover,
   .landing-card-lift:hover,
   .landing-pill-hover:hover,
-  .landing-marquee-card:hover,
   .landing-payment-badge:hover,
   .landing-logo-mark:hover,
-  .landing-highlight:hover svg,
   .landing-img-zoom:hover img {
     transform: none;
   }
@@ -1865,21 +2717,64 @@ h1, h2, h3, h4, h5, h6 {
   --text-muted: #7A8585;
   --border: #D6D2CB;
   --border-focus: rgba(61, 107, 94, 0.35);
-  --success: #3D8A6A;
+  --success: hsl(163, 40%, 36%);
   --success-light: rgba(61, 138, 106, 0.15);
-  --warning: #D4813A;
+  --warning: hsl(30, 65%, 43%);
   --warning-light: rgba(212, 129, 58, 0.15);
-  --danger: #C0392B;
+  --danger: hsl(6, 64%, 45%);
   --danger-light: rgba(192, 57, 43, 0.15);
-  --info: #3D6B5E;
-  --info-light: rgba(61, 107, 94, 0.12);
-  --font-secondary: 'DM Sans', sans-serif;
+  --info: var(--primary);
+  --info-light: var(--brand-50);
+
+  /* La console est claire en permanence : elle doit donc redéclarer les fonds
+     sémantiques, sinon le thème sombre de l'application lui envoie ses propres
+     surfaces foncées à l'intérieur d'une interface claire. */
+  --success-surface: hsl(152, 55%, 95%);
+  --success-ink: hsl(152, 60%, 24%);
+  --warning-surface: hsl(38, 92%, 95%);
+  --warning-ink: hsl(30, 80%, 30%);
+  --danger-surface: hsl(0, 86%, 96%);
+  --danger-ink: hsl(0, 65%, 40%);
+  --info-surface: hsl(199, 89%, 95%);
+  --info-ink: hsl(201, 90%, 27%);
+  --brand-soft: var(--brand-50);
+  --brand-soft-ink: var(--brand-700);
+  --brand-line: var(--brand-200);
+
+  /* La console garde son fond papier, hérité de la maquette Banani et assumé :
+     c'est l'outil de l'exploitant, pas une page vue par une clinique. En
+     revanche elle ne garde plus son propre vert ni sa propre police. Elle
+     avait hsl(163 27% 33%) là où l'application a hsl(163 44% 24%) : deux verts
+     à un clic d'écart, pour aucune raison. */
+  --primary-h: 163;
+  --primary-s: 44%;
+  --primary-l: 24%;
+  --primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
+  --primary-rgb: 30, 77, 64;
+  --primary-hover: var(--brand-700);
+  --primary-light: var(--brand-50);
+}
+
+/* Console dense : une carte qui contient un tableau de vingt lignes ne doit
+   pas sauter de 4px au survol (.card:hover global). Le relief au survol reste,
+   par l'ombre seule. */
+.platform-admin-shell .card:hover {
+  transform: none;
+}
+
+/* .table-container apporte sa propre bordure + rayon + ombre ; posé dans une
+   .card qui en a déjà, cela dessinait un double cadre. */
+.platform-admin-shell .card > .table-container {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: transparent;
 }
 
 .platform-admin-shell input,
 .platform-admin-shell select,
 .platform-admin-shell button {
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-primary);
 }
 
 /* Banani badges/pills are rounded-md (6px), not the app-wide full-pill shape */
@@ -1935,11 +2830,111 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
 }
 
+/* Barre latérale collante à partir de 900px. La liste des cliniques dépasse
+   de loin la hauteur d'un écran, et la nav défilait avec la page : au milieu
+   du tableau il ne restait qu'une colonne sombre vide, et il fallait remonter
+   tout en haut pour changer de section. align-self: flex-start est
+   indispensable — un élément flex étiré (comportement par défaut, stretch) ne
+   peut pas coller. overflow-y sur la barre elle-même : sur un écran de 600px
+   de haut, les neuf entrées plus le pied dépassent les 100vh. */
+@media (min-width: 900px) {
+  .platform-admin-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    align-self: flex-start;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 640px) {
   .platform-admin-shell th,
   .platform-admin-shell td {
     padding: 0.6rem 0.7rem;
     font-size: 0.78rem;
+  }
+  /* Les cartes sans padding en ligne (Rapports, Sécurité, Config. système)
+     gardaient les 1.75rem de .card : 56px de marges perdues sur 375px. */
+  .platform-admin-shell .card {
+    padding: 1rem;
+  }
+  /* Cibles tactiles : les pastilles de filtre et les boutons « Gérer » des
+     tableaux tombaient autour de 24-30px de haut, sous le minimum de 44px. */
+  .platform-admin-shell .filter-pill,
+  .platform-admin-shell .btn-outline,
+  .platform-admin-shell .page-cta-btn {
+    min-height: 40px;
+  }
+}
+
+/* Sous 640px, les tableaux d'exploitation (.platform-table) deviennent des
+   fiches empilées. Le défilement horizontal reste la solution pour les
+   journaux de Sécurité et Rapports — données courtes et chronologiques, qui se
+   lisent en grille — mais sur huit colonnes et 375px de large il ne se lit
+   pas, il se déchiffre : on fait glisser pour trouver le statut, puis on
+   revient pour savoir de quelle clinique il s'agissait.
+   Chaque cellule porte son intitulé en data-label, repris ici en ::before :
+   pas de second balisage mobile à maintenir en parallèle du tableau. */
+@media (max-width: 640px) {
+  .platform-admin-shell .platform-table {
+    min-width: 0 !important;
+  }
+  .platform-admin-shell .platform-table thead {
+    display: none;
+  }
+  .platform-admin-shell .platform-table,
+  .platform-admin-shell .platform-table tbody,
+  .platform-admin-shell .platform-table tr,
+  .platform-admin-shell .platform-table td {
+    display: block;
+    width: 100%;
+  }
+  .platform-admin-shell .platform-table tr {
+    padding: 0.8rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .platform-admin-shell .platform-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  .platform-admin-shell .platform-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    border: none;
+    font-size: 0.82rem;
+  }
+  .platform-admin-shell .platform-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  /* Première cellule = titre de la fiche : le nom de la clinique ou le sujet
+     du ticket se passe d'intitulé. */
+  .platform-admin-shell .platform-table td:first-child {
+    display: block;
+    font-size: 0.9rem;
+    padding-bottom: 6px;
+  }
+  .platform-admin-shell .platform-table td:first-child::before {
+    content: none;
+  }
+  /* Cellule vide — colonne « Illimité » d'une clinique ordinaire, colonne
+     d'action sur sa propre ligne : pas de ligne fantôme réduite à son
+     intitulé. */
+  .platform-admin-shell .platform-table td:empty {
+    display: none;
+  }
+  /* Les lignes dépliées par « Gérer » couvrent toutes les colonnes : elles
+     gardent leur bloc de commandes, la mise en fiche n'a pas de sens ici. */
+  .platform-admin-shell .platform-table td[colspan] {
+    display: block;
+  }
+  .platform-admin-shell .platform-table td[colspan]::before {
+    content: none;
   }
 }
 
@@ -1959,6 +2954,19 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center !important;
     justify-content: flex-start !important;
     overflow-x: auto;
+    /* Même raison qu'en desktop : la nav doit rester atteignable en cours de
+       défilement d'un tableau. 50 passe sous la barre d'actions mobile (90)
+       et sous les toasts (1000). */
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
+  }
+  /* Le bloc qui porte l'en-tête et la nav est un élément flex comme un autre :
+     sans ceci il se comprimait au lieu de laisser la barre défiler, et les
+     libellés se tronquaient au milieu. */
+  .platform-admin-sidebar > div {
+    flex-shrink: 0;
   }
   .platform-admin-sidebar-header {
     display: none !important;
@@ -1973,9 +2981,12 @@ h1, h2, h3, h4, h5, h6 {
     flex-direction: column !important;
     gap: 3px !important;
     font-size: 0.62rem !important;
-    padding: 6px 8px !important;
+    padding: 8px !important;
     white-space: nowrap !important;
     text-align: center !important;
+    flex-shrink: 0 !important;
+    min-height: 44px;
+    justify-content: center !important;
   }
   .platform-admin-sidebar-divider {
     display: none !important;
@@ -1998,6 +3009,9 @@ h1, h2, h3, h4, h5, h6 {
     white-space: normal !important;
     text-align: center !important;
     max-width: 72px !important;
+    flex-shrink: 0 !important;
+    min-height: 44px;
+    justify-content: center !important;
   }
   .platform-admin-sidebar-username {
     display: none !important;
@@ -2007,6 +3021,25 @@ h1, h2, h3, h4, h5, h6 {
   }
   .platform-admin-main-body {
     padding: 1rem 1.25rem !important;
+  }
+}
+
+/* Un libellé de mois sur deux sous 480px (voir BarChart.tsx). visibility et
+   non display : la largeur de chaque case reste celle de sa barre, sinon les
+   libellés restants se décalent par rapport aux barres qu'ils nomment. */
+@media (max-width: 480px) {
+  .bar-chart-labels span:nth-child(even) {
+    visibility: hidden;
+  }
+}
+
+/* Après le bloc 899px, et pas avant : à spécificité et !important égaux,
+   c'est l'ordre du fichier qui tranche — placé plus haut, ce padding se
+   faisait écraser par celui de 1.25rem ci-dessus. */
+@media (max-width: 480px) {
+  .platform-admin-main-header,
+  .platform-admin-main-body {
+    padding: 0.85rem !important;
   }
 }
 

@@ -110,8 +110,17 @@ router.get('/overview', async (req, res) => {
 
     // Variations affichées sous chaque carte. Comptées sur created_at, donc sur
     // la date d'entrée réelle de la ligne — pas une estimation.
+    //
+    // Chaque variation doit porter sur EXACTEMENT la population que compte sa
+    // carte, sinon elle contredit le nombre qu'elle commente. `clinicsActive`
+    // ne compte que les cliniques actives : sans le filtre de statut ci-dessous,
+    // une clinique ouverte le 2 et déjà expirée le 15 gonflait le « +N ce mois »
+    // d'une carte dont la valeur, elle, n'avait pas bougé.
     const isThisMonth = (value) => value && value >= startOfMonth;
-    const clinicsNewThisMonth = (clinics || []).filter(c => isThisMonth(c.created_at)).length;
+    const clinicsNewThisMonth = enrichedClinics
+      .filter(c => c.status === 'active' && isThisMonth(c.createdAt)).length;
+    // Pas de filtre équivalent ici : `totalUsers` compte tous les comptes,
+    // actifs ou non, donc la variation doit les compter tous aussi.
     const usersNewThisMonth = (users || []).filter(u => isThisMonth(u.created_at)).length;
 
     // `null` quand le mois précédent n'a rien encaissé : une variation en

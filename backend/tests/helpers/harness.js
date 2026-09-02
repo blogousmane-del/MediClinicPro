@@ -24,24 +24,55 @@ function stubModule(relativePath, exports) {
 }
 
 // Reproduit la partie de l'API PostgREST utilisée par les routes :
-// .from().select().eq().maybeSingle() / .single() / .insert() / .update(),
+// .from().select().eq().maybeSingle() / .single() / .insert() / .update() /
+// .delete(),
 // le tout « thenable » pour fonctionner avec await.
 function queryBuilder(table) {
   const state = { op: 'select', filters: [], payload: null, singleRow: false, count: false, head: false };
-  const rowMatches = (row) => state.filters.every(([column, value, op]) => (
-    op === 'in' ? value.includes(row[column]) : row[column] === value
-  ));
+  const rowMatches = (row) => state.filters.every(([column, value, op]) => {
+    switch (op) {
+      case 'in': return value.includes(row[column]);
+      // Comparaisons de plage : les dates circulent en ISO 8601 UTC, dont
+      // l'ordre lexicographique est l'ordre chronologique, donc `<` suffit et
+      // se comporte comme la comparaison PostgREST.
+      case 'gte': return row[column] != null && row[column] >= value;
+      case 'gt': return row[column] != null && row[column] > value;
+      case 'lte': return row[column] != null && row[column] <= value;
+      case 'lt': return row[column] != null && row[column] < value;
+      default: return row[column] === value;
+    }
+  });
 
   const run = () => {
     const rows = db[table];
 
+    // `nextId` evite la collision apres un delete : `rows.length + 1` reprend
+    // un identifiant deja pris des qu'une ligne a disparu. La valeur reste
+    // celle d'avant tant qu'aucune suppression n'a eu lieu.
+    const nextId = () => {
+      let candidate = rows.length + 1;
+      while (rows.some((r) => String(r.id) === String(candidate))) candidate += 1;
+      return candidate;
+    };
+
     if (state.op === 'insert') {
-      const row = { id: rows.length + 1, ...state.payload };
-      rows.push(row);
-      return { data: state.singleRow ? row : [row], error: null };
+      // PostgREST accepte un tableau et insere autant de lignes ; le faux ne
+      // gerait qu'un objet et transformait le tableau en `{0: {...}}`.
+      const payloads = Array.isArray(state.payload) ? state.payload : [state.payload];
+      const inserted = payloads.map((payload) => {
+        const row = { id: nextId(), ...payload };
+        rows.push(row);
+        return row;
+      });
+      return { data: state.singleRow ? inserted[0] : inserted, error: null };
     }
 
     const hits = rows.filter(rowMatches);
+
+    if (state.op === 'delete') {
+      hits.forEach((row) => rows.splice(rows.indexOf(row), 1));
+      return { data: hits, error: null };
+    }
 
     if (state.op === 'update') {
       hits.forEach((row) => Object.assign(row, state.payload));
@@ -71,12 +102,20 @@ function queryBuilder(table) {
     in(column, values) { state.filters.push([column, values, 'in']); return builder; },
     limit() { return builder; },
     order() { return builder; },
-    // Filtres de plage ignorés : les tests posent des dates explicites et
-    // vérifient le calcul applicatif, pas le filtrage PostgREST.
-    gte() { return builder; },
-    lt() { return builder; },
+    // Les filtres de plage étaient ignorés ici, au motif que les tests
+    // vérifiaient le calcul applicatif et non le filtrage PostgREST. Mais dès
+    // qu'une route découpe ses données PAR la requête — le revenu du mois
+    // courant contre celui du mois précédent, tous deux lus dans la même table
+    // avec des bornes différentes — les ignorer rend les deux lectures
+    // identiques, et un test écrit là-dessus valide une séparation qui n'existe
+    // pas. Même leçon que le `count` juste au-dessus.
+    gte(column, value) { state.filters.push([column, value, 'gte']); return builder; },
+    gt(column, value) { state.filters.push([column, value, 'gt']); return builder; },
+    lte(column, value) { state.filters.push([column, value, 'lte']); return builder; },
+    lt(column, value) { state.filters.push([column, value, 'lt']); return builder; },
     insert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
     update(payload) { state.op = 'update'; state.payload = payload; return builder; },
+    delete() { state.op = 'delete'; return builder; },
     upsert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
     maybeSingle() { state.singleRow = true; return builder; },
     single() { state.singleRow = true; return builder; },

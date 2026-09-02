@@ -45,7 +45,10 @@ export const BarChart: React.FC<BarChartProps> = ({ data, height = 160, formatVa
           );
         })}
       </svg>
-      <div style={{ display: 'flex', width: '100%' }}>
+      {/* Douze mois sur 375px, c'est 28px par libellé : sous 480px l'index.css
+          n'en laisse qu'un sur deux, plutôt que douze étiquettes coupées au
+          milieu d'un mot. */}
+      <div className="bar-chart-labels" style={{ display: 'flex', width: '100%' }}>
         {data.map((item, index) => (
           <span
             key={item.label + index}

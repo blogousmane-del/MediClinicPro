@@ -30,6 +30,17 @@ WHERE email IN (
   'kouassi@mediclinic.com'
 );
 
+-- CONTRÔLE DU 2026-09-02 (sonde en lecture seule sur la base live) : six des
+-- sept comptes sont bien fermés, mais ibrahim@mediclinic.com (id 3, doctor,
+-- clinique 1) est ressorti `active = 1`. Ce script le liste pourtant : quelque
+-- chose l'a rouvert après l'exécution du 2026-08-09 — une réactivation depuis
+-- Paramètres > Utilisateurs est l'explication la plus plausible. Son
+-- `password_hash` est identique à celui d'aminata@mediclinic.com, dont le mot
+-- de passe est publié dans CLAUDE.md : le compte se connecte réellement.
+-- Refermé le même jour, seconde sonde : les sept sont à `active = 0`.
+-- La leçon tient : cette fermeture peut régresser sans bruit, il faut la
+-- revérifier plutôt que la supposer acquise.
+--
 -- Depuis le correctif du 2026-08-09, middleware/auth.js relit users.active à
 -- chaque requête : la désactivation prend effet immédiatement, sans attendre
 -- l'expiration des jetons JWT (24 h) déjà émis.

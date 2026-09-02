@@ -10,10 +10,16 @@ import { SubscriptionLockScreen } from './components/SubscriptionLockScreen';
 import { isTabLocked } from './utils/subscription';
 import { initRippleEffect } from './utils/ripple';
 
-// Logged-out entry pages: kept eager (small, must render instantly on first paint).
+// Vitrine : gardée en chargement direct, c'est le premier rendu.
 import { LandingPage } from './pages/LandingPage';
-import { TermsOfServicePage } from './pages/TermsOfServicePage';
-import { AuthPage } from './pages/Auth/AuthPage';
+
+// Connexion/inscription et CGU : découpées comme les pages authentifiées.
+// AuthPage tire PhoneInput, donc react-phone-number-input et libphonenumber-js,
+// soit la plus grosse dépendance du dépôt. Chargée d'emblée, elle était
+// téléchargée par tout visiteur de la vitrine, y compris ceux qui ne cliquent
+// jamais sur « Connexion ». Mesuré : 1,2 s de blocage du fil principal en 4G.
+const AuthPage = lazy(() => import('./pages/Auth/AuthPage').then(m => ({ default: m.AuthPage })));
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage').then(m => ({ default: m.TermsOfServicePage })));
 
 // Authenticated pages: code-split so the initial bundle doesn't ship every
 // tab's code upfront. Each is only fetched the first time its tab is opened.
@@ -69,16 +75,20 @@ const MainAppContent: React.FC = () => {
   const [openApptModal, setOpenApptModal] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
+  // Le titre de la barre du haut reprend l'intitulé de la barre latérale : un
+  // même onglet s'appelait « Comptabilité » à gauche, « Grand Livre & Recettes »
+  // en haut et « Créer une facture » dans la page. Le titre de la page dit ce
+  // qu'on est en train de faire ; celui-ci dit seulement où l'on est.
   const tabTitles: Record<string, string> = {
     dashboard: 'Tableau de bord',
-    appointments: 'Gestion des Rendez-vous',
-    patients: selectedPatientId ? 'Dossier Patient' : 'Registre des Patients',
-    pharmacy: 'Gestion de Pharmacie',
-    prescriptions: 'Gestion des Ordonnances',
-    laboratory: 'File du Laboratoire',
-    accounting: 'Grand Livre & Recettes',
+    appointments: 'Rendez-vous',
+    patients: selectedPatientId ? 'Dossier patient' : 'Patients',
+    pharmacy: 'Pharmacie',
+    prescriptions: 'Ordonnances',
+    laboratory: 'Laboratoire',
+    accounting: 'Comptabilité',
     deposits: 'Dépôts de garantie',
-    settings: 'Paramètres du cabinet',
+    settings: 'Paramètres',
     profile: 'Mon profil',
     'platform-admin': 'Administration plateforme'
   };
@@ -123,10 +133,18 @@ const MainAppContent: React.FC = () => {
   // 1. Unauthenticated workflow
   if (!user) {
     if (loggedOutTab === 'login' || loggedOutTab === 'register') {
-      return <AuthPage initialTab={loggedOutTab} onNavigate={setLoggedOutTab} />;
+      return (
+        <Suspense fallback={<TabFallback />}>
+          <AuthPage initialTab={loggedOutTab} onNavigate={setLoggedOutTab} />
+        </Suspense>
+      );
     }
     if (loggedOutTab === 'terms') {
-      return <TermsOfServicePage onBack={() => setLoggedOutTab('landing')} onRegister={() => setLoggedOutTab('register')} />;
+      return (
+        <Suspense fallback={<TabFallback />}>
+          <TermsOfServicePage onBack={() => setLoggedOutTab('landing')} onRegister={() => setLoggedOutTab('register')} />
+        </Suspense>
+      );
     }
     return <LandingPage onNavigate={setLoggedOutTab} />;
   }

@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { SkeletonTableRows } from '../../components/Skeleton';
 import {
   Search,
-  Bell,
   Plus,
   Trash2,
-  RefreshCw,
   Send,
   Save,
   X,
@@ -28,6 +27,7 @@ interface InvoiceService {
 
 export const AccountingPage: React.FC = () => {
   const { showToast } = useNotifications();
+  const { clinic } = useAuth();
 
   const [viewMode, setViewMode] = useState<'create' | 'journal'>('create');
 
@@ -39,17 +39,23 @@ export const AccountingPage: React.FC = () => {
   const [patientResults, setPatientResults] = useState<any[]>([]);
   const [showPatientDropdown, setShowPatientDropdown] = useState<boolean>(false);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
-  const [invoiceNumber, setInvoiceNumber] = useState<string>(() => `#INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+  // Le numéro de facture est attribué par le serveur à l'encaissement, dérivé
+  // de l'identifiant de la ligne. Il était tiré au hasard ici, sur quatre
+  // chiffres et sans contrainte d'unicité en base : deux factures pouvaient
+  // porter le même numéro.
+  const [invoiceNumber, setInvoiceNumber] = useState<string>('');
   const [invoiceDate, setInvoiceDate] = useState<string>(todayISO);
   const [dueDate, setDueDate] = useState<string>(defaultDueDate.toISOString().split('T')[0]);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [notes, setNotes] = useState<string>('');
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState<boolean>(false);
 
-  const [services, setServices] = useState<InvoiceService[]>([
-    { id: 1, type: 'Consultation', description: 'Consultation générale', quantity: 1, unitPrice: 25000 },
-    { id: 2, type: 'Pharmacie', description: 'Médicaments prescrits', quantity: 1, unitPrice: 15600 }
-  ]);
+  // Une seule ligne vide : la facture s'ouvrait pré-remplie à 47 908 FCFA de
+  // soins inventés (« Consultation générale » 25 000, « Médicaments prescrits »
+  // 15 600). Un clic distrait sur « Envoyer » encaissait ce montant.
+  const blankService = (id: number): InvoiceService => ({ id, type: 'Consultation', description: '', quantity: 1, unitPrice: 0 });
+
+  const [services, setServices] = useState<InvoiceService[]>([blankService(1)]);
 
   const [payments, setPayments] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -99,14 +105,7 @@ export const AccountingPage: React.FC = () => {
   };
 
   const handleAddService = () => {
-    const newService: InvoiceService = {
-      id: Date.now(),
-      type: 'Consultation',
-      description: 'Nouveau soin',
-      quantity: 1,
-      unitPrice: 5000
-    };
-    setServices([...services, newService]);
+    setServices([...services, blankService(Date.now())]);
   };
 
   const handleRemoveService = (id: number) => {
@@ -117,12 +116,6 @@ export const AccountingPage: React.FC = () => {
     setServices(services.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
 
-  const handleGenerateInvoiceNum = () => {
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    setInvoiceNumber(`#INV-2025-${randomNum}`);
-    showToast('info', 'Numéro généré', 'Un nouveau numéro de facture a été attribué.');
-  };
-
   const subtotal = services.reduce((acc, curr) => acc + (curr.quantity * curr.unitPrice), 0);
   const tva = Math.round(subtotal * 0.18);
   const total = subtotal + tva;
@@ -130,16 +123,16 @@ export const AccountingPage: React.FC = () => {
   const resetInvoiceForm = () => {
     setSelectedPatient(null);
     setPatientSearch('');
-    setServices([{ id: Date.now(), type: 'Consultation', description: 'Consultation générale', quantity: 1, unitPrice: 10000 }]);
+    setServices([blankService(Date.now())]);
     setNotes('');
     setPaymentMethod('cash');
-    setInvoiceNumber(`#INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    setInvoiceNumber('');
   };
 
   // Encaissement en espèces uniquement : la facture est réglée au comptoir, donc
   // le serveur enregistre le paiement immédiatement. Plus aucun état « en
   // attente » à surveiller, contrairement à l'ancien parcours Mobile Money.
-  const submitInvoice = async (): Promise<{ ok: boolean }> => {
+  const submitInvoice = async (): Promise<{ ok: boolean; invoiceNumber?: string }> => {
     if (!selectedPatient) {
       showToast('error', 'Patient requis', 'Veuillez sélectionner un patient pour cette facture.');
       return { ok: false };
@@ -151,15 +144,15 @@ export const AccountingPage: React.FC = () => {
 
     setIsSubmittingInvoice(true);
     try {
-      await api.post('/financials/checkout', {
+      const created = await api.post('/financials/checkout', {
         patientId: selectedPatient.id,
         amountTotal: total,
         paymentMethod,
-        referenceNumber: `${invoiceNumber}`,
         items: services.map(s => ({ type: s.type, name: s.description, cost: s.quantity * s.unitPrice }))
       });
 
-      return { ok: true };
+      setInvoiceNumber(created.invoiceNumber || '');
+      return { ok: true, invoiceNumber: created.invoiceNumber };
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Échec de l\'enregistrement', err.error || 'Impossible d\'enregistrer la facture.');
@@ -172,12 +165,16 @@ export const AccountingPage: React.FC = () => {
   const handleSaveInvoice = async () => {
     const result = await submitInvoice();
     if (!result.ok) return;
-    showToast('success', 'Facture enregistrée', `Facture ${invoiceNumber} sauvegardée et encaissée avec succès.`);
+    showToast('success', 'Facture enregistrée', `Facture ${result.invoiceNumber} enregistrée et encaissée.`);
     resetInvoiceForm();
     setViewMode('journal');
   };
 
-  const buildInvoiceReceiptHtml = () => {
+  // Le reçu s'ouvre dans une fenêtre neuve : aucune feuille de style de
+  // l'application ne l'accompagne, donc les `var(--...)` qu'il utilisait n'y
+  // résolvaient rien et le document sortait sans couleurs ni bordures. Tout est
+  // écrit en littéral ici.
+  const buildInvoiceReceiptHtml = (number: string) => {
     const rows = services.map(s => `
       <tr>
         <td>${s.type}</td>
@@ -191,25 +188,27 @@ export const AccountingPage: React.FC = () => {
     return `
       <html>
         <head>
-          <title>Facture ${invoiceNumber}</title>
+          <title>Facture ${number}</title>
           <style>
             body { font-family: sans-serif; padding: 30px; color: #333; line-height: 1.6; }
-            .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 15px; margin-bottom: 20px; }
-            .title { font-size: 1.5rem; font-weight: bold; color: #0d9488; }
-            .patient-box { background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #1e4d40; padding-bottom: 15px; margin-bottom: 20px; }
+            .title { font-size: 1.5rem; font-weight: bold; color: #1e4d40; }
+            .clinic-meta { font-size: 0.85rem; color: #555; }
+            .patient-box { background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 0.9rem; }
-            th { background: #f3f4f6; text-align: left; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 0.9rem; }
+            th { background: #f1f5f9; text-align: left; }
             .totals { margin-left: auto; width: 280px; }
             .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
             .grand-total { font-weight: bold; font-size: 1.1rem; border-top: 1px solid #333; margin-top: 6px; padding-top: 8px; }
-            .footer { text-align: center; margin-top: 40px; font-size: 0.8rem; color: #888; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+            .footer { text-align: center; margin-top: 40px; font-size: 0.8rem; color: #888; border-top: 1px solid #cbd5e1; padding-top: 10px; }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="title">CLINIQUE MÉDICALE DE L'AVENIR</div>
-            <div>Facture ${invoiceNumber}</div>
+            <div class="title">${(clinic?.name || 'Clinique').toUpperCase()}</div>
+            <div class="clinic-meta">${[clinic?.address, clinic?.phone].filter(Boolean).join(' · ')}</div>
+            <div>Facture ${number}</div>
           </div>
           <div class="patient-box">
             <strong>Patient :</strong> ${selectedPatient.last_name.toUpperCase()} ${selectedPatient.first_name}<br>
@@ -235,20 +234,121 @@ export const AccountingPage: React.FC = () => {
     `;
   };
 
-  const printReceipt = () => {
+  // Styles partagés par les documents imprimés. Ils s'ouvrent dans une fenêtre
+  // neuve, sans la feuille de style de l'application : tout est littéral.
+  const PRINT_STYLES = `
+    body { font-family: sans-serif; padding: 30px; color: #333; line-height: 1.6; }
+    .header { text-align: center; border-bottom: 2px solid #1e4d40; padding-bottom: 15px; margin-bottom: 20px; }
+    .title { font-size: 1.5rem; font-weight: bold; color: #1e4d40; }
+    .clinic-meta { font-size: 0.85rem; color: #555; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 0.9rem; }
+    th { background: #f1f5f9; text-align: left; }
+    .right { text-align: right; }
+    .footer { text-align: center; margin-top: 40px; font-size: 0.8rem; color: #888; border-top: 1px solid #cbd5e1; padding-top: 10px; }
+  `;
+
+  const clinicHeaderHtml = (subtitle: string) => `
+    <div class="header">
+      <div class="title">${(clinic?.name || 'Clinique').toUpperCase()}</div>
+      <div class="clinic-meta">${[clinic?.address, clinic?.phone].filter(Boolean).join(' \u00b7 ')}</div>
+      <div>${subtitle}</div>
+    </div>
+  `;
+
+  const openPrintWindow = (html: string) => {
     const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(buildInvoiceReceiptHtml());
-      printWindow.document.close();
-      printWindow.print();
+    if (!printWindow) {
+      showToast('error', 'Fenêtre bloquée', "Autorisez les fenêtres surgissantes pour imprimer ce document.");
+      return;
     }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  // Reçu d'un encaissement déjà enregistré, reconstruit depuis la ligne du
+  // journal. Le bouton « Reçu » de chaque ligne n'avait aucun gestionnaire.
+  const handlePrintPaymentReceipt = (pay: any) => {
+    const items: { type?: string; name?: string; cost?: number }[] = Array.isArray(pay.items) ? pay.items : [];
+    const rows = items.map(it => `
+      <tr>
+        <td>${it.type || ''}</td>
+        <td>${it.name || ''}</td>
+        <td class="right">${Number(it.cost || 0).toLocaleString()} FCFA</td>
+      </tr>
+    `).join('');
+
+    openPrintWindow(`
+      <html>
+        <head><title>Reçu ${pay.reference_number || pay.id}</title><style>${PRINT_STYLES}</style></head>
+        <body>
+          ${clinicHeaderHtml(`Reçu ${pay.reference_number || `#${pay.id}`}`)}
+          <p>
+            <strong>Patient :</strong> ${pay.patient_last_name} ${pay.patient_first_name}<br>
+            <strong>Date :</strong> ${new Date(pay.created_at).toLocaleDateString('fr-FR')}<br>
+            <strong>Encaissé par :</strong> ${pay.cashier_name}<br>
+            <strong>Mode de paiement :</strong> ${pay.payment_method}
+          </p>
+          ${rows ? `<table><thead><tr><th>Type</th><th>Description</th><th class="right">Montant</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+          <p class="right"><strong>Total : ${Number(pay.amount_total).toLocaleString()} FCFA</strong></p>
+          <div class="footer">Document généré par MediClinic.</div>
+        </body>
+      </html>
+    `);
+  };
+
+  // « Exporter PDF » n'exportait rien : le bouton n'affichait qu'un message
+  // annonçant un export qui n'avait pas lieu. Le journal s'imprime maintenant
+  // réellement, et la boîte d'impression du navigateur permet l'enregistrement
+  // en PDF.
+  const handlePrintLedger = () => {
+    if (payments.length === 0) {
+      showToast('info', 'Journal vide', "Aucun encaissement à imprimer pour l'instant.");
+      return;
+    }
+
+    const rows = payments.map(pay => `
+      <tr>
+        <td>${new Date(pay.created_at).toLocaleDateString('fr-FR')}</td>
+        <td>${pay.reference_number || `#${pay.id}`}</td>
+        <td>${pay.patient_last_name} ${pay.patient_first_name}</td>
+        <td>${pay.payment_method}</td>
+        <td>${pay.cashier_name}</td>
+        <td class="right">${Number(pay.amount_total).toLocaleString()} FCFA</td>
+      </tr>
+    `).join('');
+    const sum = payments.reduce((acc, pay) => acc + Number(pay.amount_total || 0), 0);
+
+    openPrintWindow(`
+      <html>
+        <head><title>Journal des recettes</title><style>${PRINT_STYLES}</style></head>
+        <body>
+          ${clinicHeaderHtml(`Journal des recettes \u00b7 édité le ${new Date().toLocaleDateString('fr-FR')}`)}
+          <table>
+            <thead>
+              <tr><th>Date</th><th>N° facture</th><th>Patient</th><th>Mode</th><th>Encaissé par</th><th class="right">Montant</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p class="right"><strong>Total sur ${payments.length} encaissement(s) : ${sum.toLocaleString()} FCFA</strong></p>
+          <div class="footer">Document généré par MediClinic.</div>
+        </body>
+      </html>
+    `);
+  };
+
+  const printReceipt = (number: string) => {
+    openPrintWindow(buildInvoiceReceiptHtml(number));
   };
 
   const handleSendAndPrint = async () => {
     const result = await submitInvoice();
     if (!result.ok) return;
-    printReceipt();
-    showToast('success', 'Facture transmise', `Facture ${invoiceNumber} encaissée et prête pour l'impression.`);
+    // Le reçu porte le numéro que le serveur vient d'attribuer, pas celui que
+    // le navigateur avait tiré avant l'encaissement.
+    printReceipt(result.invoiceNumber || '');
+    showToast('success', 'Facture transmise', `Facture ${result.invoiceNumber} encaissée, reçu prêt à imprimer.`);
     resetInvoiceForm();
     setViewMode('journal');
   };
@@ -261,7 +361,7 @@ export const AccountingPage: React.FC = () => {
     backgroundColor: 'var(--bg-primary)',
     fontSize: '0.85rem',
     color: 'var(--text-primary)',
-    outline: 'none',
+    
     boxSizing: 'border-box'
   };
 
@@ -296,32 +396,6 @@ export const AccountingPage: React.FC = () => {
           flex-wrap: wrap;
           gap: 0.75rem;
         }
-        .acc-header-search {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-        }
-        .acc-search-box {
-          position: relative;
-          width: 220px;
-        }
-        .acc-search-box input {
-          width: 100%;
-          padding: 8px 12px 8px 34px;
-          border-radius: 10px;
-          border: 1px solid var(--border);
-          background-color: var(--bg-secondary);
-          font-size: 0.85rem;
-          outline: none;
-          color: var(--text-primary);
-        }
-        .acc-search-icon {
-          position: absolute;
-          left: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          pointer-events: none;
-        }
 
         /* Tabs */
         .acc-tabs {
@@ -340,9 +414,9 @@ export const AccountingPage: React.FC = () => {
           transition: background 0.2s, color 0.2s;
         }
         .acc-tab.active {
-          background-color: #1e4d40;
+          background-color: var(--brand-fill);
           color: #fff;
-          border-color: #1e4d40;
+          border-color: var(--brand-fill);
         }
         .acc-tab.inactive {
           background-color: var(--bg-secondary);
@@ -410,21 +484,9 @@ export const AccountingPage: React.FC = () => {
           }
 
           /* Hide search bar on very small screens, keep bell */
-          .acc-search-box {
-            width: 100%;
-          }
           .acc-header {
             flex-direction: column;
             align-items: stretch;
-          }
-          .acc-header-search {
-            flex-direction: row;
-            justify-content: flex-end;
-          }
-          .acc-search-box {
-            flex: 1;
-            width: auto;
-            max-width: 200px;
           }
 
           /* Service fields → stacked 2 per row */
@@ -483,29 +545,6 @@ export const AccountingPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="acc-header-search">
-            <div className="acc-search-box">
-              <Search size={15} color="var(--text-muted)" className="acc-search-icon" />
-              <input type="text" placeholder="Rechercher un patient..." />
-            </div>
-            <div style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
-              <div style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                border: '1px solid var(--border)', backgroundColor: 'var(--bg-secondary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-secondary)'
-              }}>
-                <Bell size={18} />
-              </div>
-              <span style={{
-                position: 'absolute', top: '-4px', right: '-4px',
-                backgroundColor: '#ef4444', color: 'white', fontSize: '0.68rem',
-                fontWeight: 700, width: '17px', height: '17px', borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '2px solid var(--bg-primary)'
-              }}>3</span>
-            </div>
-          </div>
         </div>
 
         {/* 2. Tab Switcher */}
@@ -527,15 +566,6 @@ export const AccountingPage: React.FC = () => {
         {/* VIEW 1: NOUVELLE FACTURE */}
         {viewMode === 'create' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-            <div>
-              <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-secondary)' }}>
-                Nouvelle facture
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '2px' }}>
-                Remplissez les informations ci-dessous
-              </p>
-            </div>
 
             {/* 2-column grid (collapses to 1 on tablet/mobile) */}
             <div className="acc-form-grid">
@@ -599,28 +629,17 @@ export const AccountingPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* N° Facture */}
+                {/* Le numéro est attribué par le serveur à l'encaissement : il
+                    n'est ni saisissable ni régénérable, sans quoi deux factures
+                    peuvent porter le même. */}
                 <div>
                   <label style={labelStyle}>N° FACTURE</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      style={{ ...inputStyle, fontFamily: 'monospace', fontWeight: 700 }}
-                    />
-                    <button
-                      onClick={handleGenerateInvoiceNum}
-                      title="Générer un autre numéro"
-                      style={{
-                        flexShrink: 0, background: 'none', border: '1px solid var(--border)',
-                        borderRadius: '8px', padding: '8px', color: 'var(--text-secondary)',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}
-                    >
-                      <RefreshCw size={16} />
-                    </button>
-                  </div>
+                  <input
+                    type="text"
+                    value={invoiceNumber || 'Attribué à l’enregistrement'}
+                    readOnly
+                    style={{ ...inputStyle, fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-muted)', cursor: 'default' }}
+                  />
                 </div>
 
                 {/* Date Facture */}
@@ -658,7 +677,7 @@ export const AccountingPage: React.FC = () => {
                     onClick={handleAddService}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
-                      padding: '7px 12px', backgroundColor: '#1e4d40', color: '#ffffff',
+                      padding: '7px 12px', backgroundColor: 'var(--brand-fill)', color: '#ffffff',
                       border: 'none', borderRadius: '8px', fontWeight: 700,
                       fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap'
                     }}
@@ -750,7 +769,7 @@ export const AccountingPage: React.FC = () => {
                               title="Supprimer"
                               style={{
                                 background: 'none', border: 'none', cursor: 'pointer',
-                                color: '#ef4444', padding: '6px', display: 'flex',
+                                color: 'var(--danger)', padding: '6px', display: 'flex',
                                 alignItems: 'center', justifyContent: 'center'
                               }}
                             >
@@ -773,7 +792,7 @@ export const AccountingPage: React.FC = () => {
                     <span>TVA (18%)</span>
                     <span style={{ fontWeight: 600 }}>{tva.toLocaleString()} FCFA</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#1e4d40', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-soft-ink)', marginTop: '4px' }}>
                     <span>Total</span>
                     <span>{total.toLocaleString()} FCFA</span>
                   </div>
@@ -791,7 +810,7 @@ export const AccountingPage: React.FC = () => {
                       width: '100%', padding: '10px 12px', borderRadius: '10px',
                       border: '1px solid var(--border)', backgroundColor: 'var(--bg-primary)',
                       fontSize: '0.85rem', color: 'var(--text-primary)',
-                      outline: 'none', resize: 'none', boxSizing: 'border-box'
+                      resize: 'none', boxSizing: 'border-box'
                     }}
                   />
                 </div>
@@ -819,8 +838,8 @@ export const AccountingPage: React.FC = () => {
                   disabled={isSubmittingInvoice}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                    padding: '10px 18px', backgroundColor: '#e6f4ea', color: '#1e4d40',
-                    border: '1px solid #bbf7d0', borderRadius: '10px',
+                    padding: '10px 18px', backgroundColor: 'var(--brand-soft)', color: 'var(--brand-soft-ink)',
+                    border: '1px solid var(--brand-line)', borderRadius: '10px',
                     fontWeight: 700, fontSize: '0.875rem', cursor: isSubmittingInvoice ? 'not-allowed' : 'pointer',
                     opacity: isSubmittingInvoice ? 0.6 : 1
                   }}
@@ -834,7 +853,7 @@ export const AccountingPage: React.FC = () => {
                   disabled={isSubmittingInvoice}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                    padding: '10px 22px', backgroundColor: '#1e4d40', color: '#ffffff',
+                    padding: '10px 22px', backgroundColor: 'var(--brand-fill)', color: '#ffffff',
                     border: 'none', borderRadius: '10px', fontWeight: 700,
                     fontSize: '0.875rem', cursor: isSubmittingInvoice ? 'not-allowed' : 'pointer',
                     boxShadow: '0 2px 8px rgba(30,77,64,0.25)',
@@ -858,9 +877,9 @@ export const AccountingPage: React.FC = () => {
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 700, fontFamily: 'var(--font-secondary)' }}>Comptabilité & Caisse</h2>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Suivez les paiements, éditez les factures et exportez les rapports financiers.</p>
               </div>
-              <button onClick={() => showToast('info', 'Exportation PDF', 'Grand Livre exporté en PDF.')} className="btn btn-outline" style={{ gap: '6px', whiteSpace: 'nowrap' }}>
+              <button onClick={handlePrintLedger} className="btn btn-outline" style={{ gap: '6px', whiteSpace: 'nowrap' }}>
                 <FileDown size={18} />
-                <span>Exporter PDF</span>
+                <span>Imprimer / PDF</span>
               </button>
             </div>
 
@@ -940,7 +959,11 @@ export const AccountingPage: React.FC = () => {
                         <td style={{ fontFamily: 'monospace' }}>{pay.reference_number || 'N/A'}</td>
                         <td>{pay.cashier_name}</td>
                         <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.8rem', gap: '4px' }}>
+                          <button
+                            onClick={() => handlePrintPaymentReceipt(pay)}
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 10px', fontSize: '0.8rem', gap: '4px' }}
+                          >
                             <Printer size={14} /> Reçu
                           </button>
                         </td>

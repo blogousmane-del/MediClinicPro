@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { AnimatedNumber } from '../components/AnimatedNumber';
+import { StatCard } from '../components/ui/StatCard';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { SkeletonPage } from '../components/Skeleton';
 import { SubscriptionLockScreen } from '../components/SubscriptionLockScreen';
 import { daysUntilExpiry } from '../utils/subscription';
@@ -88,11 +89,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
     time: new Date(a.date_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
     name: `${a.patient_first_name || ''} ${a.patient_last_name || ''}`.trim() || 'Patient',
     detail: `Motif: ${a.motif} · ${a.practitioner_name || 'Praticien'}`,
-    status: a.status === 'completed' ? 'completed' : a.status === 'cancelled' ? 'cancelled' : 'waiting'
+    // Les trois seuls statuts du domaine (supabase_schema.sql:80). Un quatrième
+    // état « in_progress » était rendu ici alors que rien ne peut le produire :
+    // la pastille correspondante était morte, et un RDV annulé tombait dans la
+    // branche par défaut, donc s'affichait « En attente ».
+    status: a.status === 'completed' ? 'completed' : a.status === 'cancelled' ? 'cancelled' : 'scheduled'
   }));
 
   const totalPatientsCount = stats?.patientsTotal ?? 0;
-  const confirmedRdvCount = todayAppts.length;
+  // Les annulés sont exclus : les compter revenait à annoncer une journée plus
+  // chargée qu'elle ne l'est, alors que le créneau est justement libéré.
+  const todayRdvCount = todayAppts.filter((a: any) => a.status !== 'cancelled').length;
   const activeAlertsCount = (stats?.lowStockCount || 0) + (stats?.nearExpiryCount || 0);
 
   const year = calendarDate.getFullYear();
@@ -152,7 +159,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
             alignItems: 'center',
             gap: '8px'
           }}>
-            Bonjour, {user?.name?.split(' ')[0] || 'Docteur'} 👋
+            Bonjour, {user?.name?.split(' ')[0] || 'Docteur'}
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px', margin: 0, textTransform: 'capitalize' }}>
             {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -182,34 +189,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                 backgroundColor: 'var(--bg-secondary)',
                 fontSize: '0.85rem',
                 color: 'var(--text-primary)',
-                outline: 'none',
+                
                 boxSizing: 'border-box'
               }}
             />
           </div>
 
-          {/* Bell Icon — badge reflects real pharmacy alert count */}
-          <div style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)'
-            }}>
+          {/* Bell Icon — badge reflects real pharmacy alert count.
+              C'était un <div> cliquable : ni tabulable, ni activable au
+              clavier, et sans nom pour un lecteur d'écran. */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setCurrentTab('pharmacy')}
+              aria-label={activeAlertsCount > 0
+                ? `Alertes de stock : ${activeAlertsCount}. Ouvrir la pharmacie.`
+                : 'Aucune alerte de stock. Ouvrir la pharmacie.'}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--bg-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: 0
+              }}>
               <Bell size={18} />
-            </div>
+            </button>
             {activeAlertsCount > 0 && (
               <span style={{
                 position: 'absolute',
                 top: '-4px',
                 right: '-4px',
-                backgroundColor: '#ef4444',
-                color: 'white',
+                backgroundColor: 'var(--danger)',
+                color: '#ffffff',
                 fontSize: '0.7rem',
                 fontWeight: 700,
                 minWidth: '18px',
@@ -235,14 +252,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
             alignItems: 'center',
             gap: '8px',
             padding: '10px 18px',
-            backgroundColor: '#1e4d40',
-            color: '#ffffff',
+            backgroundColor: 'var(--brand-fill)',
+            color: 'var(--brand-fill-fg)',
             border: 'none',
-            borderRadius: '10px',
+            borderRadius: 'var(--radius-sm)',
             fontWeight: 600,
             fontSize: '0.875rem',
             cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(30, 77, 64, 0.25)',
+            boxShadow: 'var(--shadow-sm)',
             transition: 'var(--transition)'
           }}
         >
@@ -329,12 +346,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               gap: '10px',
               marginLeft: 'auto',
               padding: '8px 14px',
-              background: 'linear-gradient(135deg, #e8a93e, #d4813a)',
-              border: 'none',
-              borderRadius: '10px',
-              color: '#ffffff',
+              /* Le dégradé orange était la seule surface dégradée de
+                 l'application, et son blanc sur orange clair passait sous le
+                 seuil AA. Fond teinté + encre foncée, comme toute alerte. */
+              backgroundColor: 'var(--warning-surface)',
+              border: '1px solid var(--warning)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--warning-ink)',
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(212, 129, 58, 0.3)'
+              boxShadow: 'var(--shadow-sm)'
             }}
           >
             <Sparkles size={15} />
@@ -350,176 +370,53 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
       </div>
 
       {/* 4 Stat Cards Row */}
+      {/* Les quatre cartes passent par <StatCard> : elles étaient quatre blocs
+          de style recopiés, chacun avec sa pastille d'icône codée en dur
+          (#e6f4ea, #f1f5f9, #ffedd5), qui restait claire en thème sombre. */}
       <div className="dashboard-stats-grid">
-        {/* Card 1 */}
-        <div
+        <StatCard
+          label="PATIENTS ACTIFS"
+          value={totalPatientsCount}
+          hint="Dossiers non archivés"
+          icon={Users}
+          tone="brand"
           onClick={() => setCurrentTab('patients')}
-          className="stat-card-animate"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '16px',
-            padding: '1.25rem 1.5rem',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
-              PATIENTS AUJOURD'HUI
-            </span>
-            <div style={{
-              backgroundColor: '#e6f4ea',
-              padding: '10px',
-              borderRadius: '12px',
-              color: '#1e4d40',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Users size={20} />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              <AnimatedNumber value={totalPatientsCount} />
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Dossiers actifs configurés
-            </div>
-          </div>
-        </div>
+        />
 
-        {/* Card 2 */}
-        <div
+        <StatCard
+          label="RDV DU JOUR"
+          value={todayRdvCount}
+          hint="Hors rendez-vous annulés"
+          icon={CalendarIcon}
+          tone="neutral"
           onClick={() => setCurrentTab('appointments')}
-          className="stat-card-animate"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '16px',
-            padding: '1.25rem 1.5rem',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
-              RDV CONFIRMÉS
-            </span>
-            <div style={{
-              backgroundColor: '#f1f5f9',
-              padding: '10px',
-              borderRadius: '12px',
-              color: '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <CalendarIcon size={20} />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              <AnimatedNumber value={confirmedRdvCount} />
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Planifiés aujourd'hui
-            </div>
-          </div>
-        </div>
+        />
 
         {/* Card 3 — real today's revenue (replaces a fully-fabricated "temps d'attente" card) */}
-        <div
-          onClick={() => ['admin', 'manager', 'secretary'].includes(user?.role || '') && setCurrentTab('accounting')}
-          className="stat-card-animate"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '16px',
-            padding: '1.25rem 1.5rem',
-            cursor: ['admin', 'manager', 'secretary'].includes(user?.role || '') ? 'pointer' : 'default',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
-              RECETTES DU JOUR
-            </span>
-            <div style={{
-              backgroundColor: '#e6f4ea',
-              padding: '10px',
-              borderRadius: '12px',
-              color: '#1e4d40',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <CreditCard size={20} />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              <AnimatedNumber value={stats?.todayRevenue || 0} formatter={(n) => `${n.toLocaleString('fr-FR')} FCFA`} />
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Paiements encaissés
-            </div>
-          </div>
-        </div>
+        <StatCard
+          label="RECETTES DU JOUR"
+          value={stats?.todayRevenue || 0}
+          hint="Paiements encaissés"
+          icon={CreditCard}
+          tone="brand"
+          formatter={(n) => `${n.toLocaleString('fr-FR')} FCFA`}
+          onClick={
+            ['admin', 'manager', 'secretary'].includes(user?.role || '')
+              ? () => setCurrentTab('accounting')
+              : undefined
+          }
+        />
 
-        {/* Card 4 */}
-        <div
+        <StatCard
+          label="ALERTES ACTIVES"
+          value={activeAlertsCount}
+          hint={activeAlertsCount === 0
+            ? 'Aucune alerte active'
+            : `${stats?.lowStockCount || 0} stock bas, ${stats?.nearExpiryCount || 0} péremption proche`}
+          icon={AlertTriangle}
+          tone={activeAlertsCount === 0 ? 'neutral' : 'warning'}
           onClick={() => setCurrentTab('pharmacy')}
-          className="stat-card-animate"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '16px',
-            padding: '1.25rem 1.5rem',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
-              ALERTES ACTIVES
-            </span>
-            <div style={{
-              backgroundColor: '#ffedd5',
-              padding: '10px',
-              borderRadius: '12px',
-              color: '#ea580c',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <AlertTriangle size={20} />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '8px' }}>
-              <AnimatedNumber value={activeAlertsCount} />
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              {activeAlertsCount === 0
-                ? 'Aucune alerte active'
-                : `${stats?.lowStockCount || 0} stock bas, ${stats?.nearExpiryCount || 0} péremption proche`}
-            </div>
-          </div>
-        </div>
+        />
       </div>
 
       {/* Main Split Content Section */}
@@ -540,23 +437,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                 Rendez-vous du jour
               </h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
-                {apptListToRender.length} rendez-vous planifiés
+                {todayRdvCount} rendez-vous, hors annulations
               </span>
             </div>
 
             {/* Status Legend */}
             <div className="dashboard-legend">
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#1e4d40' }} />
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--brand-fill)' }} />
                 <span>Terminé</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#475569' }} />
-                <span>En cours</span>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--border-strong)' }} />
+                <span>Planifié</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#cbd5e1' }} />
-                <span>En attente</span>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--text-secondary)' }} />
+                <span>Annulé</span>
               </div>
             </div>
           </div>
@@ -570,51 +467,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               </div>
             )}
             {apptListToRender.map((appt) => {
-              let statusBadge = null;
-              if (appt.status === 'completed') {
-                statusBadge = (
-                  <span style={{
-                    backgroundColor: '#1e4d40',
-                    color: '#ffffff',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap'
-                  }}>
-                    Terminé
-                  </span>
-                );
-              } else if (appt.status === 'in_progress') {
-                statusBadge = (
-                  <span style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-secondary)',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap'
-                  }}>
-                    En consultation
-                  </span>
-                );
-              } else {
-                statusBadge = (
-                  <span style={{
-                    backgroundColor: '#f1f5f9',
-                    color: '#64748b',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap'
-                  }}>
-                    En attente
-                  </span>
-                );
-              }
+              const statusBadge = appt.status === 'completed'
+                ? <StatusBadge tone="brand">Terminé</StatusBadge>
+                : appt.status === 'cancelled'
+                  ? <StatusBadge struck>Annulé</StatusBadge>
+                  : <StatusBadge tone="neutral">Planifié</StatusBadge>;
 
               return (
                 <div 
@@ -638,7 +495,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                       width: '36px',
                       height: '36px',
                       borderRadius: '50%',
-                      backgroundColor: '#cbd5e1',
+                      backgroundColor: 'var(--border-strong)',
                       overflow: 'hidden',
                       display: 'flex',
                       alignItems: 'center',
@@ -665,7 +522,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                   {/* Right side Badge & Chevron */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                     {statusBadge}
-                    <button style={{
+                    <button
+                      aria-label={`Ouvrir le rendez-vous de ${appt.name}`}
+                      onClick={() => setCurrentTab('appointments')}
+                      style={{
                       background: 'none',
                       border: '1px solid var(--border)',
                       borderRadius: '8px',
@@ -773,8 +633,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderRadius: '50%',
-                      backgroundColor: isSelected ? '#1e4d40' : 'transparent',
-                      color: isSelected ? '#ffffff' : 'inherit',
+                      backgroundColor: isSelected ? 'var(--brand-fill)' : 'transparent',
+                      color: isSelected ? 'var(--brand-fill-fg)' : 'inherit',
                       fontWeight: isSelected ? 700 : 500
                     }}
                   >
@@ -799,7 +659,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
               </h3>
               {activeAlertsCount > 0 && (
                 <span style={{
-                  backgroundColor: '#ef4444',
+                  backgroundColor: 'var(--danger)',
                   color: 'white',
                   fontSize: '0.72rem',
                   fontWeight: 700,
@@ -820,8 +680,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                   {(stats?.lowStockCount || 0) > 0 && (
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                       <div style={{
-                        backgroundColor: '#fef2f2',
-                        color: '#ef4444',
+                        backgroundColor: 'var(--danger-surface)',
+                        color: 'var(--danger-ink)',
                         padding: '8px',
                         borderRadius: '10px',
                         display: 'flex',
@@ -844,8 +704,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                   {(stats?.nearExpiryCount || 0) > 0 && (
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                       <div style={{
-                        backgroundColor: '#fff7ed',
-                        color: '#ea580c',
+                        backgroundColor: 'var(--warning-surface)',
+                        color: 'var(--warning-ink)',
                         padding: '8px',
                         borderRadius: '10px',
                         display: 'flex',
@@ -877,7 +737,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onQuickActi
                 padding: '8px',
                 backgroundColor: 'transparent',
                 border: 'none',
-                color: '#1e4d40',
+                color: 'var(--primary)',
                 fontSize: '0.8rem',
                 fontWeight: 600,
                 cursor: 'pointer',
