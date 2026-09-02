@@ -231,8 +231,9 @@ phase 1. Phase 4 est indépendante et peut être menée en parallèle.
 ## État d'avancement (2026-09-01)
 
 **Phase 0 — faite.** A1 à A12 corrigés. Contact des CGU passé à `contact@mediclinicpro.com` sur
-décision de l'utilisateur : **cette boîte doit être relevée**, une adresse morte dans des conditions
-générales est pire que l'ancienne. Les quatre opérateurs Chariow sont confirmés actifs par
+décision de l'utilisateur, puis **ramené à `blog.ousmane@gmail.com` le 2026-09-02** : la boîte au
+domaine n'était pas exploitable. Quelle qu'elle soit, **cette adresse doit être relevée** — une
+adresse morte dans des conditions générales vaut moins que pas d'adresse du tout. Les quatre opérateurs Chariow sont confirmés actifs par
 l'utilisateur, les pastilles restent (leurs couleurs seront reprises en phase 3).
 
 **Phase 1 — faite.** Échelle de marque `--brand-50…900` dérivée de `#1e4d40`, séparation
