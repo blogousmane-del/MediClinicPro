@@ -15,6 +15,7 @@ import { PhoneInput } from '../../components/PhoneInput';
 import { PaymentCheckoutModal } from '../../components/PaymentCheckoutModal';
 import { daysUntilExpiry } from '../../utils/subscription';
 import { PasswordChangeForm } from '../../components/PasswordChangeForm';
+import { isVatEnabled } from '../../utils/invoice';
 
 interface DaySchedule {
   day: number; // 0=Dimanche..6=Samedi (JS Date.getDay())
@@ -80,6 +81,7 @@ export const SettingsPage: React.FC = () => {
   const [clinicAddress, setClinicAddress] = useState<string>('');
   const [clinicPhone, setClinicPhone] = useState<string>('');
   const [tariffs, setTariffs] = useState<any>({});
+  const [vatEnabled, setVatEnabled] = useState<boolean>(true);
   const [isSavingClinic, setIsSavingClinic] = useState<boolean>(false);
 
   // Staff users states
@@ -132,6 +134,7 @@ export const SettingsPage: React.FC = () => {
       setClinicAddress(data.address || '');
       setClinicPhone(data.phone || '');
       setTariffs(data.settings?.tariffs || {});
+      setVatEnabled(isVatEnabled(data.settings));
     } catch (err) {
       console.error(err);
     } finally {
@@ -202,7 +205,8 @@ export const SettingsPage: React.FC = () => {
         phone: clinicPhone,
         settings: {
           ...clinic?.settings,
-          tariffs
+          tariffs,
+          vat_enabled: vatEnabled
         }
       };
 
@@ -944,6 +948,18 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
             </div>
+
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, borderBottom: '1px solid var(--border)', paddingBottom: '8px', margin: 0 }}>Facturation</h3>
+
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={vatEnabled} onChange={e => setVatEnabled(e.target.checked)} style={{ marginTop: '4px', width: '18px', height: '18px', flexShrink: 0 }} />
+              <span>
+                <span style={{ display: 'block', fontWeight: 600 }}>Appliquer la TVA de 18 % aux factures patients</span>
+                <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Décochez si votre établissement est exonéré de TVA. Les factures déjà émises ne changent pas.
+                </span>
+              </span>
+            </label>
 
             <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start', backgroundColor: 'var(--brand-fill)', borderRadius: '10px' }} disabled={isSavingClinic}>
               {isSavingClinic ? 'Sauvegarde...' : 'Enregistrer les paramètres'}
