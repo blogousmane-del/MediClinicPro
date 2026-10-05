@@ -1,5 +1,24 @@
-// Coordonnées publiques de MediClinic : seule source du numéro WhatsApp pour
-// la page de connexion (et, au chantier vitrine, pour la landing et les CGU).
+// Coordonnées et identité publiques de MediClinic : seule source pour la
+// vitrine, la page de connexion et les CGU. Un bloc dont la donnée vaut null
+// n'est pas affiché : rien n'est inventé en attendant que le propriétaire la
+// fournisse.
+export interface Founder {
+  name: string;
+  role: string; // « fondateur de MediClinic »
+  photo: string; // chemin sous public/, portrait 4:5
+  quote: string; // deux ou trois phrases à la première personne
+}
+
+export interface Legal {
+  name: string; // raison sociale
+  rccm: string;
+}
+
+export interface FieldPhoto {
+  src: string;
+  alt: string;
+}
+
 export const SITE = {
   url: 'https://mediclinicpro.com',
   whatsapp: {
@@ -7,6 +26,12 @@ export const SITE = {
     e164: '2250788818118',
     message: 'Bonjour, je souhaite en savoir plus sur MediClinic.',
   },
+  // Moyens de paiement de l'abonnement, tels que les accepte la boutique
+  // Chariow : la vitrine les affiche tels quels, à tenir identiques.
+  subscriptionPaymentMethods: ['Orange Money', 'MTN MoMo', 'Wave', 'carte bancaire'] as readonly string[],
+  founder: null as Founder | null,
+  legal: null as Legal | null,
+  fieldPhoto: null as FieldPhoto | null,
 };
 
 export const whatsappUrl = (text: string = SITE.whatsapp.message): string =>
