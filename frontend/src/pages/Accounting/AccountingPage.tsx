@@ -4,6 +4,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { SkeletonTableRows } from '../../components/Skeleton';
+import { escapeHtml, clinicHeaderHtml, buildPrintDocument, openPrintWindow } from '../../utils/print';
 import {
   Search,
   Plus,
@@ -170,101 +171,46 @@ export const AccountingPage: React.FC = () => {
     setViewMode('journal');
   };
 
-  // Le reçu s'ouvre dans une fenêtre neuve : aucune feuille de style de
-  // l'application ne l'accompagne, donc les `var(--...)` qu'il utilisait n'y
-  // résolvaient rien et le document sortait sans couleurs ni bordures. Tout est
-  // écrit en littéral ici.
+  // Les documents imprimés passent tous par utils/print.ts : styles littéraux
+  // (la fenêtre neuve ne voit pas les variables CSS de l'application) et
+  // échappement de chaque valeur saisie (la fenêtre partage l'origine et peut
+  // lire le jeton de session).
   const buildInvoiceReceiptHtml = (number: string) => {
     const rows = services.map(s => `
       <tr>
-        <td>${s.type}</td>
-        <td>${s.description}</td>
-        <td style="text-align:center;">${s.quantity}</td>
-        <td style="text-align:right;">${s.unitPrice.toLocaleString()} FCFA</td>
-        <td style="text-align:right;">${(s.quantity * s.unitPrice).toLocaleString()} FCFA</td>
+        <td>${escapeHtml(s.type)}</td>
+        <td>${escapeHtml(s.description)}</td>
+        <td class="center">${escapeHtml(s.quantity)}</td>
+        <td class="right">${s.unitPrice.toLocaleString()} FCFA</td>
+        <td class="right">${(s.quantity * s.unitPrice).toLocaleString()} FCFA</td>
       </tr>
     `).join('');
 
-    return `
-      <html>
-        <head>
-          <title>Facture ${number}</title>
-          <style>
-            body { font-family: sans-serif; padding: 30px; color: #333; line-height: 1.6; }
-            .header { text-align: center; border-bottom: 2px solid #1e4d40; padding-bottom: 15px; margin-bottom: 20px; }
-            .title { font-size: 1.5rem; font-weight: bold; color: #1e4d40; }
-            .clinic-meta { font-size: 0.85rem; color: #555; }
-            .patient-box { background: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 0.9rem; }
-            th { background: #f1f5f9; text-align: left; }
-            .totals { margin-left: auto; width: 280px; }
-            .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
-            .grand-total { font-weight: bold; font-size: 1.1rem; border-top: 1px solid #333; margin-top: 6px; padding-top: 8px; }
-            .footer { text-align: center; margin-top: 40px; font-size: 0.8rem; color: #888; border-top: 1px solid #cbd5e1; padding-top: 10px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">${(clinic?.name || 'Clinique').toUpperCase()}</div>
-            <div class="clinic-meta">${[clinic?.address, clinic?.phone].filter(Boolean).join(' · ')}</div>
-            <div>Facture ${number}</div>
-          </div>
-          <div class="patient-box">
-            <strong>Patient :</strong> ${selectedPatient.last_name.toUpperCase()} ${selectedPatient.first_name}<br>
-            <strong>Date facture :</strong> ${new Date(invoiceDate).toLocaleDateString('fr-FR')} |
-            <strong>Échéance :</strong> ${new Date(dueDate).toLocaleDateString('fr-FR')}<br>
-            <strong>Mode de paiement :</strong> ${paymentMethod.toUpperCase()}
-          </div>
-          <table>
-            <thead>
-              <tr><th>Type</th><th>Description</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-          <div class="totals">
-            <div><span>Sous-total</span><span>${subtotal.toLocaleString()} FCFA</span></div>
-            <div><span>TVA (18%)</span><span>${tva.toLocaleString()} FCFA</span></div>
-            <div class="grand-total"><span>Total</span><span>${total.toLocaleString()} FCFA</span></div>
-          </div>
-          ${notes ? `<p><strong>Notes :</strong> ${notes}</p>` : ''}
-          <div class="footer">Document généré automatiquement via MediClinic.</div>
-        </body>
-      </html>
-    `;
+    return buildPrintDocument(`Facture ${number}`, `
+      ${clinicHeaderHtml(clinic, `Facture ${number}`)}
+      <div class="box">
+        <strong>Patient :</strong> ${escapeHtml(selectedPatient.last_name.toUpperCase())} ${escapeHtml(selectedPatient.first_name)}<br>
+        <strong>Date facture :</strong> ${new Date(invoiceDate).toLocaleDateString('fr-FR')} |
+        <strong>Échéance :</strong> ${new Date(dueDate).toLocaleDateString('fr-FR')}<br>
+        <strong>Mode de paiement :</strong> ${escapeHtml(paymentMethod.toUpperCase())}
+      </div>
+      <table>
+        <thead><tr><th>Type</th><th>Description</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="totals">
+        <div><span>Sous-total</span><span>${subtotal.toLocaleString()} FCFA</span></div>
+        <div><span>TVA (18%)</span><span>${tva.toLocaleString()} FCFA</span></div>
+        <div class="grand-total"><span>Total</span><span>${total.toLocaleString()} FCFA</span></div>
+      </div>
+      ${notes ? `<p><strong>Notes :</strong> ${escapeHtml(notes)}</p>` : ''}
+    `);
   };
 
-  // Styles partagés par les documents imprimés. Ils s'ouvrent dans une fenêtre
-  // neuve, sans la feuille de style de l'application : tout est littéral.
-  const PRINT_STYLES = `
-    body { font-family: sans-serif; padding: 30px; color: #333; line-height: 1.6; }
-    .header { text-align: center; border-bottom: 2px solid #1e4d40; padding-bottom: 15px; margin-bottom: 20px; }
-    .title { font-size: 1.5rem; font-weight: bold; color: #1e4d40; }
-    .clinic-meta { font-size: 0.85rem; color: #555; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-    th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 0.9rem; }
-    th { background: #f1f5f9; text-align: left; }
-    .right { text-align: right; }
-    .footer { text-align: center; margin-top: 40px; font-size: 0.8rem; color: #888; border-top: 1px solid #cbd5e1; padding-top: 10px; }
-  `;
-
-  const clinicHeaderHtml = (subtitle: string) => `
-    <div class="header">
-      <div class="title">${(clinic?.name || 'Clinique').toUpperCase()}</div>
-      <div class="clinic-meta">${[clinic?.address, clinic?.phone].filter(Boolean).join(' \u00b7 ')}</div>
-      <div>${subtitle}</div>
-    </div>
-  `;
-
-  const openPrintWindow = (html: string) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
+  const printHtml = (html: string) => {
+    if (!openPrintWindow(html)) {
       showToast('error', 'Fenêtre bloquée', "Autorisez les fenêtres surgissantes pour imprimer ce document.");
-      return;
     }
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.print();
   };
 
   // Reçu d'un encaissement déjà enregistré, reconstruit depuis la ligne du
@@ -273,29 +219,24 @@ export const AccountingPage: React.FC = () => {
     const items: { type?: string; name?: string; cost?: number }[] = Array.isArray(pay.items) ? pay.items : [];
     const rows = items.map(it => `
       <tr>
-        <td>${it.type || ''}</td>
-        <td>${it.name || ''}</td>
+        <td>${escapeHtml(it.type)}</td>
+        <td>${escapeHtml(it.name)}</td>
         <td class="right">${Number(it.cost || 0).toLocaleString()} FCFA</td>
       </tr>
     `).join('');
+    const reference = pay.reference_number || `#${pay.id}`;
 
-    openPrintWindow(`
-      <html>
-        <head><title>Reçu ${pay.reference_number || pay.id}</title><style>${PRINT_STYLES}</style></head>
-        <body>
-          ${clinicHeaderHtml(`Reçu ${pay.reference_number || `#${pay.id}`}`)}
-          <p>
-            <strong>Patient :</strong> ${pay.patient_last_name} ${pay.patient_first_name}<br>
-            <strong>Date :</strong> ${new Date(pay.created_at).toLocaleDateString('fr-FR')}<br>
-            <strong>Encaissé par :</strong> ${pay.cashier_name}<br>
-            <strong>Mode de paiement :</strong> ${pay.payment_method}
-          </p>
-          ${rows ? `<table><thead><tr><th>Type</th><th>Description</th><th class="right">Montant</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
-          <p class="right"><strong>Total : ${Number(pay.amount_total).toLocaleString()} FCFA</strong></p>
-          <div class="footer">Document généré par MediClinic.</div>
-        </body>
-      </html>
-    `);
+    printHtml(buildPrintDocument(`Reçu ${reference}`, `
+      ${clinicHeaderHtml(clinic, `Reçu ${reference}`)}
+      <p>
+        <strong>Patient :</strong> ${escapeHtml(pay.patient_last_name)} ${escapeHtml(pay.patient_first_name)}<br>
+        <strong>Date :</strong> ${new Date(pay.created_at).toLocaleDateString('fr-FR')}<br>
+        <strong>Encaissé par :</strong> ${escapeHtml(pay.cashier_name)}<br>
+        <strong>Mode de paiement :</strong> ${escapeHtml(pay.payment_method)}
+      </p>
+      ${rows ? `<table><thead><tr><th>Type</th><th>Description</th><th class="right">Montant</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+      <p class="right"><strong>Total : ${Number(pay.amount_total).toLocaleString()} FCFA</strong></p>
+    `));
   };
 
   // « Exporter PDF » n'exportait rien : le bouton n'affichait qu'un message
@@ -311,35 +252,29 @@ export const AccountingPage: React.FC = () => {
     const rows = payments.map(pay => `
       <tr>
         <td>${new Date(pay.created_at).toLocaleDateString('fr-FR')}</td>
-        <td>${pay.reference_number || `#${pay.id}`}</td>
-        <td>${pay.patient_last_name} ${pay.patient_first_name}</td>
-        <td>${pay.payment_method}</td>
-        <td>${pay.cashier_name}</td>
+        <td>${escapeHtml(pay.reference_number || `#${pay.id}`)}</td>
+        <td>${escapeHtml(pay.patient_last_name)} ${escapeHtml(pay.patient_first_name)}</td>
+        <td>${escapeHtml(pay.payment_method)}</td>
+        <td>${escapeHtml(pay.cashier_name)}</td>
         <td class="right">${Number(pay.amount_total).toLocaleString()} FCFA</td>
       </tr>
     `).join('');
     const sum = payments.reduce((acc, pay) => acc + Number(pay.amount_total || 0), 0);
 
-    openPrintWindow(`
-      <html>
-        <head><title>Journal des recettes</title><style>${PRINT_STYLES}</style></head>
-        <body>
-          ${clinicHeaderHtml(`Journal des recettes \u00b7 édité le ${new Date().toLocaleDateString('fr-FR')}`)}
-          <table>
-            <thead>
-              <tr><th>Date</th><th>N° facture</th><th>Patient</th><th>Mode</th><th>Encaissé par</th><th class="right">Montant</th></tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-          <p class="right"><strong>Total sur ${payments.length} encaissement(s) : ${sum.toLocaleString()} FCFA</strong></p>
-          <div class="footer">Document généré par MediClinic.</div>
-        </body>
-      </html>
-    `);
+    printHtml(buildPrintDocument('Journal des recettes', `
+      ${clinicHeaderHtml(clinic, `Journal des recettes · édité le ${new Date().toLocaleDateString('fr-FR')}`)}
+      <table>
+        <thead>
+          <tr><th>Date</th><th>N° facture</th><th>Patient</th><th>Mode</th><th>Encaissé par</th><th class="right">Montant</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="right"><strong>Total sur ${payments.length} encaissement(s) : ${sum.toLocaleString()} FCFA</strong></p>
+    `));
   };
 
   const printReceipt = (number: string) => {
-    openPrintWindow(buildInvoiceReceiptHtml(number));
+    printHtml(buildInvoiceReceiptHtml(number));
   };
 
   const handleSendAndPrint = async () => {

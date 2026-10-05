@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { escapeHtml, clinicHeaderHtml, buildPrintDocument, openPrintWindow } from '../../utils/print';
 import { SkeletonPage } from '../../components/Skeleton';
 import {
   ArrowLeft,
@@ -30,7 +31,7 @@ const REFERRAL_AVAILABILITY_META: Record<string, { label: string; color: string 
 };
 
 export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId, onBack }) => {
-  const { user } = useAuth();
+  const { user, clinic } = useAuth();
   const { showToast } = useNotifications();
 
   const [patient, setPatient] = useState<any>(null);
@@ -296,71 +297,49 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
     }
   };
 
-  // Print function
+  // Impression d'un élément du dossier : passe par utils/print.ts, qui échappe
+  // chaque valeur saisie (la fenêtre d'impression partage l'origine de
+  // l'application) et prend l'en-tête de la clinique connectée. Cet en-tête
+  // affichait jusqu'ici « Clinique Médicale de l'Avenir » pour toutes les
+  // cliniques.
   const handlePrintTimelineItem = (item: any) => {
-    const printContent = `
-      <html>
-        <head>
-          <title>Impression MediClinic</title>
-          <style>
-            body { font-family: sans-serif; padding: 30px; color: #333; line-height: 1.6; }
-            .header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px; }
-            .title { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
-            .patient-box { background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 20px; }
-            .details { border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-            .footer { text-align: center; margin-top: 50px; font-size: 0.8rem; color: #888; border-top: 1px solid var(--border); padding-top: 10px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">CLINIQUE MÉDICALE DE L'AVENIR</div>
-            <div>Cocody Boulevard de France, Abidjan | Tél: +225 0707080910</div>
-          </div>
-          
-          <div class="patient-box">
-            <strong>Patient :</strong> ${patient.last_name.toUpperCase()} ${patient.first_name}<br>
-            <strong>N° Dossier :</strong> ${patient.folder_number} | <strong>Tél :</strong> ${patient.phone}<br>
-            <strong>Date :</strong> ${new Date(item.date).toLocaleDateString('fr-FR')}
-          </div>
+    const d = item.details || {};
+    let detailsHtml = '';
+    if (item.type === 'consultation') {
+      detailsHtml = `
+        <p>Motif : ${escapeHtml(d.motif)}</p>
+        <p>Observations : ${escapeHtml(d.symptoms || 'Néant')}</p>
+        <p>Diagnostic : ${escapeHtml(d.diagnosis || 'Non spécifié')}</p>
+        <p>Notes médicales : ${escapeHtml(d.notes || 'Néant')}</p>`;
+    } else if (item.type === 'prescription') {
+      detailsHtml = `<ul>${(d.items || []).map((line: any) => `
+        <li><strong>${escapeHtml(line.medication_name)}</strong> : posologie ${escapeHtml(line.dosage)} | fréquence ${escapeHtml(line.frequency)} | durée ${escapeHtml(line.duration)} (quantité : ${escapeHtml(line.quantity_prescribed)})</li>`).join('')}
+      </ul>`;
+    } else if (item.type === 'lab') {
+      detailsHtml = `
+        <p>Examen : ${escapeHtml(d.test_name)}</p>
+        <p>Compte-rendu : ${escapeHtml(d.results_text || 'En attente')}</p>`;
+    } else if (item.type === 'payment') {
+      detailsHtml = `
+        <p>Montant payé : ${escapeHtml(d.amount_total)} FCFA</p>
+        <p>Méthode : ${escapeHtml(String(d.payment_method || '').toUpperCase())}</p>
+        <p>Référence : ${escapeHtml(d.reference_number)}</p>`;
+    }
 
-          <div class="details">
-            <h3>${item.title}</h3>
-            <p><strong>Détails / Description :</strong></p>
-            ${item.type === 'consultation' ? `
-              <p>Motif: ${item.details.motif}</p>
-              <p>Observations: ${item.details.symptoms || 'Néant'}</p>
-              <p>Diagnostic: ${item.details.diagnosis || 'Non spécifié'}</p>
-              <p>Notes médicales: ${item.details.notes || 'Néant'}</p>
-            ` : ''}
-            ${item.type === 'prescription' ? `
-              <ul>
-                ${item.details.items.map((line: any) => `
-                  <li><strong>${line.medication_name}</strong> - Posologie: ${line.dosage} | Freq: ${line.frequency} | Durée: ${line.duration} (Qté: ${line.quantity_prescribed})</li>
-                `).join('')}
-              </ul>
-            ` : ''}
-            ${item.type === 'lab' ? `
-              <p>Examen: ${item.details.test_name}</p>
-              <p>Compte-rendu: ${item.details.results_text || 'En attente'}</p>
-            ` : ''}
-            ${item.type === 'payment' ? `
-              <p>Montant payé: ${item.details.amount_total} FCFA</p>
-              <p>Méthode: ${item.details.payment_method.toUpperCase()}</p>
-              <p>Référence: ${item.details.reference_number}</p>
-            ` : ''}
-          </div>
-
-          <div class="footer">
-            Document généré automatiquement via MediClinic.
-          </div>
-        </body>
-      </html>
-    `;
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.print();
+    const html = buildPrintDocument(item.title, `
+      ${clinicHeaderHtml(clinic, item.title)}
+      <div class="box">
+        <strong>Patient :</strong> ${escapeHtml(patient.last_name.toUpperCase())} ${escapeHtml(patient.first_name)}<br>
+        <strong>N° dossier :</strong> ${escapeHtml(patient.folder_number)} | <strong>Tél :</strong> ${escapeHtml(patient.phone)}<br>
+        <strong>Date :</strong> ${new Date(item.date).toLocaleDateString('fr-FR')}
+      </div>
+      <div class="details">
+        <h3>${escapeHtml(item.title)}</h3>
+        ${detailsHtml}
+      </div>
+    `);
+    if (!openPrintWindow(html)) {
+      showToast('error', 'Fenêtre bloquée', "Autorisez les fenêtres surgissantes pour imprimer ce document.");
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { escapeHtml, clinicHeaderHtml, buildPrintDocument, openPrintWindow } from '../../utils/print';
 import { SkeletonCards } from '../../components/Skeleton';
 import {
   Search,
@@ -71,7 +72,7 @@ interface Prescription {
 }
 
 export const OrdonnancesPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, clinic } = useAuth();
   const { showToast } = useNotifications();
 
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
@@ -312,64 +313,31 @@ const blankLine = (id: number, medicationId: number | null = null): MedicationLi
     }
   };
 
+  // Passe par utils/print.ts : chaque valeur saisie est échappée (la fenêtre
+  // d'impression partage l'origine de l'application) et l'en-tête est celui de
+  // la clinique connectée. Il affichait « Clinique Médicale de l'Avenir » pour
+  // toutes les cliniques.
   const handlePrintPrescription = (presc: Prescription) => {
-    const printContent = `
-      <html>
-        <head>
-          <title>Ordonnance Médicale - ${presc.patient_name}</title>
-          <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: var(--text-primary); }
-            .header { border-bottom: 2px solid var(--brand-fill); padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; }
-            .clinic-title { font-size: 1.4rem; font-weight: bold; color: var(--brand-fill); }
-            .doctor-info { font-size: 0.9rem; color: var(--text-muted); margin-top: 4px; }
-            .patient-box { background-color: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; }
-            .rx-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--brand-fill); }
-            .item-row { border-bottom: 1px solid var(--bg-tertiary); padding: 10px 0; }
-            .item-name { font-weight: bold; font-size: 1rem; color: var(--text-primary); }
-            .item-posology { font-size: 0.875rem; color: var(--text-secondary); margin-top: 2px; }
-            .footer { margin-top: 50px; text-align: right; font-weight: bold; border-top: 1px solid var(--border); padding-top: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="clinic-title">CLINIQUE MÉDICALE DE L'AVENIR</div>
-              <div class="doctor-info">Cocody Boulevard de France, Abidjan · Tél: +225 0707080910</div>
-            </div>
-            <div style="text-align: right;">
-              <div>Date: ${presc.date}</div>
-              <div style="font-weight: bold; color: var(--brand-fill);">Prescripteur: ${presc.doctor_name}</div>
-            </div>
-          </div>
-
-          <div class="patient-box">
-            <div><strong>Patient :</strong> ${presc.patient_name}${presc.patient_age ? ` (${presc.patient_age})` : ''}</div>
-            ${presc.diagnostic ? `<div><strong>Diagnostic :</strong> ${presc.diagnostic}</div>` : ''}
-          </div>
-
-          <div class="rx-title">ORDONNANCE MÉDICALE (Rx)</div>
-
-          ${presc.items.map(it => `
-            <div class="item-row">
-              <div class="item-name">• ${it.medication_name}</div>
-              <div class="item-posology">Posologie : ${it.posology} — Quantité : ${it.quantity_prescribed} unités</div>
-            </div>
-          `).join('')}
-
-          ${presc.notes ? `<div style="margin-top: 20px; font-style: italic; color: var(--text-muted);"><strong>Notes :</strong> ${presc.notes}</div>` : ''}
-
-          <div class="footer">
-            Signature & Cachet du Médecin<br/><br/><br/>
-            ${presc.doctor_name}
-          </div>
-        </body>
-      </html>
-    `;
-    const printWin = window.open('', '_blank');
-    if (printWin) {
-      printWin.document.write(printContent);
-      printWin.document.close();
-      printWin.print();
+    const html = buildPrintDocument(`Ordonnance ${presc.patient_name}`, `
+      ${clinicHeaderHtml(clinic, 'Ordonnance médicale')}
+      <div class="box">
+        <div><strong>Patient :</strong> ${escapeHtml(presc.patient_name)}${presc.patient_age ? ` (${escapeHtml(presc.patient_age)})` : ''}</div>
+        <div><strong>Date :</strong> ${escapeHtml(presc.date)} | <strong>Prescripteur :</strong> ${escapeHtml(presc.doctor_name)}</div>
+        ${presc.diagnostic ? `<div><strong>Diagnostic :</strong> ${escapeHtml(presc.diagnostic)}</div>` : ''}
+      </div>
+      <div class="rx-title">Ordonnance médicale</div>
+      ${presc.items.map(it => `
+        <div class="item-row">
+          <div class="item-name">${escapeHtml(it.medication_name)}</div>
+          <div class="item-posology">Posologie : ${escapeHtml(it.posology)}. Quantité : ${escapeHtml(it.quantity_prescribed)} unité(s)</div>
+        </div>
+      `).join('')}
+      ${presc.notes ? `<p><em><strong>Notes :</strong> ${escapeHtml(presc.notes)}</em></p>` : ''}
+      <div class="signature">Signature et cachet du médecin<br><br><br>${escapeHtml(presc.doctor_name)}</div>
+    `);
+    if (!openPrintWindow(html)) {
+      showToast('error', 'Fenêtre bloquée', "Autorisez les fenêtres surgissantes pour imprimer ce document.");
+      return;
     }
     showToast('success', 'Impression', `Document d'ordonnance pour ${presc.patient_name} prêt.`);
   };
