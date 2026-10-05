@@ -65,8 +65,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
   const handleGoogleCredential = async (response: { credential: string }) => {
     setIsGoogleSubmitting(true);
     try {
-      await loginWithGoogle(response.credential);
-      showToast('success', 'Connexion réussie', 'Bienvenue sur MediClinic !');
+      const { passwordReset } = await loginWithGoogle(response.credential);
+      if (passwordReset) {
+        showToast(
+          'info',
+          'Compte sécurisé',
+          "Votre connexion Google protège désormais ce compte. L'ancien mot de passe a été désactivé : définissez-en un nouveau depuis votre profil si vous en avez besoin."
+        );
+      } else {
+        showToast('success', 'Connexion réussie', 'Bienvenue sur MediClinic !');
+      }
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Échec de connexion Google', err.error || 'Impossible de vous connecter avec Google.');
