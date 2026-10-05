@@ -2,6 +2,11 @@ const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 
 const { getAppUrl } = require('./publicUrls');
+const { escapeHtml } = require('./html');
+
+// Numéro réel du support. Le modèle d'accueil affichait +225 07 07 07 07 07,
+// un numéro sans titulaire.
+const SUPPORT_WHATSAPP = '+225 07 88 81 81 18';
 
 // Appelé à chaque envoi, jamais figé au chargement du module : une constante
 // gèlerait la valeur au démarrage de la fonction serverless et survivrait à un
@@ -16,6 +21,10 @@ const appUrl = () => getAppUrl() || '';
 // compte. Repli sur 7, la valeur par défaut de starter_trial_days.
 const buildConfirmationEmail = (adminName, clinicName, trialDays = 7) => {
   const trialLabel = `${trialDays} jour${trialDays > 1 ? 's' : ''} d'essai gratuit`;
+  // Textes saisis à l'inscription, publique et non vérifiée : échappés dans le
+  // HTML. La version texte n'interprète rien et reste telle quelle.
+  const safeAdmin = escapeHtml(adminName);
+  const safeClinic = escapeHtml(clinicName);
   const html = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1a202c;">
       <div style="text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 20px; margin-bottom: 20px;">
@@ -24,9 +33,9 @@ const buildConfirmationEmail = (adminName, clinicName, trialDays = 7) => {
       </div>
 
       <div style="line-height: 1.6; font-size: 16px;">
-        <p>Bonjour <strong>${adminName}</strong>,</p>
+        <p>Bonjour <strong>${safeAdmin}</strong>,</p>
 
-        <p>Nous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement <strong>"${clinicName}"</strong>.</p>
+        <p>Nous avons le plaisir de vous confirmer la création de votre compte clinique pour l'établissement <strong>"${safeClinic}"</strong>.</p>
 
         <p>Votre compte administrateur est désormais actif et vous bénéficiez dès aujourd'hui de <strong>${trialLabel}</strong> avec accès complet à toutes les fonctionnalités (Dossier patient, Agenda, Pharmacie, Labo et Comptabilité).</p>
 
@@ -43,7 +52,7 @@ const buildConfirmationEmail = (adminName, clinicName, trialDays = 7) => {
           <a href="${appUrl()}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Accéder à mon espace clinique</a>
         </div>
 
-        <p>Si vous avez des questions, notre support est à votre disposition par WhatsApp au <strong>+225 07 07 07 07 07</strong>.</p>
+        <p>Si vous avez des questions, notre support est à votre disposition par WhatsApp au <strong>${SUPPORT_WHATSAPP}</strong>.</p>
 
         <p style="margin-top: 40px; border-top: 1px solid #edf2f7; padding-top: 20px; font-size: 12px; color: #a0aec0; text-align: center;">
           Cet email est généré automatiquement, merci de ne pas y répondre directement.
@@ -143,6 +152,9 @@ const buildRenewalReminderEmail = (adminName, clinicName, daysLeft, planName, pr
   const actionText = isFree
     ? `votre période d'essai gratuite du plan ${planName} se termine dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`
     : `votre abonnement au plan ${planName} (${price.toLocaleString()} FCFA/mois) expire dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`;
+  const safeAdmin = escapeHtml(adminName);
+  const safeClinic = escapeHtml(clinicName);
+  const safeAction = escapeHtml(actionText);
 
   const html = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1a202c;">
@@ -151,9 +163,9 @@ const buildRenewalReminderEmail = (adminName, clinicName, daysLeft, planName, pr
       </div>
 
       <div style="line-height: 1.6; font-size: 16px;">
-        <p>Bonjour <strong>${adminName}</strong>,</p>
+        <p>Bonjour <strong>${safeAdmin}</strong>,</p>
 
-        <p>Pour l'établissement <strong>"${clinicName}"</strong>, ${actionText}.</p>
+        <p>Pour l'établissement <strong>"${safeClinic}"</strong>, ${safeAction}.</p>
 
         <p>Passé ce délai, l'écriture de nouvelles données (patients, rendez-vous, ordonnances...) sera automatiquement bloquée jusqu'au renouvellement.</p>
 
@@ -228,15 +240,20 @@ const TICKET_STATUS_LABELS_FR = { open: 'Ouvert', in_progress: 'En cours', resol
 
 const buildTicketStatusEmail = (adminName, clinicName, subject, status, resolutionNote) => {
   const statusLabel = TICKET_STATUS_LABELS_FR[status] || status;
+  const safeAdmin = escapeHtml(adminName);
+  const safeClinic = escapeHtml(clinicName);
+  const safeSubject = escapeHtml(subject);
+  const safeStatus = escapeHtml(statusLabel);
+  const safeNote = escapeHtml(resolutionNote);
   const html = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; color: #1a202c;">
       <div style="text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 20px; margin-bottom: 20px;">
         <h1 style="color: #0d9488; margin: 0; font-size: 24px;">Mise à jour de votre ticket support</h1>
       </div>
       <div style="line-height: 1.6; font-size: 16px;">
-        <p>Bonjour <strong>${adminName}</strong>,</p>
-        <p>Votre ticket <strong>"${subject}"</strong> pour l'établissement <strong>"${clinicName}"</strong> est maintenant : <strong>${statusLabel}</strong>.</p>
-        ${resolutionNote ? `<div style="background-color: #f7fafc; border-left: 4px solid #0d9488; padding: 15px; border-radius: 6px; margin: 20px 0;"><p style="margin:0;">${resolutionNote}</p></div>` : ''}
+        <p>Bonjour <strong>${safeAdmin}</strong>,</p>
+        <p>Votre ticket <strong>"${safeSubject}"</strong> pour l'établissement <strong>"${safeClinic}"</strong> est maintenant : <strong>${safeStatus}</strong>.</p>
+        ${resolutionNote ? `<div style="background-color: #f7fafc; border-left: 4px solid #0d9488; padding: 15px; border-radius: 6px; margin: 20px 0;"><p style="margin:0;">${safeNote}</p></div>` : ''}
         <div style="text-align: center; margin: 30px 0;">
           <a href="${appUrl()}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir mes tickets</a>
         </div>
@@ -305,5 +322,9 @@ const sendTicketStatusEmail = async (toEmail, adminName, clinicName, subject, st
 module.exports = {
   sendConfirmationEmail,
   sendRenewalReminderEmail,
-  sendTicketStatusEmail
+  sendTicketStatusEmail,
+  // Modèles purs, exportés pour les tests d'échappement.
+  buildConfirmationEmail,
+  buildRenewalReminderEmail,
+  buildTicketStatusEmail
 };

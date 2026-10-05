@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
-const { auth } = require('../middleware/auth');
+const { auth, checkRole } = require('../middleware/auth');
 
 // POST /api/consultations
 // Save a new consultation + optional prescription + optional lab exams
-router.post('/', auth, async (req, res) => {
+//
+// Une consultation porte une ordonnance que la pharmacie délivre ensuite.
+// Ouverte à tous les rôles, elle laissait un pharmacien se prescrire puis se
+// délivrer du stock sans médecin, alors que POST /pharmacy/prescriptions le
+// lui interdit déjà (audit du 2026-10-05). Même liste que le formulaire de
+// PatientDetailPage.tsx ; admin passe toujours.
+router.post('/', auth, checkRole(['doctor']), async (req, res) => {
   try {
     const { patientId, motif, symptoms, constants, diagnosis, notes, prescriptionItems, labExams } = req.body;
 

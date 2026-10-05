@@ -23,6 +23,16 @@ function stubModule(relativePath, exports) {
   require.cache[file] = { id: file, filename: file, loaded: true, exports, children: [], paths: [] };
 }
 
+// LIKE de PostgREST : `%` couvre n'importe quelle suite, `_` un seul caractère,
+// tout le reste est littéral (le point d'une date ISO compris).
+function likeToRegExp(pattern) {
+  const escaped = String(pattern)
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/%/g, '.*')
+    .replace(/_/g, '.');
+  return new RegExp(`^${escaped}$`, 's');
+}
+
 // Reproduit la partie de l'API PostgREST utilisée par les routes :
 // .from().select().eq().maybeSingle() / .single() / .insert() / .update() /
 // .delete(),
@@ -39,6 +49,7 @@ function queryBuilder(table) {
       case 'gt': return row[column] != null && row[column] > value;
       case 'lte': return row[column] != null && row[column] <= value;
       case 'lt': return row[column] != null && row[column] < value;
+      case 'like': return row[column] != null && likeToRegExp(value).test(String(row[column]));
       default: return row[column] === value;
     }
   });
@@ -113,6 +124,7 @@ function queryBuilder(table) {
     gt(column, value) { state.filters.push([column, value, 'gt']); return builder; },
     lte(column, value) { state.filters.push([column, value, 'lte']); return builder; },
     lt(column, value) { state.filters.push([column, value, 'lt']); return builder; },
+    like(column, pattern) { state.filters.push([column, pattern, 'like']); return builder; },
     insert(payload) { state.op = 'insert'; state.payload = payload; return builder; },
     update(payload) { state.op = 'update'; state.payload = payload; return builder; },
     delete() { state.op = 'delete'; return builder; },

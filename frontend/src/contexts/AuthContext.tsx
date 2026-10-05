@@ -36,7 +36,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<void>;
+  /** `passwordReset` : premier rattachement Google, l'ancien mot de passe vient d'être désactivé. */
+  loginWithGoogle: (idToken: string) => Promise<{ passwordReset: boolean }>;
   register: (clinicName: string, adminName: string, email: string, password: string, phone: string) => Promise<void>;
   logout: () => void;
   onboardClinic: (address: string, phone: string, staff: any[], modules: string[]) => Promise<void>;
@@ -130,13 +131,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGoogle = async (idToken: string) => {
+  const loginWithGoogle = async (idToken: string): Promise<{ passwordReset: boolean }> => {
     setLoading(true);
     try {
       const data = await api.post('/auth/google', { idToken });
       localStorage.setItem('mediclinic_token', data.token);
       setUser(data.user);
       setClinic(data.clinic);
+      return { passwordReset: data.passwordReset === true };
     } catch (err) {
       throw err;
     } finally {

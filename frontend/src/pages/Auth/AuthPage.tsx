@@ -18,6 +18,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { PhoneInput } from '../../components/PhoneInput';
+import { SITE, whatsappUrl } from '../../config/site';
 
 const brandFeatures = [
   { icon: Calendar, label: 'Gestion des rendez-vous' },
@@ -65,8 +66,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
   const handleGoogleCredential = async (response: { credential: string }) => {
     setIsGoogleSubmitting(true);
     try {
-      await loginWithGoogle(response.credential);
-      showToast('success', 'Connexion réussie', 'Bienvenue sur MediClinic !');
+      const { passwordReset } = await loginWithGoogle(response.credential);
+      if (passwordReset) {
+        showToast(
+          'info',
+          'Compte sécurisé',
+          "Votre connexion Google protège désormais ce compte. L'ancien mot de passe a été désactivé : définissez-en un nouveau depuis votre profil si vous en avez besoin."
+        );
+      } else {
+        showToast('success', 'Connexion réussie', 'Bienvenue sur MediClinic !');
+      }
     } catch (err: any) {
       console.error(err);
       showToast('error', 'Échec de connexion Google', err.error || 'Impossible de vous connecter avec Google.');
@@ -150,20 +159,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
     }
   };
 
-  // Handle Forgot Password
-  const handleRecoverySubmit = async (e: React.FormEvent) => {
+  // La réinitialisation par e-mail n'existe pas encore. Ce formulaire annonçait
+  // « Un lien de réinitialisation a été envoyé » après une attente simulée, sans
+  // aucun appel au serveur (audit du 2026-10-05) : la personne attendait un
+  // e-mail qui ne partirait jamais. La demande part donc sur WhatsApp, avec
+  // l'adresse du compte déjà écrite ; l'exploitant la traite depuis Platform
+  // Admin (mot de passe temporaire).
+  const handleRecoverySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryEmail) {
-      showToast('error', 'Champ requis', 'Veuillez renseigner votre adresse email.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      showToast('success', 'Email envoyé', `Un lien de réinitialisation a été envoyé à ${recoveryEmail}.`);
-      setIsForgotView(false);
-    }, 1200);
+    const email = recoveryEmail.trim();
+    const text = email
+      ? `Bonjour, j'ai oublié le mot de passe de mon compte MediClinic (${email}).`
+      : "Bonjour, j'ai oublié le mot de passe de mon compte MediClinic.";
+    window.open(whatsappUrl(text), '_blank', 'noopener');
   };
 
   return (
@@ -407,7 +415,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
               </h2>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '4px', margin: 0 }}>
                 {isForgotView
-                  ? 'Entrez votre email pour réinitialiser votre mot de passe'
+                  ? 'Nous réinitialisons votre accès sur WhatsApp, après vérification.'
                   : activeTab === 'register'
                   ? 'Enregistrez votre cabinet en 1 minute'
                   : 'Entrez vos identifiants pour accéder à votre espace.'}
@@ -482,8 +490,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
                   </div>
                 </div>
 
-                <button type="submit" className="auth-btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <span>Envoyer les instructions</span>}
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 }}>
+                  La réinitialisation par e-mail n'est pas encore disponible. Envoyez-nous votre demande sur
+                  WhatsApp au {SITE.whatsapp.display} : nous vérifions votre identité, puis vous transmettons
+                  un mot de passe temporaire.
+                </p>
+
+                <button type="submit" className="auth-btn-primary">
+                  <span>Demander sur WhatsApp</span>
                 </button>
 
                 <button

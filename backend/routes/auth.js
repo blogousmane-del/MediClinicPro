@@ -259,12 +259,52 @@ router.post('/google', async (req, res) => {
     let user;
     let clinic;
     let isNewAccount = false;
+    let passwordReset = false;
 
     if (existingUser) {
       if (!existingUser.active) {
         return res.status(403).json({ error: "Ce compte a été désactivé. Contactez votre administrateur." });
       }
       user = existingUser;
+
+      // Premier rattachement Google d'un compte créé par mot de passe. Google
+      // vient de prouver la possession de l'adresse, ce que l'inscription par
+      // mot de passe ne vérifie pas : sans cette étape, quiconque s'était
+      // inscrit avec l'adresse d'un médecin gardait l'accès au compte que le
+      // vrai médecin ouvrait ensuite par Google (audit du 2026-10-05). Le mot
+      // de passe d'origine est désactivé ; le titulaire en choisit un nouveau
+      // depuis son profil s'il en veut un. Une connexion Google antérieure
+      // (LOGIN_GOOGLE) ou une création par Google (REGISTER_GOOGLE) signifie
+      // que le mot de passe actuel a été choisi APRÈS cette preuve : on n'y
+      // touche plus.
+      if (user.password_set !== false) {
+        const { data: priorGoogle, error: priorError } = await supabase
+          .from('activity_logs')
+          .select('id')
+          .eq('user_id', user.id)
+          .in('action', ['LOGIN_GOOGLE', 'REGISTER_GOOGLE'])
+          .limit(1);
+        if (priorError) throw priorError;
+
+        if (!priorGoogle || priorGoogle.length === 0) {
+          const unusableHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+          const { error: resetError } = await supabase
+            .from('users')
+            .update({ password_hash: unusableHash, password_set: false })
+            .eq('id', user.id);
+          if (resetError) throw resetError;
+
+          user = { ...user, password_set: false };
+          passwordReset = true;
+
+          await supabase.from('activity_logs').insert({
+            clinic_id: user.clinic_id,
+            user_id: user.id,
+            action: 'GOOGLE_LINK_PASSWORD_RESET',
+            details: `Premier rattachement Google : ancien mot de passe de ${user.name} désactivé`
+          });
+        }
+      }
 
       const { data: clinicData, error: clinicError } = await supabase
         .from('clinics')
@@ -354,7 +394,8 @@ router.post('/google', async (req, res) => {
         passwordSet: user.password_set,
         availabilityStatus: computeEffectiveAvailability(user)
       },
-      clinic
+      clinic,
+      passwordReset
     });
   } catch (error) {
     console.error("Google Auth Error:", error);

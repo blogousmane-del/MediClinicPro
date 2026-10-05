@@ -19,7 +19,10 @@ const { getAppUrl } = require('../utils/publicUrls');
 
 // GET /api/financials/payments
 // List payments / receipts
-router.get('/payments', auth, async (req, res) => {
+// Réservé aux rôles qui voient la Comptabilité (Sidebar.tsx). La barre
+// latérale cachait l'écran, mais l'API rendait le journal complet à
+// n'importe quel compte connecté (audit du 2026-10-05).
+router.get('/payments', auth, checkRole(['secretary', 'manager']), async (req, res) => {
   try {
     const { startDate, endDate, method, status } = req.query;
 
@@ -163,7 +166,7 @@ router.post('/checkout', auth, checkRole(['admin', 'secretary', 'manager']), asy
 
 // GET /api/financials/payments/:id/status
 // Polled by the frontend while a Mobile Money checkout is pending confirmation.
-router.get('/payments/:id/status', auth, async (req, res) => {
+router.get('/payments/:id/status', auth, checkRole(['secretary', 'manager']), async (req, res) => {
   try {
     const { data: payment, error } = await supabase
       .from('payments')
