@@ -7,6 +7,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1e4d40" />
 
+    <!-- Geist, la police de la vitrine, est préchargée. Sans cela, Chrome met
+         toute la page en forme avec la police de repli, puis recommence à
+         l'arrivée de Geist : environ 0,5 s de LCP en 4G lente, et un décalage
+         de mise en page. Le chemin passe par node_modules pour que Vite donne
+         au fichier le même nom haché que l'import de styles/site.css. -->
+    <link rel="preload" href="/node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- La capture du héros, image LCP sur téléphone, est préchargée : sans
+         cela, elle ne part qu'une fois le JavaScript exécuté, environ 0,5 s de
+         LCP en 4G lente. Mêmes candidats et même sizes que la <source> AVIF
+         téléphone de pages/Landing/Capture.tsx (phoneSizes du héros), sinon
+         l'image est téléchargée deux fois. Comme la police, elle part aussi à
+         l'ouverture de l'application connectée : 30 Ko la première fois. -->
+    <link rel="preload" as="image" type="image/avif" media="(max-width: 640px)" imagesrcset="/captures/dashboard-mobile-390.avif 390w, /captures/dashboard-mobile-780.avif 780w" imagesizes="86vw" fetchpriority="high" />
+
     <!-- Polices : chargées ici, plus par un @import en tête de index.css. Un
          @import sérialise la requête derrière le CSS et bloque le rendu ; le
          preconnect ouvre la connexion à gstatic pendant que le HTML s'analyse.
@@ -28,30 +42,35 @@
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
     </noscript>
 
-    <title>MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire</title>
+    <title>MediClinic, logiciel de gestion de clinique en Côte d'Ivoire</title>
     <!-- Prix : 9 000 FCFA = plan Clinique, le moins cher des plans payants
          (backend/utils/plans.js). Ces métadonnées annonçaient « à partir de
          15 000 FCFA/mois », un tarif qui n'existe dans aucun plan. Toute
          évolution tarifaire doit être répercutée ici à la main : un fichier
-         HTML statique ne peut pas lire plans.js. -->
+         HTML statique ne peut pas lire plans.js. La durée d'essai, « 7 jours »,
+         est écrite à la main pour la même raison : la vitrine lit la durée réelle
+         dans l'API (réglage starter_trial_days de Platform Admin), ces
+         métadonnées non. Si ce réglage change, les mettre à jour. -->
     <meta name="description" content="MediClinic est le logiciel de gestion pour petites et moyennes cliniques en Côte d'Ivoire : rendez-vous, dossiers patients, pharmacie, laboratoire et facturation. Essai gratuit 7 jours, puis à partir de 9 000 FCFA/mois." />
-    <!-- TODO: replace https://mediclinicpro.example with the real production domain once deployed -->
-    <link rel="canonical" href="https://mediclinicpro.example/" />
+    <link rel="canonical" href="https://mediclinicpro.com/" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="fr_CI" />
     <meta property="og:site_name" content="MediClinic" />
-    <meta property="og:url" content="https://mediclinicpro.example/" />
-    <meta property="og:title" content="MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire" />
+    <meta property="og:url" content="https://mediclinicpro.com/" />
+    <meta property="og:title" content="MediClinic, logiciel de gestion de clinique en Côte d'Ivoire" />
     <meta property="og:description" content="Rendez-vous, dossiers patients, pharmacie, laboratoire et facturation pour les cliniques ivoiriennes. Essai gratuit 7 jours, puis à partir de 9 000 FCFA/mois." />
-    <meta property="og:image" content="https://mediclinicpro.example/clinic_hero.png" />
+    <meta property="og:image" content="https://mediclinicpro.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="MediClinic : toute votre clinique, de l'accueil à la caisse" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire" />
+    <meta name="twitter:title" content="MediClinic, logiciel de gestion de clinique en Côte d'Ivoire" />
     <meta name="twitter:description" content="Rendez-vous, dossiers patients, pharmacie, laboratoire et facturation pour les cliniques ivoiriennes. Essai gratuit 7 jours, puis à partir de 9 000 FCFA/mois." />
-    <meta name="twitter:image" content="https://mediclinicpro.example/clinic_hero.png" />
+    <meta name="twitter:image" content="https://mediclinicpro.com/og-image.png" />
 
     <script type="application/ld+json">
     {
@@ -73,7 +92,6 @@
     }
     </script>
 
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <div id="root"></div>

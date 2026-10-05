@@ -9,22 +9,18 @@ import {
   User,
   Eye,
   EyeOff,
-  Calendar,
-  Pill,
-  Receipt,
-  CheckCircle2,
+  CalendarCheck,
   Lock,
   ShieldCheck,
   HelpCircle
 } from 'lucide-react';
+import '@fontsource-variable/geist';
+import '../../styles/site.css';
 import { PhoneInput } from '../../components/PhoneInput';
 import { SITE, whatsappUrl } from '../../config/site';
-
-const brandFeatures = [
-  { icon: Calendar, label: 'Gestion des rendez-vous' },
-  { icon: Pill, label: 'Pharmacie & Laboratoire' },
-  { icon: Receipt, label: 'Facturation FCFA' },
-];
+import { trialDaysOf } from '../../utils/publicPlans';
+import { usePublicCatalog } from '../Landing/usePublicCatalog';
+import { Capture } from '../Landing/Capture';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
@@ -34,6 +30,19 @@ declare global {
   }
 }
 
+// Le script Google Identity n'est chargé que sur cet écran. Déclaré dans
+// index.html, il pesait près de 70 Ko sur chaque page, vitrine et application
+// connectée comprises, et contactait Google sans raison. La CSP de vercel.json
+// autorise déjà cette adresse (script-src).
+const GSI_SRC = 'https://accounts.google.com/gsi/client';
+const loadGoogleIdentity = () => {
+  if (document.querySelector(`script[src="${GSI_SRC}"]`)) return;
+  const script = document.createElement('script');
+  script.src = GSI_SRC;
+  script.async = true;
+  document.head.appendChild(script);
+};
+
 interface AuthPageProps {
   initialTab?: 'login' | 'register';
   onNavigate: (tab: 'landing' | 'login' | 'register') => void;
@@ -42,6 +51,7 @@ interface AuthPageProps {
 export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavigate }) => {
   const { login, loginWithGoogle, register } = useAuth();
   const { showToast } = useNotifications();
+  const trialDays = trialDaysOf(usePublicCatalog());
 
   // Navigation & View States
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab);
@@ -88,9 +98,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || isForgotView) return;
+    loadGoogleIdentity();
 
+    // Le script ne part qu'à l'ouverture de cet écran : sur un réseau lent il
+    // met plusieurs secondes, d'où jusqu'à 10 s d'attente. Une attente lancée
+    // avant un changement d'onglet s'arrête, sans quoi elle repeindrait le
+    // bouton avec l'ancien libellé.
+    let cancelled = false;
     let attempts = 0;
     const tryRender = () => {
+      if (cancelled) return;
       attempts += 1;
       if (window.google?.accounts?.id && googleButtonRef.current) {
         if (!googleInitialized.current) {
@@ -101,17 +118,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
           googleInitialized.current = true;
         }
         googleButtonRef.current.innerHTML = '';
+        // Largeur du formulaire, plafonnée à 320 : sur un écran de 320 px, un
+        // bouton fixe de 320 élargissait la carte au-delà de la page.
+        const availableWidth = googleButtonRef.current.parentElement?.clientWidth || 320;
         window.google.accounts.id.renderButton(googleButtonRef.current, {
           theme: 'outline',
           size: 'large',
-          width: 320,
+          width: Math.min(320, availableWidth),
           text: activeTab === 'register' ? 'signup_with' : 'signin_with'
         });
-      } else if (attempts < 30) {
+      } else if (attempts < 100) {
         setTimeout(tryRender, 100);
       }
     };
     tryRender();
+    return () => { cancelled = true; };
   }, [activeTab, isForgotView]);
 
   // Handle Login
@@ -175,557 +196,245 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      backgroundColor: 'var(--bg-primary)',
-      fontFamily: 'var(--font-primary, "Outfit", sans-serif)',
-      boxSizing: 'border-box'
-    }}>
-      <style>{`
-        .auth-container {
-          width: 100%;
-          min-height: 100vh;
-          display: flex;
-        }
-        .auth-left-panel {
-          width: 44%;
-          background: linear-gradient(165deg, var(--brand-900) 0%, var(--brand-700) 100%);
-          color: var(--brand-fill-fg);
-          padding: 3rem;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          position: relative;
-          box-sizing: border-box;
-        }
-        .auth-right-panel {
-          flex: 1;
-          background-color: var(--bg-primary);
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          padding: 2.5rem 1.5rem;
-          position: relative;
-          box-sizing: border-box;
-        }
-        .auth-card-clean {
-          width: 100%;
-          max-width: 420px;
-          display: flex;
-          flex-direction: column;
-          gap: 1.25rem;
-        }
-        .auth-input-group {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .auth-input-label {
-          font-size: 0.725rem;
-          font-weight: 700;
-          color: var(--text-secondary);
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-        .auth-field-wrapper {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-        .auth-field-wrapper input {
-          width: 100%;
-          padding: 11px 14px 11px 40px;
-          border-radius: 10px;
-          border: 1px solid var(--border);
-          background-color: var(--bg-tertiary);
-          font-size: 0.9rem;
-          color: var(--text-primary);
-          outline: none;
-          transition: all 0.2s ease;
-          box-sizing: border-box;
-        }
-        .auth-field-wrapper input:focus {
-          border-color: var(--brand-fill);
-          background-color: var(--bg-secondary);
-          box-shadow: 0 0 0 3px rgba(30, 77, 64, 0.12);
-        }
-        .auth-icon-left {
-          position: absolute;
-          left: 13px;
-          color: var(--text-muted);
-          pointer-events: none;
-        }
-        .auth-btn-primary {
-          width: 100%;
-          padding: 12px;
-          border-radius: 10px;
-          background-color: var(--brand-fill);
-          color: var(--brand-fill-fg);
-          border: none;
-          font-size: 0.95rem;
-          font-weight: 700;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          transition: background-color 0.2s ease, transform 0.1s ease;
-          box-shadow: 0 4px 12px rgba(30, 77, 64, 0.2);
-        }
-        .auth-btn-primary:hover {
-          background-color: var(--brand-fill-hover);
-          transform: translateY(-1px);
-        }
-        .auth-btn-secondary {
-          width: 100%;
-          padding: 11px;
-          border-radius: 10px;
-          background-color: var(--bg-secondary);
-          color: var(--text-primary);
-          border: 1px solid var(--border);
-          font-size: 0.875rem;
-          font-weight: 600;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          transition: all 0.2s ease;
-        }
-        .auth-btn-secondary:hover {
-          background-color: var(--bg-primary);
-          border-color: var(--brand-line);
-        }
-
-        /* Responsive Breakpoints */
-        @media (max-width: 960px) {
-          .auth-left-panel {
-            display: none;
-          }
-          .auth-right-panel {
-            padding: 2rem 1.25rem;
-          }
-        }
-      `}</style>
-
-      <div className="auth-container">
-        
-        {/* LEFT BRAND PANEL */}
-        <div className="auth-left-panel">
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/logo-icon.svg" alt="MediClinic" width={34} height={34} style={{ display: 'block', flexShrink: 0 }} />
-            <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em', color: 'var(--brand-fill-fg)' }}>
-              MediClinic
-            </span>
-          </div>
-
-          {/* Main Title & Features */}
-          <div style={{ maxWidth: '380px' }}>
-            <h1 style={{
-              fontSize: '2.2rem',
-              fontWeight: 800,
-              color: 'var(--brand-fill-fg)',
-              lineHeight: 1.2,
-              marginBottom: '1rem',
-              fontFamily: 'var(--font-secondary, "Plus Jakarta Sans", sans-serif)'
-            }}>
-              La gestion de votre clinique,<br />
-              <span style={{ color: 'var(--brand-300)' }}>simplifiée.</span>
-            </h1>
-
-            <p style={{
-              fontSize: '0.9rem',
-              color: 'var(--sidebar-fg)',
-              lineHeight: 1.6,
-              marginBottom: '2.2rem'
-            }}>
-              Rendez-vous, ordonnances, pharmacie, laboratoire et comptabilité — tout en un seul endroit.
-            </p>
-
-            {/* Checklist */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {brandFeatures.map(({ label }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '7px',
-                    backgroundColor: 'rgba(52, 211, 153, 0.15)',
-                    border: '1px solid rgba(52, 211, 153, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <CheckCircle2 size={15} color="var(--brand-300)" />
-                  </div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--brand-100)' }}>
-                    {label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Footer copyright */}
-          <div style={{ fontSize: '0.78rem', color: 'var(--sidebar-muted)' }}>
-            © 2026 MediClinic · Côte d'Ivoire
-          </div>
+    <div className="site vt-auth">
+      <aside className="vt-auth-aside">
+        <img className="vt-auth-logo" src="/logo-horizontal.svg" alt="MediClinic" width={103} height={28} />
+        <div>
+          <h1>Toute votre clinique, de l'accueil à la caisse.</h1>
+          <p className="vt-auth-trial">
+            <CalendarCheck size={18} strokeWidth={1.75} aria-hidden="true" />
+            {trialDays} jours gratuits, sans carte bancaire
+          </p>
         </div>
+        <figure className="vt-shot vt-auth-shot">
+          <div className="vt-shot-bar" aria-hidden="true"><span>mediclinicpro.com</span></div>
+          <Capture name="dashboard" alt="Tableau de bord MediClinic" sizes="720px" />
+        </figure>
+      </aside>
 
-        {/* RIGHT FORM PANEL */}
-        <div className="auth-right-panel">
+      <main className="vt-auth-main">
+        <button type="button" className="vt-auth-back" onClick={() => onNavigate('landing')}>
+          <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+          Retour à l'accueil
+        </button>
 
-          {/* Return link */}
-          <button
-            onClick={() => onNavigate('landing')}
-            style={{
-              position: 'absolute',
-              top: '1.75rem',
-              left: '1.75rem',
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary)',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <ArrowLeft size={16} />
-            <span>Retour à l'accueil</span>
-          </button>
+        <div className="vt-auth-card">
+          <div>
+            <h2>{isForgotView ? 'Récupération' : activeTab === 'register' ? 'Créer un compte' : 'Connexion'}</h2>
+            <p className="vt-auth-sub">
+              {isForgotView
+                ? 'Nous réinitialisons votre accès sur WhatsApp, après vérification.'
+                : activeTab === 'register'
+                ? 'Enregistrez votre cabinet en 1 minute'
+                : 'Entrez vos identifiants pour accéder à votre espace.'}
+            </p>
+          </div>
 
-          <div className="auth-card-clean">
-
-            {/* Header Title */}
-            <div>
-              <h2 style={{
-                fontSize: '1.75rem',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-                margin: 0,
-                fontFamily: 'var(--font-secondary, "Plus Jakarta Sans", sans-serif)'
-              }}>
-                {isForgotView ? 'Récupération' : activeTab === 'register' ? 'Créer un compte' : 'Connexion'}
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '4px', margin: 0 }}>
-                {isForgotView
-                  ? 'Nous réinitialisons votre accès sur WhatsApp, après vérification.'
-                  : activeTab === 'register'
-                  ? 'Enregistrez votre cabinet en 1 minute'
-                  : 'Entrez vos identifiants pour accéder à votre espace.'}
-              </p>
+          {!isForgotView && (
+            <div className="vt-auth-switch" role="group" aria-label="Connexion ou création de compte">
+              <button type="button" aria-pressed={activeTab === 'login'} onClick={() => setActiveTab('login')}>Connexion</button>
+              <button type="button" aria-pressed={activeTab === 'register'} onClick={() => setActiveTab('register')}>Créer un compte</button>
             </div>
+          )}
 
-            {/* Sub-tab navigation when not in forgot view */}
-            {!isForgotView && (
-              <div style={{
-                display: 'flex',
-                gap: '8px',
-                backgroundColor: 'var(--bg-tertiary)',
-                padding: '4px',
-                borderRadius: '10px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('login')}
-                  style={{
-                    flex: 1,
-                    padding: '7px',
-                    borderRadius: '7px',
-                    border: 'none',
-                    backgroundColor: activeTab === 'login' ? 'var(--bg-secondary)' : 'transparent',
-                    color: activeTab === 'login' ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    boxShadow: activeTab === 'login' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Connexion
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('register')}
-                  style={{
-                    flex: 1,
-                    padding: '7px',
-                    borderRadius: '7px',
-                    border: 'none',
-                    backgroundColor: activeTab === 'register' ? 'var(--bg-secondary)' : 'transparent',
-                    color: activeTab === 'register' ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    boxShadow: activeTab === 'register' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Créer un compte
-                </button>
+          {/* Une clé par formulaire : sans elle, React réutilise le même <form> et
+              ses boutons d'une vue à l'autre. « Mot de passe oublié ? » devenait le
+              bouton d'envoi pendant son propre clic, et le navigateur soumettait
+              le formulaire de récupération, vide (bulle « Veuillez renseigner ce
+              champ ») ; « Retour à la connexion » soumettait la connexion. */}
+          {isForgotView ? (
+            <form key="recovery" onSubmit={handleRecoverySubmit} className="vt-form">
+              <div className="vt-field">
+                <label className="vt-field-label" htmlFor="vt-recovery-email">Adresse e-mail</label>
+                <div className="vt-field-control">
+                  <Mail size={17} strokeWidth={1.75} aria-hidden="true" />
+                  <input
+                    id="vt-recovery-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Ex : docteur@gmail.com"
+                    value={recoveryEmail}
+                    onChange={e => setRecoveryEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
               </div>
-            )}
-
-            {/* FORGOT PASSWORD VIEW */}
-            {isForgotView ? (
-              <form onSubmit={handleRecoverySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="auth-input-group">
-                  <label className="auth-input-label">ADRESSE EMAIL</label>
-                  <div className="auth-field-wrapper">
-                    <Mail size={17} className="auth-icon-left" />
-                    <input
-                      type="email"
-                      placeholder="Ex: docteur@gmail.com"
-                      value={recoveryEmail}
-                      onChange={e => setRecoveryEmail(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
+              <p className="vt-auth-text">
+                La réinitialisation par e-mail n'est pas encore disponible. Envoyez-nous votre demande sur
+                WhatsApp au <span className="vt-nowrap">{SITE.whatsapp.display}</span>&nbsp;: nous vérifions votre identité, puis vous transmettons
+                un mot de passe temporaire.
+              </p>
+              <button type="submit" className="vt-btn vt-btn-primary vt-btn-block">Demander sur WhatsApp</button>
+              <button type="button" className="vt-link vt-link-center" onClick={() => setIsForgotView(false)}>
+                Retour à la connexion
+              </button>
+            </form>
+          ) : activeTab === 'login' ? (
+            <form key="login" onSubmit={handleLoginSubmit} className="vt-form">
+              <div className="vt-field">
+                <label className="vt-field-label" htmlFor="vt-login-email">Adresse e-mail</label>
+                <div className="vt-field-control">
+                  <Mail size={17} strokeWidth={1.75} aria-hidden="true" />
+                  <input
+                    id="vt-login-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Ex : contact@clinique.ci"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
                 </div>
+              </div>
 
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 }}>
-                  La réinitialisation par e-mail n'est pas encore disponible. Envoyez-nous votre demande sur
-                  WhatsApp au {SITE.whatsapp.display} : nous vérifions votre identité, puis vous transmettons
-                  un mot de passe temporaire.
-                </p>
-
-                <button type="submit" className="auth-btn-primary">
-                  <span>Demander sur WhatsApp</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsForgotView(false)}
-                  style={{
-                    background: 'none', border: 'none', color: 'var(--primary)',
-                    fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
-                  }}
-                >
-                  Retour à la connexion
-                </button>
-              </form>
-            ) : activeTab === 'login' ? (
-              /* LOGIN FORM */
-              <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-
-                {/* Email Field */}
-                <div className="auth-input-group">
-                  <label className="auth-input-label">ADRESSE EMAIL</label>
-                  <div className="auth-field-wrapper">
-                    <Mail size={17} className="auth-icon-left" />
-                    <input
-                      type="email"
-                      placeholder="Ex: contact@clinique.ci"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Password Field */}
-                <div className="auth-input-group">
-                  <label className="auth-input-label">MOT DE PASSE</label>
-                  <div className="auth-field-wrapper">
-                    <Lock size={17} className="auth-icon-left" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                      style={{ paddingRight: '40px' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '12px',
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Forgot Password Link */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px' }}>
+              <div className="vt-field">
+                <label className="vt-field-label" htmlFor="vt-login-password">Mot de passe</label>
+                <div className="vt-field-control">
+                  <Lock size={17} strokeWidth={1.75} aria-hidden="true" />
+                  <input
+                    id="vt-login-password"
+                    className="vt-has-toggle"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
                   <button
                     type="button"
-                    onClick={() => setIsForgotView(true)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--primary)',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
+                    className="vt-field-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   >
-                    Mot de passe oublié ?
+                    {showPassword
+                      ? <EyeOff size={16} strokeWidth={1.75} aria-hidden="true" />
+                      : <Eye size={16} strokeWidth={1.75} aria-hidden="true" />}
                   </button>
                 </div>
+              </div>
 
-                {/* Primary Submit Button */}
-                <button type="submit" className="auth-btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="animate-spin" size={18} />
-                  ) : (
-                    <>
-                      <Lock size={16} />
-                      <span>Se connecter</span>
-                    </>
-                  )}
-                </button>
+              <button type="button" className="vt-link" onClick={() => setIsForgotView(true)}>Mot de passe oublié&nbsp;?</button>
 
-                {/* Google Sign In fallback if available */}
-                {GOOGLE_CLIENT_ID && (
+              <button type="submit" className="vt-btn vt-btn-primary vt-btn-block" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <Loader2 className="animate-spin" size={18} aria-label="Connexion en cours" />
+                ) : (
                   <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '2px 0' }}>
-                      <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }} />
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>ou</span>
-                      <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }} />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <div ref={googleButtonRef} />
-                    </div>
+                    <Lock size={16} strokeWidth={1.75} aria-hidden="true" />
+                    Se connecter
                   </>
                 )}
+              </button>
 
-                {/* Support Contact Note */}
-                <div style={{
-                  textAlign: 'center',
-                  marginTop: '6px',
-                  fontSize: '0.8rem',
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '5px',
-                  fontWeight: 600
-                }}>
-                  <HelpCircle size={14} />
-                  <span>Problème de connexion ? Contactez l'administrateur de votre clinique.</span>
+              {GOOGLE_CLIENT_ID && (
+                <>
+                  <p className="vt-or">ou</p>
+                  <div className="vt-google"><div ref={googleButtonRef} /></div>
+                </>
+              )}
+
+              <p className="vt-auth-note">
+                <HelpCircle size={14} strokeWidth={1.75} aria-hidden="true" />
+                Problème de connexion&nbsp;? Contactez l'administrateur de votre clinique.
+              </p>
+            </form>
+          ) : (
+            <form key="register" onSubmit={handleRegisterSubmit} className="vt-form">
+              <div className="vt-field">
+                <label className="vt-field-label" htmlFor="vt-register-clinic">Nom de la clinique *</label>
+                <div className="vt-field-control">
+                  <Building2 size={17} strokeWidth={1.75} aria-hidden="true" />
+                  <input
+                    id="vt-register-clinic"
+                    type="text"
+                    autoComplete="organization"
+                    placeholder="Ex : Cabinet Médical Saint-Jean"
+                    value={clinicName}
+                    onChange={e => setClinicName(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
                 </div>
+              </div>
 
-              </form>
-            ) : (
-              /* REGISTER FORM */
-              <form onSubmit={handleRegisterSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="auth-input-group">
-                  <label className="auth-input-label">NOM DE LA CLINIQUE *</label>
-                  <div className="auth-field-wrapper">
-                    <Building2 size={17} className="auth-icon-left" />
-                    <input
-                      type="text"
-                      placeholder="Ex: Cabinet Médical Saint-Jean"
-                      value={clinicName}
-                      onChange={e => setClinicName(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
+              <div className="vt-field">
+                <label className="vt-field-label" htmlFor="vt-register-admin">Nom du responsable *</label>
+                <div className="vt-field-control">
+                  <User size={17} strokeWidth={1.75} aria-hidden="true" />
+                  <input
+                    id="vt-register-admin"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="Ex : Dr Koné Aminata"
+                    value={adminName}
+                    onChange={e => setAdminName(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
                 </div>
+              </div>
 
-                <div className="auth-input-group">
-                  <label className="auth-input-label">NOM DU RESPONSABLE *</label>
-                  <div className="auth-field-wrapper">
-                    <User size={17} className="auth-icon-left" />
-                    <input
-                      type="text"
-                      placeholder="Ex: Dr. Koné Aminata"
-                      value={adminName}
-                      onChange={e => setAdminName(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
+              <div className="vt-field">
+                <label className="vt-field-label" htmlFor="vt-register-email">Adresse e-mail *</label>
+                <div className="vt-field-control">
+                  <Mail size={17} strokeWidth={1.75} aria-hidden="true" />
+                  <input
+                    id="vt-register-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Ex : contact@saintjean.ci"
+                    value={registerEmail}
+                    onChange={e => setRegisterEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
                 </div>
+              </div>
 
-                <div className="auth-input-group">
-                  <label className="auth-input-label">ADRESSE EMAIL *</label>
-                  <div className="auth-field-wrapper">
-                    <Mail size={17} className="auth-icon-left" />
-                    <input
-                      type="email"
-                      placeholder="Ex: contact@saintjean.ci"
-                      value={registerEmail}
-                      onChange={e => setRegisterEmail(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
+              {/* PhoneInput ne transmet pas d'id à son champ : le groupe porte le libellé. */}
+              <div className="vt-field" role="group" aria-labelledby="vt-register-phone-label">
+                <span className="vt-field-label" id="vt-register-phone-label">Téléphone (Mobile Money) *</span>
+                <div className="vt-field-phone">
+                  <PhoneInput value={phone} onChange={setPhone} disabled={isSubmitting} required />
                 </div>
+              </div>
 
-                <div className="auth-input-group">
-                  <label className="auth-input-label">TÉLÉPHONE (MOBILE MONEY) *</label>
-                  <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '4px' }}>
-                    <PhoneInput value={phone} onChange={setPhone} disabled={isSubmitting} required />
-                  </div>
+              <div className="vt-field">
+                <label className="vt-field-label" htmlFor="vt-register-password">Mot de passe *</label>
+                <div className="vt-field-control">
+                  <Lock size={17} strokeWidth={1.75} aria-hidden="true" />
+                  <input
+                    id="vt-register-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Minimum 8 caractères"
+                    value={registerPassword}
+                    onChange={e => setRegisterPassword(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
                 </div>
+              </div>
 
-                <div className="auth-input-group">
-                  <label className="auth-input-label">MOT DE PASSE *</label>
-                  <div className="auth-field-wrapper">
-                    <Lock size={17} className="auth-icon-left" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Minimum 8 caractères"
-                      value={registerPassword}
-                      onChange={e => setRegisterPassword(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
-                </div>
+              <button type="submit" className="vt-btn vt-btn-primary vt-btn-block" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="animate-spin" size={18} aria-label="Inscription en cours" /> : "S'inscrire et commencer"}
+              </button>
+            </form>
+          )}
 
-                <button type="submit" className="auth-btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <span>S'inscrire et commencer</span>}
-                </button>
-              </form>
-            )}
-
-            {/* Bottom Security Badge */}
-            <div style={{
-              backgroundColor: 'var(--brand-soft)',
-              border: '1px solid var(--brand-line)',
-              borderRadius: '10px',
-              padding: '9px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              color: 'var(--brand-soft-ink)',
-              marginTop: '0.5rem'
-            }}>
-              <ShieldCheck size={16} color="var(--success)" />
-              <span>Connexion chiffrée et données protégées</span>
-            </div>
-
-          </div>
-
+          <p className="vt-auth-secure">
+            <ShieldCheck size={16} strokeWidth={1.75} aria-hidden="true" />
+            Connexion chiffrée et données protégées
+          </p>
+          <p className="vt-auth-help">
+            Besoin d'aide&nbsp;? <a href={whatsappUrl()} target="_blank" rel="noopener noreferrer">Écrivez-nous sur WhatsApp</a>
+          </p>
         </div>
-
-      </div>
+      </main>
     </div>
   );
 };

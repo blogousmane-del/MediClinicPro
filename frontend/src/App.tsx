@@ -98,10 +98,10 @@ const MainAppContent: React.FC = () => {
   useEffect(() => {
     if (!user) {
       const loggedOutTitles: Record<string, string> = {
-        landing: "MediClinic — Logiciel de gestion de clinique en Côte d'Ivoire",
-        login: 'Connexion — MediClinic',
-        register: 'Créer un compte — MediClinic',
-        terms: "Conditions générales d'utilisation — MediClinic"
+        landing: "MediClinic, logiciel de gestion de clinique en Côte d'Ivoire",
+        login: 'Connexion · MediClinic',
+        register: 'Créer un compte · MediClinic',
+        terms: "Conditions générales d'utilisation · MediClinic"
       };
       document.title = loggedOutTitles[loggedOutTab] || 'MediClinic';
       return;
@@ -109,6 +109,19 @@ const MainAppContent: React.FC = () => {
     document.title = tabTitles[currentTab] ? `${tabTitles[currentTab]} — MediClinic` : 'MediClinic';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loggedOutTab, currentTab, selectedPatientId]);
+
+  // Chaque page publique s'ouvre en haut. Sans routage, la position de défilement
+  // survivait au changement de page : les CGU ouvertes depuis le pied de page de
+  // la vitrine s'affichaient déjà défilées jusqu'en bas. Le premier rendu est
+  // laissé tel quel, pour ne pas contrarier une ancre comme /#tarifs.
+  const isFirstLoggedOutTab = useRef(true);
+  useEffect(() => {
+    if (isFirstLoggedOutTab.current) {
+      isFirstLoggedOutTab.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [loggedOutTab]);
 
   if (loading) {
     return (

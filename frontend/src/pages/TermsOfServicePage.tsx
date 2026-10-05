@@ -1,5 +1,7 @@
-import React from 'react';
-import { ShieldCheck, Info, Mail, Phone, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Info, Mail, Phone } from 'lucide-react';
+import '@fontsource-variable/geist';
+import '../styles/site.css';
+import { SITE } from '../config/site';
 
 interface TermsOfServicePageProps {
   onBack: () => void;
@@ -75,123 +77,80 @@ const sections: Section[] = [
   }
 ];
 
-export const TermsOfServicePage: React.FC<TermsOfServicePageProps> = ({ onBack, onRegister }) => {
+export const TermsOfServicePage = ({ onBack, onRegister }: TermsOfServicePageProps) => {
+  const year = new Date().getFullYear();
+  const legal = SITE.legal ? `${SITE.legal.name}. RCCM ${SITE.legal.rccm}.` : 'MediClinic.';
   return (
-    <div className="terms-page">
-      {/* Nav */}
-      <nav className="terms-nav">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={onBack}>
-          <img src="/logo-icon.svg" alt="MediClinic" width={32} height={32} style={{ display: 'block', flexShrink: 0 }} />
-          <span style={{ fontWeight: 700, fontSize: '1.1rem', fontFamily: 'var(--font-secondary)', color: 'var(--tp-fg)' }}>MediClinic</span>
-        </div>
-
-        <div className="terms-nav-actions">
-          <a onClick={onBack}><ArrowLeft size={14} /> Retour</a>
-          <button
-            onClick={onRegister}
-            style={{
-              padding: '8px 18px',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: 'var(--tp-primary)',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer'
-            }}
-          >
-            Essai gratuit
+    <div className="site vt-terms">
+      <header className="vt-nav">
+        <div className="vt-wrap vt-nav-bar">
+          <button type="button" className="vt-plain vt-nav-logo" onClick={onBack} aria-label="MediClinic, retour à l'accueil">
+            <img src="/logo-horizontal.svg" alt="" width={103} height={28} />
           </button>
-        </div>
-      </nav>
-
-      {/* Page header */}
-      <div className="terms-header">
-        <div style={{ maxWidth: '720px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-            <ShieldCheck size={14} color="var(--tp-primary)" />
-            <span style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--tp-primary)' }}>Légal</span>
+          <div className="vt-nav-right">
+            <button type="button" className="vt-terms-back" onClick={onBack} aria-label="Retour à l'accueil">
+              <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span>Retour</span>
+            </button>
+            <button type="button" className="vt-btn vt-btn-primary vt-btn-sm" onClick={onRegister}>Essayer gratuitement</button>
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontFamily: 'var(--font-secondary)', color: '#ffffff', marginBottom: '0.75rem' }}>Conditions Générales d'Utilisation</h1>
-          <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>
-            Dernière mise à jour : [date de dernière mise à jour] · Document provisoire — en attente de validation juridique
-          </p>
         </div>
-      </div>
+      </header>
 
-      {/* Content */}
-      <div className="terms-layout">
-        {/* TOC (desktop only) */}
-        <aside className="terms-toc">
-          <div className="terms-toc-inner">
-            <p style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--tp-muted)', marginBottom: '0.75rem' }}>
-              Sommaire
-            </p>
+      <main className="vt-wrap vt-terms-main">
+        <header className="vt-terms-header">
+          <h1>Conditions générales d'utilisation</h1>
+          <p>Dernière mise à jour : [date de dernière mise à jour]. Document provisoire, en attente de validation juridique.</p>
+        </header>
+
+        <div className="vt-terms-layout">
+          <nav className="vt-terms-toc" aria-label="Sommaire">
+            <p className="vt-terms-toc-title">Sommaire</p>
+            {sections.map((s) => <a key={s.id} href={`#section-${s.id}`}>{s.title}</a>)}
+          </nav>
+
+          <div className="vt-terms-content">
+            <div className="vt-terms-warning">
+              <Info size={18} strokeWidth={1.75} aria-hidden="true" />
+              <p>
+                Ce document est un modèle de structure généré automatiquement et contient des sections à compléter (entre crochets). Il ne doit pas être publié tel quel : il doit être relu et complété avec les informations juridiques réelles de l'entreprise avant toute mise en ligne.
+              </p>
+            </div>
+
             {sections.map((s) => (
-              <a key={s.id} href={`#section-${s.id}`}>{s.title}</a>
+              <section key={s.id} id={`section-${s.id}`} className="vt-terms-section">
+                <h2>{s.title}</h2>
+                <p>{s.content}</p>
+              </section>
             ))}
-          </div>
-        </aside>
 
-        {/* Sections */}
-        <div className="terms-content">
-          <div style={{
-            backgroundColor: 'var(--tp-secondary)',
-            border: '1px solid rgba(61, 107, 94, 0.3)',
-            borderRadius: '10px',
-            padding: '1.1rem',
-            display: 'flex',
-            gap: '10px'
-          }}>
-            <Info size={16} color="var(--tp-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <p style={{ fontSize: '0.85rem', color: 'var(--tp-fg)', lineHeight: 1.6 }}>
-              Ce document est un modèle de structure généré automatiquement et contient des sections à compléter (entre crochets). Il ne doit pas être publié tel quel : il doit être relu et complété avec les informations juridiques réelles de l'entreprise avant toute mise en ligne.
-            </p>
-          </div>
-
-          {sections.map((s) => (
-            <div key={s.id} id={`section-${s.id}`} className="terms-section">
-              <h2 style={{ fontSize: '1.1rem', fontFamily: 'var(--font-secondary)', color: 'var(--tp-fg)', fontWeight: 700 }}>{s.title}</h2>
-              <p style={{ fontSize: '0.88rem', color: 'var(--tp-muted)', lineHeight: 1.7 }}>{s.content}</p>
-            </div>
-          ))}
-
-          <div style={{
-            backgroundColor: 'var(--tp-input)',
-            border: '1px solid var(--tp-border)',
-            borderRadius: '10px',
-            padding: '1.5rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem'
-          }}>
-            <h3 style={{ fontSize: '1rem', fontFamily: 'var(--font-secondary)', color: 'var(--tp-fg)', fontWeight: 700 }}>Des questions sur ces conditions ?</h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--tp-muted)' }}>Notre équipe est disponible pour répondre à vos questions.</p>
-            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Mail size={14} color="var(--tp-primary)" />
-                {/* Adresse de contact des CGU : elle doit rester relevée, une
-                    adresse morte ici vaut moins que pas d'adresse du tout.
-                    `contact@mediclinicpro.com` a été essayée puis abandonnée,
-                    la boîte n'étant pas exploitable. */}
-                <a href="mailto:blog.ousmane@gmail.com" style={{ fontSize: '0.85rem', color: 'var(--tp-primary)' }}>blog.ousmane@gmail.com</a>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Phone size={14} color="var(--tp-muted)" />
-                <span style={{ fontSize: '0.85rem', color: 'var(--tp-muted)' }}>+225 07 88 81 81 18</span>
-              </div>
+            <div className="vt-terms-contact">
+              <h2>Des questions sur ces conditions ?</h2>
+              <p>Notre équipe est disponible pour répondre à vos questions.</p>
+              <ul>
+                <li>
+                  <Mail size={16} strokeWidth={1.75} aria-hidden="true" />
+                  {/* Adresse de contact des CGU : elle doit rester relevée, une
+                      adresse morte ici vaut moins que pas d'adresse du tout.
+                      `contact@mediclinicpro.com` a été essayée puis abandonnée,
+                      la boîte n'étant pas exploitable. */}
+                  <a href="mailto:blog.ousmane@gmail.com">blog.ousmane@gmail.com</a>
+                </li>
+                <li>
+                  <Phone size={16} strokeWidth={1.75} aria-hidden="true" />
+                  <span>{SITE.whatsapp.display}</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* Footer — only real destinations (no Confidentialité/Contact pages exist) */}
-      <footer className="terms-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/logo-icon.svg" alt="MediClinic" width={22} height={22} style={{ display: 'block' }} />
-          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--tp-fg)' }}>MediClinic</span>
+      <footer className="vt-footer">
+        <div className="vt-wrap vt-footer-legal vt-terms-footer">
+          <span>© {year} {legal}</span>
+          <span>Logiciel de gestion de clinique pour la Côte d'Ivoire.</span>
         </div>
-        <span style={{ fontSize: '0.78rem', color: 'var(--tp-muted)' }}>© 2026 MediClinic. Développé pour les cliniques et cabinets en Côte d'Ivoire.</span>
       </footer>
     </div>
   );

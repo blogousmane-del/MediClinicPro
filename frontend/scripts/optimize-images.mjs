@@ -1,51 +1,54 @@
-// Génère les variantes AVIF et WebP des photos de la vitrine.
+// Génère les variantes AVIF et WebP des captures de la vitrine, et l'image de
+// partage. Les sources sont les PNG de scripts/.captures/, produits par
+// capture-screens.mjs : npm run captures enchaîne les deux scripts.
 //
-// Les trois PNG d'origine pèsent 1,8 Mo à eux seuls, sur une page servie à des
-// cliniques ivoiriennes le plus souvent en connexion mobile. Chaque source
-// produit deux largeurs (celle du rendu et son double pour les écrans à haute
-// densité) dans les deux formats. Les PNG d'origine restent en place : ils
-// servent de dernier repli dans le <picture> et d'image de partage Open Graph.
+// Chaque capture donne deux largeurs, celle du rendu et son double pour les
+// écrans à haute densité, dans les deux formats. Les PNG restent hors de
+// public/ : à 2880 px de large, ils pèseraient plusieurs mégaoctets chacun, sur
+// une page servie le plus souvent en connexion mobile.
 //
-// Lancement : npm run images  (sharp est une dépendance de développement, elle
-// ne part pas dans le bundle).
-
+// Lancement seul : npm run images (sharp est une dépendance de développement,
+// elle ne part pas dans le bundle).
 import sharp from 'sharp';
 import { mkdir, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const sourceDir = join(here, '.captures');
 const publicDir = join(here, '..', 'public');
-const outDir = join(publicDir, 'optimized');
+const outDir = join(publicDir, 'captures');
 
-// Largeurs choisies sur le rendu réel : le héros occupe ~560px au maximum dans
-// une grille limitée à 1200px, la photo du laboratoire ~570px.
+// Largeurs choisies sur le rendu réel : 900 px pour la capture du héros, 390 px
+// pour un téléphone, 412 px pour le reçu posé sur son panneau. Ce sont les
+// largeurs que lit frontend/src/pages/Landing/Capture.tsx.
+const SCREENS = ['dashboard', 'patients', 'patient-detail', 'laboratory', 'pharmacy', 'accounting'];
 const SOURCES = [
-  { file: 'doctor_hero.png', widths: [560, 1120] },
-  { file: 'lab_showcase.png', widths: [570, 1140] }
+  ...SCREENS.flatMap((name) => [
+    { name, widths: [900, 1800] },
+    { name: `${name}-mobile`, widths: [390, 780] },
+  ]),
+  { name: 'receipt', widths: [520, 1040] },
 ];
 
 const kb = (bytes) => `${Math.round(bytes / 1024)} Ko`;
 
 await mkdir(outDir, { recursive: true });
 
-for (const { file, widths } of SOURCES) {
-  const src = join(publicDir, file);
-  const base = file.replace(/\.png$/, '');
-  const original = await stat(src);
-  console.log(`\n${file} — ${kb(original.size)} en PNG`);
-
+for (const { name, widths } of SOURCES) {
+  const src = join(sourceDir, `${name}.png`);
   for (const width of widths) {
     const pipeline = sharp(src).resize({ width, withoutEnlargement: true });
-
-    const avifPath = join(outDir, `${base}-${width}.avif`);
-    await pipeline.clone().avif({ quality: 55, effort: 6 }).toFile(avifPath);
-    console.log(`  ${base}-${width}.avif  ${kb((await stat(avifPath)).size)}`);
-
-    const webpPath = join(outDir, `${base}-${width}.webp`);
-    await pipeline.clone().webp({ quality: 72 }).toFile(webpPath);
-    console.log(`  ${base}-${width}.webp  ${kb((await stat(webpPath)).size)}`);
+    const avifPath = join(outDir, `${name}-${width}.avif`);
+    await pipeline.clone().avif({ quality: 60, effort: 6 }).toFile(avifPath);
+    const webpPath = join(outDir, `${name}-${width}.webp`);
+    await pipeline.clone().webp({ quality: 76 }).toFile(webpPath);
+    console.log(`${name}-${width}  avif ${kb((await stat(avifPath)).size)}  webp ${kb((await stat(webpPath)).size)}`);
   }
 }
 
-console.log('\nVariantes écrites dans public/optimized/.');
+// Image de partage (WhatsApp, Facebook) : un PNG 1200 × 630, le format le mieux
+// lu par les aperçus de lien.
+const ogPath = join(publicDir, 'og-image.png');
+await sharp(join(sourceDir, 'og-image.png')).png({ compressionLevel: 9, palette: true, quality: 90 }).toFile(ogPath);
+console.log(`og-image.png  ${kb((await stat(ogPath)).size)}`);

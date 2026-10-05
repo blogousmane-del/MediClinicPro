@@ -9,9 +9,12 @@
     "lint": "oxlint",
     "test": "node --test \"src/**/*.test.ts\"",
     "preview": "vite preview",
-    "images": "node scripts/optimize-images.mjs"
+    "images": "node scripts/optimize-images.mjs",
+    "captures": "node scripts/capture-screens.mjs && node scripts/optimize-images.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
     "libphonenumber-js": "^1.13.9",
     "lucide-react": "^1.25.0",
     "react": "^19.2.7",
@@ -24,6 +27,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
+    "playwright-core": "^1.63.0",
     "sharp": "^0.35.4",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
