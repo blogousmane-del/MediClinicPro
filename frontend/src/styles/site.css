@@ -268,7 +268,8 @@ html:has(.site) body { overflow-x: clip; }
 /* ----- Connexion et inscription ----- */
 .vt-auth { display: grid; grid-template-columns: minmax(0, 44fr) minmax(0, 56fr); }
 .vt-auth-aside { display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: 48px 0 0 48px; overflow: hidden; background: var(--surface); border-right: 1px solid var(--line); }
-.vt-auth-logo { height: 28px; width: auto; }
+/* .site img impose height: auto, et la colonne flexible étirerait le logo. */
+.site .vt-auth-logo { align-self: flex-start; width: auto; height: 28px; }
 .site .vt-auth-aside h1 { max-width: 15ch; padding-right: 48px; font-size: 40px; line-height: 1.06; letter-spacing: -0.04em; text-wrap: balance; }
 .vt-auth-trial { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 15px; color: var(--ink-2); }
 .vt-auth-trial svg { color: var(--brand); }
@@ -375,6 +376,8 @@ html:has(.site) body { overflow-x: clip; }
   .vt-nav-login { display: none; }
   .vt-nav-burger { display: inline-flex; }
   .vt-nav-right { gap: 10px; }
+  .vt-terms-back { width: 40px; height: 40px; justify-content: center; }
+  .vt-terms-back span { display: none; }
   .vt-hero { padding: 40px 0 0; }
   .vt-hero-eyebrow { margin-bottom: 14px; font-size: 14px; }
   .site .vt-hero h1 { font-size: 38px; line-height: 1.05; }
