@@ -10,6 +10,11 @@ import { FactsBand } from './Landing/FactsBand';
 import { Journey } from './Landing/Journey';
 import { DocumentsSection } from './Landing/DocumentsSection';
 import { FieldPhotoBand } from './Landing/FieldPhotoBand';
+import { LocalFit } from './Landing/LocalFit';
+import { Pricing } from './Landing/Pricing';
+import { Founder } from './Landing/Founder';
+import { Faq } from './Landing/Faq';
+import { FinalCta } from './Landing/FinalCta';
 import { SiteFooter } from './Landing/SiteFooter';
 
 interface LandingPageProps {
@@ -54,6 +59,11 @@ export const LandingPage = ({ onNavigate }: LandingPageProps) => {
         <Journey />
         <DocumentsSection />
         <FieldPhotoBand />
+        <LocalFit cliniquePrice={catalog.clinique.price} />
+        <Pricing catalog={catalog} onRegister={onRegister} />
+        <Founder />
+        <Faq catalog={catalog} />
+        <FinalCta trialDays={trialDays} onRegister={onRegister} />
       </main>
       <SiteFooter onLogin={onLogin} onRegister={onRegister} onTerms={() => onNavigate('terms')} />
     </div>
