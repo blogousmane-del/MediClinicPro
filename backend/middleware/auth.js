@@ -36,6 +36,11 @@ if (!JWT_SECRET) {
   );
 }
 
+// Seul algorithme accepté : celui de jwt.sign à la connexion (HS256, le défaut
+// avec un secret texte). Sans cette liste, jsonwebtoken accepte aussi HS384 et
+// HS512 signés du même secret.
+const JWT_ALGORITHMS = ['HS256'];
+
 // General auth middleware
 async function auth(req, res, next) {
   try {
@@ -45,7 +50,7 @@ async function auth(req, res, next) {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: JWT_ALGORITHMS });
     req.user = decoded;
 
     // Deux lectures indépendantes, en parallèle : la clinique (abonnement,

@@ -50,7 +50,11 @@ function queryBuilder(table) {
       case 'lte': return row[column] != null && row[column] <= value;
       case 'lt': return row[column] != null && row[column] < value;
       case 'like': return row[column] != null && likeToRegExp(value).test(String(row[column]));
-      default: return row[column] === value;
+      // Un paramètre d'URL (`req.params.id`) arrive en texte. PostgREST le
+      // convertit dans le type de la colonne : '1' trouve l'identifiant 1.
+      default: return typeof value === 'string' && typeof row[column] === 'number'
+        ? String(row[column]) === value
+        : row[column] === value;
     }
   });
 

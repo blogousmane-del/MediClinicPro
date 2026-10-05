@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
+const { MEDICAL_READERS, canRead, withoutAntecedents } = require('../utils/medicalAccess');
 
 // Une quantité doit être un entier strictement positif, et un vrai nombre.
 // Le corps JSON peut porter n'importe quoi : avec une chaîne, `stock + qty`
@@ -212,7 +213,7 @@ router.post('/replenish', auth, checkRole(['admin', 'pharmacist', 'manager']), a
 
 // GET /api/pharmacy/prescriptions
 // List prescriptions in the clinic
-router.get('/prescriptions', auth, async (req, res) => {
+router.get('/prescriptions', auth, checkRole(MEDICAL_READERS.prescriptions), async (req, res) => {
   try {
     const { status } = req.query; // pending or dispensed or partial
 
@@ -228,7 +229,11 @@ router.get('/prescriptions', auth, async (req, res) => {
     const { data: prescriptions, error } = await queryBuilder.order('date_time', { ascending: false });
     if (error) throw error;
 
-    const formatted = (prescriptions || []).map(pr => ({
+    // Secret médical (utils/medicalAccess.js) : le diagnostic et les notes
+    // appartiennent à la consultation, que le pharmacien ne lit pas. La
+    // consultation jointe n'est donc jamais recopiée telle quelle.
+    const readsConsultation = canRead(req.user.role, 'consultations');
+    const formatted = (prescriptions || []).map(({ consultation, ...pr }) => ({
       ...pr,
       patient_first_name: pr.patient ? pr.patient.first_name : 'Inconnu',
       patient_last_name: pr.patient ? pr.patient.last_name : 'Inconnu',
@@ -240,8 +245,8 @@ router.get('/prescriptions', auth, async (req, res) => {
       // consultation dont l'ordonnance decoule. Le client les inventait
       // (« Consultation generale » sur toutes les lignes) faute de les
       // recevoir.
-      diagnosis: pr.consultation ? pr.consultation.diagnosis || '' : '',
-      notes: pr.consultation ? pr.consultation.notes || '' : '',
+      diagnosis: readsConsultation && consultation ? consultation.diagnosis || '' : '',
+      notes: readsConsultation && consultation ? consultation.notes || '' : '',
       doctor_name: pr.doctor ? pr.doctor.name : 'Inconnu',
       items: pr.items || []
     }));
@@ -255,7 +260,7 @@ router.get('/prescriptions', auth, async (req, res) => {
 
 // GET /api/pharmacy/prescriptions/:id
 // Get a single prescription details for dispensing
-router.get('/prescriptions/:id', auth, async (req, res) => {
+router.get('/prescriptions/:id', auth, checkRole(MEDICAL_READERS.prescriptions), async (req, res) => {
   try {
     const prescriptionId = req.params.id;
 
@@ -280,6 +285,8 @@ router.get('/prescriptions/:id', auth, async (req, res) => {
 
     res.json({
       ...prescription,
+      // La fiche jointe est complète (`patients(*)`) : sans ses antécédents pour le pharmacien.
+      patient: withoutAntecedents(prescription.patient, req.user.role),
       patient_first_name: prescription.patient ? prescription.patient.first_name : '',
       patient_last_name: prescription.patient ? prescription.patient.last_name : '',
       folder_number: prescription.patient ? prescription.patient.folder_number : '',

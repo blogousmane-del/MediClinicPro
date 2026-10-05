@@ -1,12 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { isWithinSchedule, computeEffectiveAvailability } = require('../utils/schedule');
 const { PLANS, getPlan, isRoleAllowedForPlan, isStaffLimitReached, isKnownRole } = require('../utils/plans');
-const { validatePassword } = require('../utils/password');
+const { validatePassword, hashPassword } = require('../utils/password');
 const { isClinicExpired } = require('../utils/subscription');
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -186,7 +185,7 @@ router.post('/users', auth, checkRole(['admin']), async (req, res) => {
       return res.status(400).json({ error: "Un utilisateur avec cet email existe déjà." });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(password);
     const { data: newUser, error: insertError } = await supabase
       .from('users')
       .insert({

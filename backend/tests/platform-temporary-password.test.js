@@ -39,6 +39,7 @@ test('genere un mot de passe temporaire qui ouvre le compte', async () => {
   assert.strictEqual(res.status, 200, JSON.stringify(body));
   assert.match(body.temporaryPassword, /^[A-Za-z0-9]{12}$/);
   assert.ok(bcrypt.compareSync(body.temporaryPassword, db.users[0].password_hash));
+  assert.strictEqual(bcrypt.getRounds(db.users[0].password_hash), 12);
   assert.strictEqual(db.users[0].password_set, true);
 });
 

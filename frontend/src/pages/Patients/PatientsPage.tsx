@@ -757,20 +757,23 @@ export const PatientsPage: React.FC<PatientsPageProps> = ({ onSelectPatient, tri
                           <Pencil size={16} />
                         </button>
 
-                        <button
-                          onClick={() => handleArchivePatient(pat.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--text-secondary)',
-                            padding: '4px',
-                            borderRadius: '4px'
-                          }}
-                          title="Archiver"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {/* Le serveur refuse l'archivage au pharmacien et au laborantin. */}
+                        {['admin', 'doctor', 'nurse', 'secretary', 'manager'].includes(user?.role || '') && (
+                          <button
+                            onClick={() => handleArchivePatient(pat.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--text-secondary)',
+                              padding: '4px',
+                              borderRadius: '4px'
+                            }}
+                            title="Archiver"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

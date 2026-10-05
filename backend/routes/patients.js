@@ -1,8 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
-const { auth } = require('../middleware/auth');
+const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
+const { ilikeOrFilter } = require('../utils/search');
+const { canRead, hiddenSections, withoutAntecedents } = require('../utils/medicalAccess');
+
+// Modifier ou archiver une fiche : tous les rôles sauf le pharmacien et le
+// laborantin, que leur travail n'amène pas à gérer les dossiers. L'admin passe
+// toujours.
+const PATIENT_EDITORS = ['doctor', 'nurse', 'secretary', 'manager'];
+
+// Résultat vide, au format d'une requête Supabase, pour une section du dossier
+// que le rôle ne lit pas : elle n'est même pas chargée.
+const notLoaded = () => ({ data: [], error: null });
 
 // GET /api/patients
 // Search and list patients
@@ -17,9 +28,10 @@ router.get('/', auth, async (req, res) => {
       .eq('clinic_id', req.user.clinicId)
       .eq('archived', archivedVal);
 
-    if (q) {
-      // Case-insensitive search using ilike in OR block
-      queryBuilder = queryBuilder.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,folder_number.ilike.%${q}%,phone.ilike.%${q}%`);
+    // Recherche insensible à la casse sur quatre colonnes (voir utils/search.js).
+    const searchFilter = ilikeOrFilter(['first_name', 'last_name', 'folder_number', 'phone'], q);
+    if (searchFilter) {
+      queryBuilder = queryBuilder.or(searchFilter);
     }
 
     const { data: patients, error } = await queryBuilder
@@ -27,7 +39,7 @@ router.get('/', auth, async (req, res) => {
       .order('first_name', { ascending: true });
 
     if (error) throw error;
-    res.json(patients || []);
+    res.json((patients || []).map((patient) => withoutAntecedents(patient, req.user.role)));
   } catch (error) {
     console.error("Get Patients Error:", error);
     res.status(500).json({ error: "Erreur lors de la récupération des patients." });
@@ -169,23 +181,31 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(404).json({ error: "Patient non trouvé." });
     }
 
+    // Secret médical (utils/medicalAccess.js) : consultations, ordonnances et
+    // examens ne sont chargés que pour les rôles qui les lisent.
+    const role = req.user.role;
+
     // Fetch consultations with doctor name
-    const { data: consultations, error: consultsError } = await supabase
-      .from('consultations')
-      .select('*, doctor:users(name)')
-      .eq('patient_id', patientId)
-      .eq('clinic_id', req.user.clinicId)
-      .order('date_time', { ascending: false });
+    const { data: consultations, error: consultsError } = canRead(role, 'consultations')
+      ? await supabase
+        .from('consultations')
+        .select('*, doctor:users(name)')
+        .eq('patient_id', patientId)
+        .eq('clinic_id', req.user.clinicId)
+        .order('date_time', { ascending: false })
+      : notLoaded();
 
     if (consultsError) throw consultsError;
 
     // Fetch prescriptions with doctor name
-    const { data: prescriptions, error: prescError } = await supabase
-      .from('prescriptions')
-      .select('*, doctor:users(name)')
-      .eq('patient_id', patientId)
-      .eq('clinic_id', req.user.clinicId)
-      .order('date_time', { ascending: false });
+    const { data: prescriptions, error: prescError } = canRead(role, 'prescriptions')
+      ? await supabase
+        .from('prescriptions')
+        .select('*, doctor:users(name)')
+        .eq('patient_id', patientId)
+        .eq('clinic_id', req.user.clinicId)
+        .order('date_time', { ascending: false })
+      : notLoaded();
 
     if (prescError) throw prescError;
 
@@ -203,12 +223,14 @@ router.get('/:id', auth, async (req, res) => {
     }
 
     // Fetch lab exams with doctor and technician names
-    const { data: labExams, error: labError } = await supabase
-      .from('lab_exams')
-      .select('*, doctor:users!lab_exams_doctor_id_fkey(name), technician:users!lab_exams_technician_id_fkey(name)')
-      .eq('patient_id', patientId)
-      .eq('clinic_id', req.user.clinicId)
-      .order('created_at', { ascending: false });
+    const { data: labExams, error: labError } = canRead(role, 'labExams')
+      ? await supabase
+        .from('lab_exams')
+        .select('*, doctor:users!lab_exams_doctor_id_fkey(name), technician:users!lab_exams_technician_id_fkey(name)')
+        .eq('patient_id', patientId)
+        .eq('clinic_id', req.user.clinicId)
+        .order('created_at', { ascending: false })
+      : notLoaded();
 
     if (labError) throw labError;
 
@@ -292,7 +314,8 @@ router.get('/:id', auth, async (req, res) => {
     timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.json({
-      patient,
+      patient: withoutAntecedents(patient, role),
+      hiddenSections: hiddenSections(role),
       timeline,
       consultations: (consultations || []).map(c => ({
         ...c,
@@ -319,7 +342,7 @@ router.get('/:id', auth, async (req, res) => {
 
 // PUT /api/patients/:id
 // Update patient
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, checkRole(PATIENT_EDITORS), async (req, res) => {
   try {
     const { firstName, lastName, birthDate, gender, phone, email, address, allergies, antecedents } = req.body;
     const patientId = req.params.id;
@@ -343,19 +366,25 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(404).json({ error: "Patient non trouvé." });
     }
 
+    const update = {
+      first_name: firstName,
+      last_name: lastName,
+      birth_date: birthDate,
+      gender,
+      phone: normalizedPhone,
+      email: email || '',
+      address: address || '',
+      allergies: allergies || ''
+    };
+    // Un rôle qui ne lit pas les antécédents reçoit la fiche sans eux : il ne
+    // peut pas non plus les écraser, sans quoi son formulaire les viderait.
+    if (canRead(req.user.role, 'antecedents')) {
+      update.antecedents = antecedents || '';
+    }
+
     const { error: updateError } = await supabase
       .from('patients')
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        birth_date: birthDate,
-        gender,
-        phone: normalizedPhone,
-        email: email || '',
-        address: address || '',
-        allergies: allergies || '',
-        antecedents: antecedents || ''
-      })
+      .update(update)
       .eq('id', patientId)
       .eq('clinic_id', req.user.clinicId);
 
@@ -377,7 +406,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // DELETE /api/patients/:id (Archive patient)
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, checkRole(PATIENT_EDITORS), async (req, res) => {
   try {
     const patientId = req.params.id;
     
