@@ -7,6 +7,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1e4d40" />
 
+    <!-- Geist, la police de la vitrine, est préchargée. Sans cela, Chrome met
+         toute la page en forme avec la police de repli, puis recommence à
+         l'arrivée de Geist : environ 0,5 s de LCP en 4G lente, et un décalage
+         de mise en page. Le chemin passe par node_modules pour que Vite donne
+         au fichier le même nom haché que l'import de styles/site.css. -->
+    <link rel="preload" href="/node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- La capture du héros, image LCP sur téléphone, est préchargée : sans
+         cela, elle ne part qu'une fois le JavaScript exécuté, environ 0,5 s de
+         LCP en 4G lente. Mêmes candidats et même sizes que la <source> AVIF
+         téléphone de pages/Landing/Capture.tsx (phoneSizes du héros), sinon
+         l'image est téléchargée deux fois. Comme la police, elle part aussi à
+         l'ouverture de l'application connectée : 30 Ko la première fois. -->
+    <link rel="preload" as="image" type="image/avif" media="(max-width: 640px)" imagesrcset="/captures/dashboard-mobile-390.avif 390w, /captures/dashboard-mobile-780.avif 780w" imagesizes="86vw" fetchpriority="high" />
+
     <!-- Polices : chargées ici, plus par un @import en tête de index.css. Un
          @import sérialise la requête derrière le CSS et bloque le rendu ; le
          preconnect ouvre la connexion à gstatic pendant que le HTML s'analyse.
@@ -78,7 +92,6 @@
     }
     </script>
 
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <div id="root"></div>

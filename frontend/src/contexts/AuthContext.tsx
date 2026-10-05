@@ -60,7 +60,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [serverSubscription, setServerSubscription] = useState<SubscriptionState | null>(null);
   const [suspended, setSuspended] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Sans jeton, il n'y a rien à vérifier : la vitrine s'affiche dès le premier
+  // rendu. Partir de true faisait peindre l'écran de chargement, puis tout
+  // recommencer, environ 0,4 s de plus sur un téléphone modeste.
+  const [loading, setLoading] = useState<boolean>(() => Boolean(localStorage.getItem('mediclinic_token')));
 
   // Le serveur fait foi ; le calcul local ne sert que si /auth/me ne renvoie pas
   // encore le bloc (onglet resté ouvert pendant un déploiement).

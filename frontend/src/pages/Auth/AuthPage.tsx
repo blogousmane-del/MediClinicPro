@@ -30,6 +30,19 @@ declare global {
   }
 }
 
+// Le script Google Identity n'est chargé que sur cet écran. Déclaré dans
+// index.html, il pesait près de 70 Ko sur chaque page, vitrine et application
+// connectée comprises, et contactait Google sans raison. La CSP de vercel.json
+// autorise déjà cette adresse (script-src).
+const GSI_SRC = 'https://accounts.google.com/gsi/client';
+const loadGoogleIdentity = () => {
+  if (document.querySelector(`script[src="${GSI_SRC}"]`)) return;
+  const script = document.createElement('script');
+  script.src = GSI_SRC;
+  script.async = true;
+  document.head.appendChild(script);
+};
+
 interface AuthPageProps {
   initialTab?: 'login' | 'register';
   onNavigate: (tab: 'landing' | 'login' | 'register') => void;
@@ -85,9 +98,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID || isForgotView) return;
+    loadGoogleIdentity();
 
+    // Le script ne part qu'à l'ouverture de cet écran : sur un réseau lent il
+    // met plusieurs secondes, d'où jusqu'à 10 s d'attente. Une attente lancée
+    // avant un changement d'onglet s'arrête, sans quoi elle repeindrait le
+    // bouton avec l'ancien libellé.
+    let cancelled = false;
     let attempts = 0;
     const tryRender = () => {
+      if (cancelled) return;
       attempts += 1;
       if (window.google?.accounts?.id && googleButtonRef.current) {
         if (!googleInitialized.current) {
@@ -107,11 +127,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialTab = 'login', onNavi
           width: Math.min(320, availableWidth),
           text: activeTab === 'register' ? 'signup_with' : 'signin_with'
         });
-      } else if (attempts < 30) {
+      } else if (attempts < 100) {
         setTimeout(tryRender, 100);
       }
     };
     tryRender();
+    return () => { cancelled = true; };
   }, [activeTab, isForgotView]);
 
   // Handle Login

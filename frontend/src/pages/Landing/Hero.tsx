@@ -19,7 +19,9 @@ export const Hero = ({ onRegister }: { onRegister: () => void }) => (
           <WhatsAppLink className="vt-btn vt-btn-ghost" />
         </div>
       </div>
-      {/* La capture n'a pas d'animation d'entrée : c'est l'image LCP. */}
+      {/* La capture n'a pas d'animation d'entrée : c'est l'image LCP. Sur
+          téléphone, index.html la précharge : changer phoneSizes ou les largeurs
+          de Capture.tsx impose de reporter la modification là-bas. */}
       <figure className="vt-shot vt-hero-shot">
         <div className="vt-shot-bar" aria-hidden="true"><span>mediclinicpro.com</span></div>
         <Capture
