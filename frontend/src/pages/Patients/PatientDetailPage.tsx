@@ -3,6 +3,7 @@ import { api } from '../../utils/api';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { escapeHtml, clinicHeaderHtml, buildPrintDocument, openPrintWindow } from '../../utils/print';
+import { hiddenSectionsNotice } from '../../utils/medicalAccess';
 import { SkeletonPage } from '../../components/Skeleton';
 import {
   ArrowLeft,
@@ -16,7 +17,8 @@ import {
   Calendar,
   AlertTriangle,
   Printer,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Lock
 } from 'lucide-react';
 
 interface PatientDetailPageProps {
@@ -36,6 +38,8 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
 
   const [patient, setPatient] = useState<any>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
+  // Sections médicales que le serveur ne renvoie pas à ce rôle (secret médical).
+  const [hiddenSections, setHiddenSections] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Consultations Medications Catalog cache
@@ -83,7 +87,8 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
       const data = await api.get(`/patients/${patientId}`);
       setPatient(data.patient);
       setTimeline(data.timeline);
-      
+      setHiddenSections(Array.isArray(data.hiddenSections) ? data.hiddenSections : []);
+
       // Filter patient prescriptions and exams
       setPendingPrescriptions(data.prescriptions.filter((p: any) => p.status !== 'dispensed'));
       setPendingExams(data.labExams.filter((e: any) => e.status !== 'completed'));
@@ -351,6 +356,10 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
     );
   }
 
+  const medicalNotice = hiddenSectionsNotice(hiddenSections);
+  // Antécédents retenus par le serveur : « Aucun ATCD » serait faux.
+  const antecedentsHidden = hiddenSections.includes('antecedents');
+
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
@@ -382,18 +391,18 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
           </div>
         </div>
         <div style={{ gridColumn: 'span 2' }}>
-          <span className="text-xs text-muted" style={{ fontWeight: 600 }}>ALLERGIES & ATCD</span>
+          <span className="text-xs text-muted" style={{ fontWeight: 600 }}>{antecedentsHidden ? 'ALLERGIES' : 'ALLERGIES & ATCD'}</span>
           <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {patient.allergies ? (
               <span className="badge badge-danger">Allergie : {patient.allergies}</span>
             ) : (
               <span className="badge badge-success">Aucune allergie</span>
             )}
-            {patient.antecedents ? (
+            {!antecedentsHidden && (patient.antecedents ? (
               <span className="badge badge-warning">ATCD : {patient.antecedents}</span>
             ) : (
               <span className="badge badge-info">Aucun ATCD</span>
-            )}
+            ))}
           </div>
         </div>
       </div>
@@ -406,7 +415,14 @@ export const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ patientId,
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
             Historique Médical & Financier
           </h3>
-          
+
+          {medicalNotice && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <Lock size={14} aria-hidden="true" />
+              <span>{medicalNotice}</span>
+            </div>
+          )}
+
           {timeline.length === 0 ? (
             <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               Aucun événement dans l'historique de ce patient.

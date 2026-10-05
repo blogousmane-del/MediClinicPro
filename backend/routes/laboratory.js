@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
+const { MEDICAL_READERS } = require('../utils/medicalAccess');
 
 // GET /api/laboratory/exams
 // List laboratory exams in the queue
-router.get('/exams', auth, async (req, res) => {
+router.get('/exams', auth, checkRole(MEDICAL_READERS.labExams), async (req, res) => {
   try {
     const { status } = req.query; // pending or completed
 

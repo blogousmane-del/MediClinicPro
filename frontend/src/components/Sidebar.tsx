@@ -42,8 +42,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, setCurrentTab, isO
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager', 'nurse'] },
     { id: 'patients', label: 'Patients', icon: Users, roles: ['admin', 'doctor', 'secretary', 'pharmacist', 'lab_tech', 'manager', 'nurse'] },
     { id: 'appointments', label: 'Rendez-vous', icon: Calendar, roles: ['admin', 'doctor', 'secretary', 'manager', 'nurse'] },
-    { id: 'prescriptions', label: 'Ordonnances', icon: FileText, roles: ['admin', 'doctor', 'pharmacist', 'manager'] },
-    { id: 'laboratory', label: 'Laboratoire', icon: FlaskConical, roles: ['admin', 'lab_tech', 'manager'] },
+    // Ordonnances et examens sont du contenu médical : le serveur les refuse au
+    // gestionnaire (backend/utils/medicalAccess.js).
+    { id: 'prescriptions', label: 'Ordonnances', icon: FileText, roles: ['admin', 'doctor', 'pharmacist'] },
+    { id: 'laboratory', label: 'Laboratoire', icon: FlaskConical, roles: ['admin', 'lab_tech'] },
     { id: 'pharmacy', label: 'Pharmacie', icon: Pill, roles: ['admin', 'pharmacist', 'manager'] },
     { id: 'accounting', label: 'Comptabilité', icon: Receipt, roles: ['admin', 'secretary', 'manager'] },
     { id: 'deposits', label: 'Dépôts de garantie', icon: ShieldCheck, roles: ['admin', 'secretary', 'manager'] },

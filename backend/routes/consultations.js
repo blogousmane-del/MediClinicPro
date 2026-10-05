@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../database');
 const { auth, checkRole } = require('../middleware/auth');
+const { MEDICAL_READERS } = require('../utils/medicalAccess');
 
 // POST /api/consultations
 // Save a new consultation + optional prescription + optional lab exams
@@ -158,7 +159,7 @@ router.post('/', auth, checkRole(['doctor']), async (req, res) => {
 
 // GET /api/consultations/:id
 // Get a single consultation details (including prescription and lab results)
-router.get('/:id', auth, async (req, res) => {
+router.get('/:id', auth, checkRole(MEDICAL_READERS.consultations), async (req, res) => {
   try {
     const consultationId = req.params.id;
     
