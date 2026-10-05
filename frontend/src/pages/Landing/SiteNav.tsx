@@ -49,6 +49,7 @@ export const SiteNav = ({ onLogin, onRegister }: SiteNavProps) => {
           {SECTION_LINKS.map((link) => <a key={link.href} href={link.href} onClick={closeMenu}>{link.label}</a>)}
           <button type="button" onClick={() => { closeMenu(); onLogin(); }}>Connexion</button>
           <WhatsAppLink onClick={closeMenu} />
+          <button type="button" className="vt-btn vt-btn-primary vt-menu-cta" onClick={() => { closeMenu(); onRegister(); }}>Essayer gratuitement</button>
         </nav>
       </div>
     </header>
