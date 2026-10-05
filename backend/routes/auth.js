@@ -9,7 +9,7 @@ const { JWT_SECRET, auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { computeEffectiveAvailability } = require('../utils/schedule');
 const { getPlan, isRoleAllowedForPlan, isStaffLimitReached, isKnownRole } = require('../utils/plans');
-const { validatePassword } = require('../utils/password');
+const { validatePassword, hashPassword } = require('../utils/password');
 const { getSettings } = require('../utils/platformSettings');
 const { getSubscriptionState } = require('../utils/subscription');
 const { recordLoginFailure, REASONS } = require('../utils/loginFailures');
@@ -79,7 +79,7 @@ router.post('/register', async (req, res) => {
     const clinicId = clinicData.id;
 
     // Create Admin User
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(password);
     const { data: userData, error: userError } = await supabase
       .from('users')
       .insert({
@@ -287,7 +287,7 @@ router.post('/google', async (req, res) => {
         if (priorError) throw priorError;
 
         if (!priorGoogle || priorGoogle.length === 0) {
-          const unusableHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+          const unusableHash = await hashPassword(crypto.randomBytes(32).toString('hex'));
           const { error: resetError } = await supabase
             .from('users')
             .update({ password_hash: unusableHash, password_set: false })
@@ -352,7 +352,7 @@ router.post('/google', async (req, res) => {
       // users.password_hash is NOT NULL — this account only ever authenticates via
       // Google, so store an unusable random hash rather than relaxing the constraint.
       const randomPassword = crypto.randomBytes(32).toString('hex');
-      const passwordHash = await bcrypt.hash(randomPassword, 10);
+      const passwordHash = await hashPassword(randomPassword);
 
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -494,7 +494,7 @@ router.put('/password', auth, async (req, res) => {
       }
     }
 
-    const newHash = await bcrypt.hash(newPassword, 10);
+    const newHash = await hashPassword(newPassword);
     const { error: updateError } = await supabase
       .from('users')
       .update({ password_hash: newHash, password_set: true })
@@ -595,7 +595,7 @@ router.post('/onboarding', auth, checkRole(['admin']), async (req, res) => {
           if (checkError) throw checkError;
 
           if (!emailCheck) {
-            const passwordHash = await bcrypt.hash(password, 10);
+            const passwordHash = await hashPassword(password);
             const { error: insertUserError } = await supabase
               .from('users')
               .insert({

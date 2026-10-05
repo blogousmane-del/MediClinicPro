@@ -7,14 +7,13 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
 const { superAdminOnly } = require('../middleware/superAdmin');
 const { sendTicketStatusEmail } = require('../utils/mailer');
 const { PLAN_IDS, getPlan, isRoleAllowedForPlan } = require('../utils/plans');
 const { isClinicExpired } = require('../utils/subscription');
-const { validatePassword } = require('../utils/password');
+const { validatePassword, hashPassword } = require('../utils/password');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { getSettings } = require('../utils/platformSettings');
 
@@ -435,7 +434,7 @@ router.post('/clinics', async (req, res) => {
       .single();
     if (clinicError) throw clinicError;
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(password);
     const { data: adminUser, error: userError } = await supabase
       .from('users')
       .insert({
@@ -728,7 +727,7 @@ router.put('/users/:id/temporary-password', async (req, res) => {
     }
 
     const temporaryPassword = generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+    const passwordHash = await hashPassword(temporaryPassword);
     const { error: updateError } = await supabase
       .from('users')
       .update({ password_hash: passwordHash, password_set: true })

@@ -3,6 +3,7 @@ const router = express.Router();
 const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
+const { ilikeOrFilter } = require('../utils/search');
 
 // GET /api/patients
 // Search and list patients
@@ -17,9 +18,10 @@ router.get('/', auth, async (req, res) => {
       .eq('clinic_id', req.user.clinicId)
       .eq('archived', archivedVal);
 
-    if (q) {
-      // Case-insensitive search using ilike in OR block
-      queryBuilder = queryBuilder.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,folder_number.ilike.%${q}%,phone.ilike.%${q}%`);
+    // Recherche insensible à la casse sur quatre colonnes (voir utils/search.js).
+    const searchFilter = ilikeOrFilter(['first_name', 'last_name', 'folder_number', 'phone'], q);
+    if (searchFilter) {
+      queryBuilder = queryBuilder.or(searchFilter);
     }
 
     const { data: patients, error } = await queryBuilder
