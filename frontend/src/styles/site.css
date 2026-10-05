@@ -44,6 +44,8 @@
 .site img { display: block; max-width: 100%; height: auto; }
 .site button { cursor: pointer; }
 .site :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; box-shadow: none; }
+/* Un numéro de téléphone ne se coupe pas en fin de ligne. */
+.site .vt-nowrap { white-space: nowrap; }
 .site .vt-mono { font-family: var(--font-mono); font-size: 0.92em; color: var(--ink); }
 
 /* Ancres : la barre collante ne masque pas le titre visé. index.css met
@@ -171,10 +173,14 @@ html:has(.site) body { overflow-x: clip; }
 .vt-bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: 'phone roles roles' 'phone money secure'; gap: 16px; margin-top: 48px; }
 .vt-cell { display: flex; flex-direction: column; gap: 10px; padding: 32px; overflow: hidden; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--surface); }
 .vt-cell p { font-size: 15.5px; line-height: 1.55; color: var(--muted); }
-.vt-cell-phone { grid-area: phone; padding-bottom: 0; background: var(--brand); border-color: var(--brand); }
+.vt-cell-phone { grid-area: phone; container-type: inline-size; padding-bottom: 0; background: var(--brand); border-color: var(--brand); }
 .site .vt-cell-phone h3 { color: #fff; }
-.vt-cell-phone p { color: var(--on-brand-muted); }
-.vt-phone-shot { align-self: center; width: 78%; margin: 26px 0 0; aspect-ratio: 390 / 560; overflow: hidden; border: 6px solid #0f2a22; border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25); }
+/* Le téléphone reste posé sur le bord bas de la carte. Quand la grille l'étire
+   à la hauteur des cartes voisines (deux colonnes, vers 1024 px), il grandit et
+   montre plus d'écran, jusqu'au ratio de la capture (390 × 844, soit 168cqi pour
+   une largeur de 78cqi) : au-delà, elle serait rognée sur les côtés. */
+.vt-cell-phone p { margin-bottom: 16px; color: var(--on-brand-muted); }
+.vt-phone-shot { align-self: center; flex: 1 0 auto; width: 78%; max-height: 168cqi; margin: auto 0 0; aspect-ratio: 390 / 560; overflow: hidden; border: 6px solid #0f2a22; border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25); }
 .vt-phone-shot picture,
 .vt-phone-shot img { width: 100%; height: 100%; }
 .vt-phone-shot img { object-fit: cover; object-position: top; }
@@ -337,7 +343,9 @@ html:has(.site) body { overflow-x: clip; }
   .vt-faq-grid,
   .vt-founder-grid { grid-template-columns: 1fr; gap: 40px; }
   .vt-faq-side { position: static; }
-  .vt-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: 'phone roles' 'phone money' 'phone secure'; }
+  /* Rôles en pleine largeur : trois cartes empilées à droite étireraient la
+     carte du téléphone bien au-delà de ce que la capture peut remplir. */
+  .vt-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: 'roles roles' 'phone money' 'phone secure'; }
   .vt-included { grid-template-columns: 1fr; gap: 20px; }
   .vt-closing-panel { grid-template-columns: 1fr; }
   .vt-footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -380,7 +388,7 @@ html:has(.site) body { overflow-x: clip; }
   .vt-facts ul { grid-template-columns: 1fr 1fr; gap: 0 16px; }
   .vt-facts li { flex-direction: column; gap: 8px; padding: 20px 0; }
   .vt-facts span { font-size: 13.5px; }
-  .vt-tabs { width: calc(100% + 2 * var(--gutter)); margin: 32px 0 0 calc(-1 * var(--gutter)); padding: 4px var(--gutter); border-radius: 0; border-left: 0; border-right: 0; }
+  .vt-tabs { width: calc(100% + 2 * var(--gutter)); max-width: none; margin: 32px 0 0 calc(-1 * var(--gutter)); padding: 4px var(--gutter); border-radius: 0; border-left: 0; border-right: 0; }
   .vt-panel { margin-top: 28px; gap: 28px; }
   .site .vt-panel h3 { font-size: 22px; }
   .vt-paper-stage { padding: 24px 24px 0; }
