@@ -6,6 +6,7 @@
 // this file.
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { supabase } = require('../database');
 const { auth } = require('../middleware/auth');
@@ -688,6 +689,63 @@ router.put('/users/:id', async (req, res) => {
   } catch (error) {
     console.error("Platform user status error:", error);
     res.status(500).json({ error: "Erreur lors de la mise à jour du statut de l'utilisateur." });
+  }
+});
+
+// PUT /api/platform/users/:id/temporary-password
+// Seule voie de réinitialisation tant que le parcours « mot de passe oublié »
+// par e-mail n'existe pas (audit du 2026-10-05) : la personne bloquée écrit sur
+// WhatsApp, l'exploitant vérifie son identité et lui transmet ce mot de passe.
+// Renvoyé une seule fois, stocké haché, jamais écrit dans le journal.
+const TEMP_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+function generateTemporaryPassword(length = 12) {
+  let password = '';
+  for (let i = 0; i < length; i += 1) {
+    password += TEMP_PASSWORD_ALPHABET[crypto.randomInt(TEMP_PASSWORD_ALPHABET.length)];
+  }
+  return password;
+}
+
+router.put('/users/:id/temporary-password', async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isInteger(targetId)) {
+      return res.status(400).json({ error: "Identifiant d'utilisateur invalide." });
+    }
+    if (targetId === req.user.userId) {
+      return res.status(400).json({ error: "Changez votre propre mot de passe depuis votre profil." });
+    }
+
+    const { data: targetUser, error: userError } = await supabase
+      .from('users')
+      .select('id, clinic_id, name')
+      .eq('id', targetId)
+      .maybeSingle();
+    if (userError) throw userError;
+    if (!targetUser) {
+      return res.status(404).json({ error: "Utilisateur introuvable." });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password_hash: passwordHash, password_set: true })
+      .eq('id', targetId);
+    if (updateError) throw updateError;
+
+    await supabase.from('activity_logs').insert({
+      clinic_id: targetUser.clinic_id,
+      user_id: req.user.userId,
+      action: 'PLATFORM_USER_PASSWORD_RESET',
+      details: `Mot de passe temporaire généré pour ${targetUser.name} par l'administrateur de la plateforme.`
+    });
+
+    res.json({ success: true, temporaryPassword });
+  } catch (error) {
+    console.error("Platform temporary password error:", error);
+    res.status(500).json({ error: "Erreur lors de la génération du mot de passe temporaire." });
   }
 });
 

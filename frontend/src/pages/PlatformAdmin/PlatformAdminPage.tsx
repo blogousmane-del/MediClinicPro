@@ -287,6 +287,20 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
     }
   };
 
+  const handleTemporaryPassword = async (userId: number, userName: string) => {
+    if (!window.confirm(`Générer un mot de passe temporaire pour ${userName} ? Son mot de passe actuel cessera de fonctionner.`)) return;
+    try {
+      const { temporaryPassword } = await api.put(`/platform/users/${userId}/temporary-password`, {});
+      // prompt : la valeur s'affiche sélectionnée, prête à copier, et disparaît
+      // à la fermeture. Elle n'est conservée nulle part dans la page.
+      window.prompt(`Mot de passe temporaire de ${userName}. Copiez-le maintenant : il ne sera plus affiché.`, temporaryPassword);
+      showToast('success', 'Mot de passe réinitialisé', `Transmettez-le à ${userName} et demandez-lui de le changer depuis son profil.`);
+    } catch (err: any) {
+      console.error(err);
+      showToast('error', 'Erreur', err.error || 'Impossible de générer le mot de passe temporaire.');
+    }
+  };
+
   const handleSendNotification = async (payload: { title: string; body: string; targetAll: boolean; clinicIds?: number[] }) => {
     try {
       await api.post('/platform/notifications', payload);
@@ -522,7 +536,7 @@ export const PlatformAdminPage: React.FC<PlatformAdminPageProps> = ({ onExit }) 
                 />
               )}
               {section === 'users' && (
-                <UsersSection users={platformUsers} currentUserId={user?.id} onToggleActive={handleToggleUserActive} />
+                <UsersSection users={platformUsers} currentUserId={user?.id} onToggleActive={handleToggleUserActive} onTemporaryPassword={handleTemporaryPassword} />
               )}
               {section === 'subscriptions' && <SubscriptionsSection data={subscriptions} />}
               {section === 'tickets' && (
@@ -1143,7 +1157,8 @@ const UsersSection: React.FC<{
   users: PlatformUser[] | null;
   currentUserId?: number;
   onToggleActive: (userId: number, active: boolean) => void;
-}> = ({ users, currentUserId, onToggleActive }) => {
+  onTemporaryPassword: (userId: number, userName: string) => void;
+}> = ({ users, currentUserId, onToggleActive, onTemporaryPassword }) => {
   const [search, setSearch] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -1224,18 +1239,27 @@ const UsersSection: React.FC<{
                   </td>
                   <td data-label="" style={{ textAlign: 'right' }}>
                     {u.id !== currentUserId && (
-                      <button
-                        onClick={() => onToggleActive(u.id, !u.active)}
-                        className="btn btn-outline"
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '0.75rem',
-                          borderColor: u.active ? 'var(--danger)' : 'var(--success)',
-                          color: u.active ? 'var(--danger)' : 'var(--success)'
-                        }}
-                      >
-                        {u.active ? 'Désactiver' : 'Activer'}
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                        <button
+                          onClick={() => onTemporaryPassword(u.id, u.name)}
+                          className="btn btn-outline"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                        >
+                          Mot de passe
+                        </button>
+                        <button
+                          onClick={() => onToggleActive(u.id, !u.active)}
+                          className="btn btn-outline"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            borderColor: u.active ? 'var(--danger)' : 'var(--success)',
+                            color: u.active ? 'var(--danger)' : 'var(--success)'
+                          }}
+                        >
+                          {u.active ? 'Désactiver' : 'Activer'}
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
