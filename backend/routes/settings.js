@@ -5,6 +5,7 @@ const { auth, checkRole } = require('../middleware/auth');
 const { validateAndNormalizePhone } = require('../utils/phone');
 const { isWithinSchedule, computeEffectiveAvailability } = require('../utils/schedule');
 const { PLANS, getPlan, isRoleAllowedForPlan, isStaffLimitReached, isKnownRole } = require('../utils/plans');
+const { getSettings } = require('../utils/platformSettings');
 const { validatePassword, hashPassword } = require('../utils/password');
 const { isClinicExpired } = require('../utils/subscription');
 
@@ -408,8 +409,20 @@ router.put('/clinic', auth, checkRole(['admin', 'manager']), async (req, res) =>
 // dans LandingPage.tsx — deux endroits à modifier lors d'une hausse de tarif,
 // donc une divergence garantie à terme. Ne renvoie que PLANS : aucune donnée
 // de clinique, rien qui ne soit déjà affiché sur la page tarifs.
-router.get('/public/plans', (req, res) => {
-  res.json({ plans: PLANS });
+//
+// La durée d'essai renvoyée est celle qu'applique l'inscription (réglage
+// starter_trial_days de Platform Admin, lu comme dans auth.js) : PLANS tel
+// quel annonçait 7 jours même quand l'exploitant en accordait 14. Si les
+// réglages sont illisibles, la vitrine garde PLANS plutôt qu'une erreur.
+router.get('/public/plans', async (req, res) => {
+  let trialDays = PLANS.starter.trialDays;
+  try {
+    const { values } = await getSettings();
+    trialDays = values.starter_trial_days || trialDays;
+  } catch (error) {
+    console.error('Public Plans Settings Error:', error);
+  }
+  res.json({ plans: { ...PLANS, starter: { ...PLANS.starter, trialDays } } });
 });
 
 // GET /api/settings/plans
