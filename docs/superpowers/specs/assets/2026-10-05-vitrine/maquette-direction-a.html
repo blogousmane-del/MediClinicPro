@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediClinic : maquette vitrine (direction A)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style>
+/* =========================================================================
+   Maquette : outils d'aperçu (ne font pas partie du design)
+   ========================================================================= */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: #2a3330; font-family: 'Geist', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.preview-bar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 4px; padding: 4px; background: #111816; border-radius: 999px; box-shadow: 0 8px 24px rgba(0,0,0,.35); font: 500 13px 'Geist', sans-serif; }
+.preview-bar span { color: #8fa39b; padding: 0 10px 0 12px; }
+.preview-bar button { font: inherit; color: #d6e2dd; background: transparent; border: 0; padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+.preview-bar button.on { background: #e9f3ee; color: #111816; }
+.frame { container: site / inline-size; margin: 0 auto; width: 100%; transition: width .35s cubic-bezier(.16,1,.3,1); background: #f5f7f6; }
+body.is-phone .frame { width: 390px; margin-top: 64px; margin-bottom: 64px; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+.slot-note { display: inline-block; font: 500 12px 'Geist Mono', monospace; color: #8a5a00; background: #fff4d6; border: 1px dashed #d9a400; padding: 3px 8px; border-radius: 6px; }
+
+/* =========================================================================
+   Vitrine MediClinic : système visuel (deviendra src/styles/site.css)
+   ========================================================================= */
+.site {
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+  --surface-2: #eef2f0;
+  --ink: #0f1a17;
+  --ink-2: #3a4743;
+  --muted: #5b6762;
+  --line: #e0e6e3;
+  --line-2: #ccd6d1;
+  --brand: #1e4d40;
+  --brand-hover: #163a30;
+  --brand-soft: #e4eee9;
+  --brand-soft-2: #d3e5dc;
+  --r-ctl: 10px;
+  --r-panel: 16px;
+  --r-shot: 12px;
+  --gutter: 56px;
+  --shot-shadow: 0 44px 90px -36px rgba(20, 62, 50, .30), 0 10px 26px -14px rgba(20, 62, 50, .14);
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+}
+.site a { color: inherit; text-decoration: none; }
+.site img { display: block; max-width: 100%; height: auto; }
+.site [data-lucide] { width: 20px; height: 20px; stroke-width: 1.75; flex-shrink: 0; }
+.wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 var(--gutter); }
+.site h2 { font-size: 44px; line-height: 1.08; letter-spacing: -0.035em; font-weight: 600; text-wrap: balance; max-width: 22ch; }
+.site h3 { font-size: 20px; line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; }
+.lead { margin-top: 18px; font-size: 19px; line-height: 1.55; color: var(--ink-2); max-width: 58ch; text-wrap: pretty; }
+.section { padding: 120px 0; }
+
+/* Boutons : une seule forme, 10 px partout */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 50px; padding: 0 22px; border-radius: var(--r-ctl); font-size: 16px; font-weight: 500; white-space: nowrap; cursor: pointer; border: 1px solid transparent; transition: background .2s var(--ease), border-color .2s var(--ease), transform .12s var(--ease); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--brand); color: #fff !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 1px 2px rgba(15, 26, 23, .25); }
+.btn-primary:hover { background: var(--brand-hover); }
+.btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line-2); }
+.btn-ghost:hover { border-color: #9fb0a8; }
+.btn-sm { height: 38px; padding: 0 15px; font-size: 14px; border-radius: 8px; }
+.wa { width: 18px; height: 18px; }
+
+/* ----- Navigation ----- */
+.nav { position: sticky; top: 0; z-index: 50; background: rgba(245, 247, 246, .86); backdrop-filter: saturate(160%) blur(14px); -webkit-backdrop-filter: saturate(160%) blur(14px); border-bottom: 1px solid var(--line); }
+.nav-logo { flex-shrink: 0; }
+.nav .wrap { height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.nav-links { display: flex; gap: 32px; font-size: 15px; font-weight: 500; color: var(--ink-2); }
+.nav-links a:hover, .nav-login:hover { color: var(--ink); }
+.nav-right { display: flex; align-items: center; gap: 20px; font-size: 15px; font-weight: 500; }
+.nav-burger { display: none; width: 42px; height: 42px; border-radius: var(--r-ctl); border: 1px solid var(--line-2); background: var(--surface); align-items: center; justify-content: center; color: var(--ink); }
+
+/* ----- Héros ----- */
+.hero { overflow: hidden; padding: 88px 0 0; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 64px; align-items: start; }
+.hero-eyebrow { font-size: 15px; font-weight: 500; color: var(--brand); margin-bottom: 22px; }
+.hero h1 { font-size: 56px; line-height: 1.02; letter-spacing: -0.042em; font-weight: 600; text-wrap: balance; }
+.hero .lead { margin-top: 24px; }
+.hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
+.hero-shot { width: 900px; margin-top: -8px; }
+.hero-phone { display: none; }
+.shot { border-radius: var(--r-shot); overflow: hidden; border: 1px solid var(--line-2); background: var(--surface); box-shadow: var(--shot-shadow); }
+.shot-bar { height: 30px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.shot-bar span { font: 400 11px 'Geist Mono', monospace; color: #69766f; background: var(--surface); padding: 3px 16px; border-radius: 6px; }
+.hero-spacer { height: 96px; }
+
+/* Entrée du héros : ordre de lecture, une seule fois */
+@media (prefers-reduced-motion: no-preference) {
+  .rise { opacity: 0; transform: translateY(10px); animation: rise .7s var(--ease) forwards; animation-delay: calc(var(--i, 0) * 70ms + 80ms); }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+}
+
+/* ----- Faits vérifiables ----- */
+.facts { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.facts ul { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.facts li { display: flex; gap: 14px; padding: 30px 28px; border-left: 1px solid var(--line); }
+.facts li:first-child { border-left: 0; padding-left: 0; }
+.facts [data-lucide] { color: var(--brand); margin-top: 3px; }
+.facts strong { display: block; font-size: 16px; font-weight: 600; line-height: 1.35; }
+.facts span { display: block; font-size: 14.5px; color: var(--muted); line-height: 1.45; margin-top: 3px; }
+
+/* ----- Parcours produit (onglets) ----- */
+.tabs { display: inline-flex; gap: 4px; padding: 4px; margin-top: 44px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.tab { font: 500 15px 'Geist', sans-serif; color: var(--ink-2); background: transparent; border: 0; padding: 10px 18px; border-radius: 9px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; transition: background .2s var(--ease), color .2s var(--ease); }
+.tab [data-lucide] { width: 17px; height: 17px; }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 26, 23, .08), 0 0 0 1px var(--line); }
+.panel { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 56px; align-items: center; margin-top: 40px; }
+.panel[hidden] { display: none; }
+.panel h3 { font-size: 26px; line-height: 1.2; letter-spacing: -0.025em; }
+.panel ul { list-style: none; margin-top: 22px; display: grid; gap: 14px; }
+.panel li { display: flex; gap: 12px; font-size: 16px; color: var(--ink-2); line-height: 1.5; }
+.panel li [data-lucide] { width: 18px; height: 18px; color: var(--brand); margin-top: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel:not([hidden]) { animation: fade .45s var(--ease); }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+.caption { margin-top: 22px; font-size: 14px; color: var(--muted); }
+
+/* ----- Documents ----- */
+.docs { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.docs-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 500px); gap: 64px; align-items: center; }
+.docs-points { margin-top: 36px; display: grid; gap: 22px; }
+.docs-points div { padding-left: 18px; border-left: 2px solid var(--brand-soft-2); }
+.docs-points dt { font-weight: 600; font-size: 16px; }
+.docs-points dd { color: var(--muted); font-size: 15.5px; margin-top: 2px; }
+.mono { font-family: 'Geist Mono', monospace; font-size: .92em; color: var(--ink); }
+.paper-stage { background: var(--brand-soft); border-radius: var(--r-panel); padding: 44px 44px 0; overflow: hidden; }
+.paper { background: #fff; border-radius: 8px 8px 0 0; box-shadow: 0 30px 60px -28px rgba(20, 62, 50, .35), 0 0 0 1px rgba(20, 62, 50, .06); aspect-ratio: 1640 / 1080; overflow: hidden; }
+.paper img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+
+/* ----- Bento ----- */
+.bento { margin-top: 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 16px; grid-template-areas: "phone roles roles" "phone money secure"; }
+.cell { border-radius: var(--r-panel); background: var(--surface); border: 1px solid var(--line); padding: 32px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.cell p { color: var(--muted); font-size: 15.5px; line-height: 1.55; }
+.cell-phone { grid-area: phone; background: var(--brand); border-color: var(--brand); color: #fff; padding-bottom: 0; }
+.cell-phone p { color: #c4dbd1; }
+.cell-phone .phone-shot { margin-top: 26px; align-self: center; width: 78%; border-radius: 22px 22px 0 0; overflow: hidden; border: 6px solid #0f2a22; border-bottom: 0; box-shadow: 0 -10px 40px rgba(0,0,0,.25); aspect-ratio: 390 / 560; }
+.cell-phone .phone-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.cell-roles { grid-area: roles; }
+.chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chips li { font-size: 14px; font-weight: 500; padding: 7px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.chips li.on { background: var(--brand-soft); border-color: var(--brand-soft-2); color: var(--brand); }
+.cell-money { grid-area: money; background: var(--brand-soft); border-color: var(--brand-soft-2); }
+.cell-money .amount { color: var(--ink); font-size: 34px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin-top: auto; padding-top: 18px; }
+.cell-money .amount small { font-size: 15px; font-weight: 500; color: var(--ink-2); letter-spacing: 0; }
+.cell-secure { grid-area: secure; }
+.cell-secure ul { list-style: none; display: grid; gap: 12px; margin-top: 8px; }
+.cell-secure li { display: flex; gap: 10px; font-size: 15px; color: var(--ink-2); line-height: 1.45; }
+.cell-secure li [data-lucide] { width: 18px; height: 18px; color: var(--brand); margin-top: 2px; }
+
+/* ----- Tarifs ----- */
+.pricing { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.trial { margin-top: 48px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 30px; border-radius: var(--r-panel); background: var(--brand-soft); border: 1px solid var(--brand-soft-2); }
+.trial strong { display: block; font-size: 18px; font-weight: 600; }
+.trial span { display: block; color: var(--ink-2); font-size: 15.5px; margin-top: 2px; }
+.plans { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.plan { padding: 34px 30px; border-radius: var(--r-panel); border: 1px solid var(--line-2); background: var(--surface); }
+.plan .for { color: var(--muted); font-size: 15.5px; margin-top: 4px; }
+.price { display: flex; align-items: baseline; gap: 8px; margin-top: 26px; }
+.price .amount { font-size: 52px; font-weight: 600; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
+.price .unit { color: var(--muted); font-size: 15.5px; font-weight: 500; }
+.plan ul { list-style: none; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.plan li { display: flex; gap: 10px; font-size: 16px; color: var(--ink-2); }
+.plan li [data-lucide] { width: 18px; height: 18px; color: var(--brand); margin-top: 3px; }
+.included { margin-top: 48px; display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 40px; }
+.included h3 { font-size: 17px; }
+.included ul { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; }
+.included li { display: flex; gap: 10px; font-size: 15.5px; color: var(--ink-2); }
+.included li [data-lucide] { width: 17px; height: 17px; color: var(--brand); margin-top: 3px; }
+.pay-note { margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 15px; color: var(--muted); }
+
+/* ----- Fondateur ----- */
+.founder-grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 72px; align-items: center; }
+.portrait { aspect-ratio: 4 / 5; border-radius: var(--r-panel); background: repeating-linear-gradient(135deg, #e9eeeb 0 12px, #e2e8e5 12px 24px); border: 1px dashed var(--line-2); display: grid; place-items: center; text-align: center; padding: 20px; color: var(--muted); font-size: 14px; }
+.founder blockquote { font-size: 30px; line-height: 1.3; letter-spacing: -0.025em; font-weight: 500; max-width: 30ch; text-wrap: balance; }
+.founder .who { margin-top: 26px; color: var(--ink-2); }
+.founder .who strong { color: var(--ink); font-weight: 600; }
+.founder .btn { margin-top: 28px; }
+
+/* ----- Questions ----- */
+.faq-grid { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 72px; align-items: start; }
+.faq-side { position: sticky; top: 108px; }
+.faq-side p { margin-top: 16px; color: var(--muted); font-size: 16px; }
+.faq-side a { color: var(--brand); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.faq details { border-bottom: 1px solid var(--line); }
+.faq details:first-child { border-top: 1px solid var(--line); }
+.faq summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 0; font-size: 17.5px; font-weight: 500; letter-spacing: -0.01em; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary [data-lucide] { color: var(--muted); transition: transform .25s var(--ease); }
+.faq details[open] summary [data-lucide] { transform: rotate(45deg); }
+.faq details p { padding: 0 48px 24px 0; color: var(--ink-2); font-size: 16px; line-height: 1.65; }
+
+/* ----- Appel final ----- */
+.closing-panel { border-radius: 20px; background: var(--brand); color: #fff; padding: 72px 64px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: end; }
+.closing-panel h2 { color: #fff; max-width: 24ch; }
+.closing-panel .lead { color: #c4dbd1; }
+.closing-ctas { display: flex; flex-direction: column; gap: 12px; min-width: 260px; }
+.closing-panel .btn-primary { background: #fff; color: var(--brand) !important; box-shadow: none; }
+.closing-panel .btn-primary:hover { background: #eef5f1; }
+.closing-panel .btn-ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.28); }
+.closing-panel .btn-ghost:hover { border-color: rgba(255,255,255,.6); }
+
+/* ----- Pied de page ----- */
+.footer { border-top: 1px solid var(--line); padding: 64px 0 40px; }
+.footer-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 40px; }
+.footer-brand p { margin-top: 16px; color: var(--muted); font-size: 15px; max-width: 32ch; }
+.footer h4 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+.footer ul { list-style: none; display: grid; gap: 10px; font-size: 15px; color: var(--ink-2); }
+.footer ul a:hover { color: var(--ink); }
+.footer-legal { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+
+/* =========================================================================
+   Tablette
+   ========================================================================= */
+@container site (max-width: 1080px) {
+  .site h2 { font-size: 38px; }
+  .hero h1 { font-size: 48px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+  .hero-copy { max-width: 640px; }
+  .hero-shot { width: 100%; margin: 0; }
+  .facts ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts li { border-left: 0; padding: 22px 0; }
+  .panel, .docs-grid, .faq-grid, .founder-grid { grid-template-columns: 1fr; gap: 40px; }
+  .faq-side { position: static; }
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "phone roles" "phone money" "phone secure"; }
+  .included { grid-template-columns: 1fr; gap: 20px; }
+  .closing-panel { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* =========================================================================
+   Téléphone
+   ========================================================================= */
+@container site (max-width: 640px) {
+  .site { --gutter: 20px; font-size: 16px; }
+  .section { padding: 72px 0; }
+  .site h2 { font-size: 30px; line-height: 1.12; }
+  .lead { font-size: 17px; }
+  .nav .wrap { height: 60px; }
+  .nav-links, .nav-login { display: none; }
+  .nav-burger { display: inline-flex; }
+  .nav-right { gap: 10px; }
+  .hero { padding-top: 40px; }
+  .hero-eyebrow { font-size: 14px; margin-bottom: 14px; }
+  .hero h1 { font-size: 38px; line-height: 1.05; }
+  .hero .lead { margin-top: 18px; }
+  .hero-ctas { flex-direction: column; margin-top: 28px; }
+  .hero-ctas .btn { width: 100%; }
+  .hero-shot { display: none; }
+  .hero-phone { display: block; margin: 8px auto 0; width: 86%; border-radius: 26px 26px 0 0; overflow: hidden; border: 7px solid #13241f; border-bottom: 0; box-shadow: 0 -12px 40px -10px rgba(20,62,50,.35); aspect-ratio: 390 / 620; }
+  .hero-phone img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .hero-spacer { height: 0; }
+  .facts ul { grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .facts li { flex-direction: column; gap: 8px; padding: 20px 0; }
+  .facts span { font-size: 13.5px; }
+  .tabs { margin-top: 32px; width: calc(100% + 2 * var(--gutter)); margin-left: calc(-1 * var(--gutter)); border-radius: 0; border-left: 0; border-right: 0; padding: 4px var(--gutter); }
+  .panel { margin-top: 28px; gap: 28px; }
+  .panel h3 { font-size: 22px; }
+  .paper-stage { padding: 24px 24px 0; }
+  .bento { grid-template-columns: 1fr; grid-template-areas: "phone" "roles" "money" "secure"; }
+  .cell { padding: 26px 22px; }
+  .cell-phone { padding-bottom: 0; }
+  .trial { flex-direction: column; align-items: stretch; padding: 22px; }
+  .trial .btn { width: 100%; }
+  .plans { grid-template-columns: 1fr; }
+  .price .amount { font-size: 44px; }
+  .included ul { grid-template-columns: 1fr; }
+  .founder blockquote { font-size: 23px; }
+  .portrait { max-width: 240px; }
+  .faq summary { font-size: 16.5px; padding: 18px 0; }
+  .faq details p { padding-right: 0; }
+  .closing-panel { padding: 40px 24px; border-radius: 16px; }
+  .closing-ctas { min-width: 0; }
+  .closing-ctas .btn { width: 100%; }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .footer-brand { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+
+<div class="preview-bar" role="group" aria-label="Aperçu">
+  <span>Aperçu</span>
+  <button type="button" class="on" data-view="desktop">Ordinateur</button>
+  <button type="button" data-view="phone">Téléphone</button>
+</div>
+
+<div class="frame">
+<div class="site">
+
+  <!-- ===================== Navigation ===================== -->
+  <header class="nav">
+    <div class="wrap">
+      <a class="nav-logo" href="#top"><img src="/files/logo-horizontal.svg" alt="MediClinic" height="28" style="height:28px;width:auto"></a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#fonctionnalites">Fonctionnalités</a>
+        <a href="#tarifs">Tarifs</a>
+        <a href="#questions">Questions</a>
+      </nav>
+      <div class="nav-right">
+        <a class="nav-login" href="#">Connexion</a>
+        <a class="btn btn-primary btn-sm" href="#">Essayer gratuitement</a>
+        <button class="nav-burger" type="button" aria-label="Ouvrir le menu"><i data-lucide="menu"></i></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== Héros ===================== -->
+  <section class="hero" id="top">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="hero-eyebrow rise" style="--i:0">Logiciel de gestion de clinique</p>
+        <h1 class="rise" style="--i:1">Toute votre clinique, de l'accueil à la caisse.</h1>
+        <p class="lead rise" style="--i:2">Dossiers patients, rendez-vous, ordonnances, pharmacie, laboratoire et encaissements, pensés pour les cliniques de Côte d'Ivoire.</p>
+        <div class="hero-ctas rise" style="--i:3">
+          <a class="btn btn-primary" href="#">Essayer gratuitement</a>
+          <a class="btn btn-ghost" href="#"><img class="wa" src="https://cdn.simpleicons.org/whatsapp/1e4d40" alt="">Écrire sur WhatsApp</a>
+        </div>
+      </div>
+      <figure class="hero-shot shot rise" style="--i:4">
+        <div class="shot-bar"><span>mediclinicpro.com</span></div>
+        <img src="/files/shot-dashboard.png" alt="Tableau de bord MediClinic : rendez-vous du jour, recettes, alertes de stock" width="1440" height="900">
+      </figure>
+      <figure class="hero-phone">
+        <img src="/files/shot-dashboard-mobile.png" alt="MediClinic sur téléphone" width="390" height="844">
+      </figure>
+    </div>
+    <div class="hero-spacer"></div>
+  </section>
+
+  <!-- ===================== Faits ===================== -->
+  <section class="facts" aria-label="En bref">
+    <div class="wrap">
+      <ul>
+        <li><i data-lucide="calendar-check"></i><div><strong>7 jours gratuits</strong><span>Sans carte bancaire ni engagement</span></div></li>
+        <li><i data-lucide="banknote"></i><div><strong>Prix en FCFA</strong><span>Abonnement payable par Mobile Money</span></div></li>
+        <li><i data-lucide="shield-check"></i><div><strong>Données séparées</strong><span>Chaque clinique ne voit que ses dossiers</span></div></li>
+        <li><i data-lucide="message-circle"></i><div><strong>Aide sur WhatsApp</strong><span>On vous aide à démarrer, en français</span></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== Parcours ===================== -->
+  <section class="section" id="fonctionnalites">
+    <div class="wrap">
+      <h2>Un seul dossier patient, partagé par toute l'équipe.</h2>
+      <p class="lead">La secrétaire l'ouvre, le médecin le complète, le laboratoire et la pharmacie s'en servent, la caisse encaisse. Personne ne ressaisit.</p>
+
+      <div class="tabs" role="tablist" aria-label="Postes de la clinique">
+        <button class="tab" role="tab" aria-selected="true" data-tab="accueil"><i data-lucide="users"></i>Accueil</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="consultation"><i data-lucide="stethoscope"></i>Consultation</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="labo"><i data-lucide="flask-conical"></i>Laboratoire</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="pharmacie"><i data-lucide="pill"></i>Pharmacie</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="caisse"><i data-lucide="receipt"></i>Caisse</button>
+      </div>
+
+      <div class="panel" role="tabpanel" data-panel="accueil">
+        <div>
+          <h3>Le registre des patients, toujours à jour.</h3>
+          <ul>
+            <li><i data-lucide="check"></i>Numéro de dossier attribué automatiquement</li>
+            <li><i data-lucide="check"></i>Allergies visibles d'un coup d'œil</li>
+            <li><i data-lucide="check"></i>Rendez-vous et orientation vers le médecin disponible</li>
+          </ul>
+        </div>
+        <figure class="shot"><div class="shot-bar"><span>mediclinicpro.com</span></div><img src="/files/shot-patients.png" alt="Registre des patients" width="1440" height="900"></figure>
+      </div>
+      <div class="panel" role="tabpanel" data-panel="consultation" hidden>
+        <div>
+          <h3>Le médecin voit tout l'historique avant de consulter.</h3>
+          <ul>
+            <li><i data-lucide="check"></i>Constantes, diagnostic et notes dans le dossier</li>
+            <li><i data-lucide="check"></i>Ordonnance et analyses prescrites depuis la consultation</li>
+            <li><i data-lucide="check"></i>Résultats et factures dans la même chronologie</li>
+          </ul>
+        </div>
+        <figure class="shot"><div class="shot-bar"><span>mediclinicpro.com</span></div><img src="/files/shot-patient-detail.png" alt="Dossier patient" width="1440" height="900"></figure>
+      </div>
+      <div class="panel" role="tabpanel" data-panel="labo" hidden>
+        <div>
+          <h3>Les demandes d'analyses arrivent directement au labo.</h3>
+          <ul>
+            <li><i data-lucide="check"></i>Chaque demande avec son heure, son patient et son médecin</li>
+            <li><i data-lucide="check"></i>Résultats saisis une fois, lus par le médecin</li>
+            <li><i data-lucide="check"></i>Plus de bon papier qui se perd entre deux bureaux</li>
+          </ul>
+        </div>
+        <figure class="shot"><div class="shot-bar"><span>mediclinicpro.com</span></div><img src="/files/shot-laboratory.png" alt="Analyses en attente au laboratoire" width="1440" height="900"></figure>
+      </div>
+      <div class="panel" role="tabpanel" data-panel="pharmacie" hidden>
+        <div>
+          <h3>Un stock qui ne disparaît plus.</h3>
+          <ul>
+            <li><i data-lucide="check"></i>Alertes de stock bas et de péremption proche</li>
+            <li><i data-lucide="check"></i>Délivrance liée à l'ordonnance : le stock baisse tout seul</li>
+            <li><i data-lucide="check"></i>Prix d'achat, prix de vente et marge par produit</li>
+          </ul>
+        </div>
+        <figure class="shot"><div class="shot-bar"><span>mediclinicpro.com</span></div><img src="/files/shot-pharmacy.png" alt="Inventaire de la pharmacie" width="1440" height="900"></figure>
+      </div>
+      <div class="panel" role="tabpanel" data-panel="caisse" hidden>
+        <div>
+          <h3>Chaque franc encaissé a son reçu.</h3>
+          <ul>
+            <li><i data-lucide="check"></i>Reçu numéroté à l'en-tête de la clinique</li>
+            <li><i data-lucide="check"></i>Journal des recettes et total du jour</li>
+            <li><i data-lucide="check"></i>Le nom de la personne qui a encaissé, sur chaque ligne</li>
+          </ul>
+        </div>
+        <figure class="shot"><div class="shot-bar"><span>mediclinicpro.com</span></div><img src="/files/shot-accounting.png" alt="Journal des recettes" width="1440" height="900"></figure>
+      </div>
+      <p class="caption">Captures de l'application, avec des données d'exemple.</p>
+    </div>
+  </section>
+
+  <!-- ===================== Documents ===================== -->
+  <section class="section docs">
+    <div class="wrap docs-grid">
+      <div>
+        <h2>Vos patients repartent avec un reçu à votre nom.</h2>
+        <p class="lead">Chaque encaissement produit un reçu numéroté, imprimé à l'en-tête de votre clinique. Les ordonnances aussi.</p>
+        <dl class="docs-points">
+          <div><dt>L'en-tête de votre clinique</dt><dd>Nom, adresse et téléphone, repris de vos paramètres.</dd></div>
+          <div><dt>Un numéro unique</dt><dd><span class="mono">FAC-2026-00042</span> est attribué par le système : deux reçus ne peuvent pas porter le même.</dd></div>
+          <div><dt>Qui a encaissé</dt><dd>Le nom de la personne à la caisse figure sur chaque reçu.</dd></div>
+        </dl>
+      </div>
+      <div class="paper-stage">
+        <figure class="paper"><img src="/files/print-receipt.png" alt="Reçu imprimé par MediClinic à l'en-tête du Cabinet Médical Les Palmiers" width="1640" height="2200"></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Bento ===================== -->
+  <section class="section">
+    <div class="wrap">
+      <h2>Fait pour les cliniques d'ici.</h2>
+      <div class="bento">
+        <article class="cell cell-phone">
+          <h3>Sur ordinateur comme sur téléphone</h3>
+          <p>Rien à installer. La caisse travaille sur l'ordinateur de l'accueil, le médecin suit sa journée depuis son téléphone.</p>
+          <figure class="phone-shot"><img src="/files/shot-dashboard-mobile.png" alt="Tableau de bord sur téléphone" width="390" height="844"></figure>
+        </article>
+        <article class="cell cell-roles">
+          <h3>Chacun voit ce qui le concerne</h3>
+          <p>Sept rôles, chacun avec ses écrans. Le pharmacien n'a pas accès à la comptabilité, le laborantin ne voit pas la caisse.</p>
+          <ul class="chips">
+            <li>Administrateur</li><li>Médecin</li><li>Infirmier</li><li>Secrétaire</li><li>Pharmacien</li><li>Laborantin</li><li>Gestionnaire</li>
+          </ul>
+        </article>
+        <article class="cell cell-money">
+          <h3>En FCFA, sans conversion</h3>
+          <p>Abonnement réglé par Orange Money, MTN MoMo, Wave ou carte bancaire.</p>
+          <p class="amount"><small>dès</small> 9 000 <small>FCFA / mois</small></p>
+        </article>
+        <article class="cell cell-secure">
+          <h3>Vos données restent les vôtres</h3>
+          <ul>
+            <li><i data-lucide="building-2"></i>Chaque clinique a son propre espace</li>
+            <li><i data-lucide="lock"></i>Connexion chiffrée</li>
+            <li><i data-lucide="user-x"></i>Un compte désactivé perd l'accès immédiatement</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Tarifs ===================== -->
+  <section class="section pricing" id="tarifs">
+    <div class="wrap">
+      <h2>Un prix clair, en FCFA.</h2>
+      <p class="lead">Toute l'équipe essaie gratuitement pendant 7 jours. Ensuite, vous choisissez la formule qui correspond à la taille de votre clinique.</p>
+
+      <div class="trial">
+        <div>
+          <strong>Essai gratuit de 7 jours</strong>
+          <span>3 comptes (administrateur, médecin, secrétaire), sans carte bancaire</span>
+        </div>
+        <a class="btn btn-primary" href="#">Essayer gratuitement</a>
+      </div>
+
+      <div class="plans">
+        <article class="plan">
+          <h3>Clinique</h3>
+          <p class="for">Cabinets et petites cliniques</p>
+          <p class="price"><span class="amount">9 000</span><span class="unit">FCFA / mois</span></p>
+          <ul>
+            <li><i data-lucide="check"></i>Jusqu'à 5 comptes</li>
+            <li><i data-lucide="check"></i>Les 7 rôles, dont pharmacien et laborantin</li>
+          </ul>
+        </article>
+        <article class="plan">
+          <h3>Hôpital</h3>
+          <p class="for">Cliniques avec plusieurs services</p>
+          <p class="price"><span class="amount">14 500</span><span class="unit">FCFA / mois</span></p>
+          <ul>
+            <li><i data-lucide="check"></i>Comptes illimités</li>
+            <li><i data-lucide="check"></i>Les 7 rôles, dont pharmacien et laborantin</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="included">
+        <h3>Inclus dans les deux formules</h3>
+        <ul>
+          <li><i data-lucide="check"></i>Patients illimités</li>
+          <li><i data-lucide="check"></i>Rendez-vous et dossiers</li>
+          <li><i data-lucide="check"></i>Ordonnances</li>
+          <li><i data-lucide="check"></i>Pharmacie et stock</li>
+          <li><i data-lucide="check"></i>Laboratoire</li>
+          <li><i data-lucide="check"></i>Caisse et reçus</li>
+          <li><i data-lucide="check"></i>Dépôts de garantie</li>
+          <li><i data-lucide="check"></i>Mises à jour</li>
+          <li><i data-lucide="check"></i>Assistance WhatsApp</li>
+        </ul>
+      </div>
+      <p class="pay-note">Paiement par Orange Money, MTN MoMo, Wave ou carte bancaire, pour 1, 3, 6 ou 12 mois. Changement de formule à tout moment depuis l'application.</p>
+    </div>
+  </section>
+
+  <!-- ===================== Fondateur ===================== -->
+  <section class="section founder">
+    <div class="wrap founder-grid">
+      <figure class="portrait"><div><strong style="display:block;color:#26302c;margin-bottom:6px">Ta photo</strong>Portrait, format vertical</div></figure>
+      <div>
+        <blockquote>« <span class="slot-note">Ton texte</span> Deux ou trois phrases, à la première personne : pourquoi tu as créé MediClinic et pour qui. »</blockquote>
+        <p class="who"><strong><span class="slot-note">Prénom Nom</span></strong>, fondateur de MediClinic</p>
+        <a class="btn btn-ghost" href="#"><img class="wa" src="https://cdn.simpleicons.org/whatsapp/1e4d40" alt="">Écrire sur WhatsApp</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Questions ===================== -->
+  <section class="section" id="questions" style="padding-top:0">
+    <div class="wrap faq-grid">
+      <div class="faq-side">
+        <h2>Questions fréquentes</h2>
+        <p>Une autre question ? <a href="#">Écrivez-nous sur WhatsApp</a>, on vous répond en français.</p>
+      </div>
+      <div class="faq">
+        <details open><summary>Faut-il installer un logiciel ?<i data-lucide="plus"></i></summary><p>Non. MediClinic s'utilise dans le navigateur, sur ordinateur, tablette ou téléphone. Il suffit d'une connexion internet.</p></details>
+        <details><summary>Que se passe-t-il à la fin des 7 jours d'essai ?<i data-lucide="plus"></i></summary><p>Vous choisissez la formule Clinique ou Hôpital et la réglez depuis l'application. Sans paiement, vos dossiers restent consultables 3 jours, puis l'accès est suspendu jusqu'au règlement. Vos données sont conservées.</p></details>
+        <details><summary>Mes données médicales sont-elles protégées ?<i data-lucide="plus"></i></summary><p>Chaque clinique dispose de son propre espace : aucune autre clinique ne voit vos patients. La connexion est chiffrée, chaque membre de l'équipe n'accède qu'aux écrans de son rôle, et un compte désactivé perd l'accès immédiatement.</p></details>
+        <details><summary>Faut-il une connexion internet en permanence ?<i data-lucide="plus"></i></summary><p>Oui, MediClinic fonctionne en ligne. Une connexion mobile suffit.</p></details>
+        <details><summary>Combien de personnes peuvent l'utiliser ?<i data-lucide="plus"></i></summary><p>3 comptes pendant l'essai, 5 avec la formule Clinique, sans limite avec la formule Hôpital. Le nombre de patients est illimité dans tous les cas.</p></details>
+        <details><summary>Comment payer l'abonnement ?<i data-lucide="plus"></i></summary><p>Par Orange Money, MTN MoMo, Wave ou carte bancaire, pour 1, 3, 6 ou 12 mois, depuis la rubrique Paramètres de l'application.</p></details>
+        <details><summary>Pouvez-vous nous aider à démarrer ?<i data-lucide="plus"></i></summary><p>Oui. Écrivez-nous sur WhatsApp au +225 07 88 81 81 18 : nous vous aidons à configurer la clinique et à créer les comptes de votre équipe.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Appel final ===================== -->
+  <section class="section" style="padding-top:0">
+    <div class="wrap">
+      <div class="closing-panel">
+        <div>
+          <h2>Essayez MediClinic dans votre clinique cette semaine.</h2>
+          <p class="lead">7 jours gratuits, sans carte bancaire. Une question avant de commencer ? On vous répond sur WhatsApp.</p>
+        </div>
+        <div class="closing-ctas">
+          <a class="btn btn-primary" href="#">Essayer gratuitement</a>
+          <a class="btn btn-ghost" href="#"><img class="wa" src="https://cdn.simpleicons.org/whatsapp/ffffff" alt="">Écrire sur WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Pied de page ===================== -->
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="/files/logo-horizontal.svg" alt="MediClinic" style="height:26px;width:auto">
+          <p>Logiciel de gestion de clinique pour la Côte d'Ivoire.</p>
+        </div>
+        <div><h4>Produit</h4><ul><li><a href="#fonctionnalites">Fonctionnalités</a></li><li><a href="#tarifs">Tarifs</a></li><li><a href="#questions">Questions</a></li></ul></div>
+        <div><h4>Compte</h4><ul><li><a href="#">Connexion</a></li><li><a href="#">Essayer gratuitement</a></li></ul></div>
+        <div><h4>Contact</h4><ul><li><a href="#">WhatsApp : +225 07 88 81 81 18</a></li><li><a href="#">Conditions d'utilisation</a></li></ul></div>
+      </div>
+      <div class="footer-legal">
+        <span>© 2026 <span class="slot-note">Raison sociale</span> RCCM <span class="slot-note">CI-ABJ-...</span></span>
+        <span>Abidjan, Côte d'Ivoire</span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+</div>
+
+<script>
+  lucide.createIcons();
+  // Onglets du parcours
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+    document.querySelectorAll('.panel').forEach(p => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+  }));
+  // Bascule d'aperçu ordinateur / téléphone
+  document.querySelectorAll('.preview-bar button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.preview-bar button').forEach(x => x.classList.toggle('on', x === b));
+    document.body.classList.toggle('is-phone', b.dataset.view === 'phone');
+    window.scrollTo({ top: 0 });
+  }));
+</script>
+</body>
+</html>
