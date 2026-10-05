@@ -31,7 +31,7 @@ export const Pricing = ({ catalog, onRegister }: { catalog: PublicCatalog; onReg
       <div className="vt-wrap vt-reveal">
         <h2>Un prix clair, en FCFA.</h2>
         <p className="vt-lead">
-          Toute l'équipe essaie gratuitement pendant {trialDays} jours. Ensuite, vous choisissez la formule qui correspond à la taille de votre clinique.
+          Vous essayez gratuitement pendant {trialDays} jours. Ensuite, vous choisissez la formule qui correspond à la taille de votre clinique.
         </p>
         <div className="vt-trial">
           <div>

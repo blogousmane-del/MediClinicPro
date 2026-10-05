@@ -25,10 +25,13 @@ export const DocumentsSection = () => (
           </div>
         </dl>
       </div>
-      <div className="vt-paper-stage">
-        <figure className="vt-paper">
-          <ReceiptCapture alt="Reçu imprimé par MediClinic à l'en-tête du Cabinet Médical Les Palmiers" />
-        </figure>
+      <div>
+        <div className="vt-paper-stage">
+          <figure className="vt-paper">
+            <ReceiptCapture alt="Exemple de reçu imprimé par MediClinic, à l'en-tête d'une clinique fictive" />
+          </figure>
+        </div>
+        <p className="vt-caption">Reçu d'exemple, au nom d'une clinique fictive.</p>
       </div>
     </div>
   </section>

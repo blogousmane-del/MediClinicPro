@@ -21,7 +21,7 @@ export const LocalFit = ({ cliniquePrice }: { cliniquePrice: number }) => (
         <article className="vt-cell vt-cell-roles">
           <h3>Chacun voit ce qui le concerne</h3>
           <p>
-            Sept rôles, chacun avec ses écrans. Le pharmacien n'a pas accès à la comptabilité, le laborantin ne voit pas la caisse, et le contenu médical est réservé à l'équipe soignante.
+            Sept rôles, chacun ses écrans&nbsp;: la comptabilité est fermée au pharmacien, la caisse au laborantin, et le contenu médical est réservé à l'équipe soignante.
           </p>
           <ul className="vt-chips">{ROLES.map((role) => <li key={role}>{role}</li>)}</ul>
         </article>

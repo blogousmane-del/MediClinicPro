@@ -25,12 +25,23 @@
   --r-ctl: 10px;
   --r-panel: 16px;
   --r-shot: 12px;
+  /* Formes, règle unique (spec) : 10 px les contrôles, 16 px les panneaux,
+     12 px les captures et le cadre des sélecteurs à onglets, 20 px le panneau
+     d'appel final (16 px sur téléphone), aucune pilule. Un élément logé dans
+     un autre prend --r-sm : onglet (12 px moins 4 px de retrait), puce, œil du
+     mot de passe, adresse de la capture, coins de la feuille imprimée. Le cadre
+     de téléphone imite un appareil : --r-device et --device-frame. */
+  --r-sm: 8px;
+  --r-closing: 20px;
+  --r-device: 22px;
+  --device-frame: #13241f;
   --gutter: 56px;
   --shot-shadow: 0 44px 90px -36px rgba(20, 62, 50, 0.3), 0 10px 26px -14px rgba(20, 62, 50, 0.14);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --font: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--ink);
   font-size: 17px;
@@ -81,7 +92,7 @@ html:has(.site) body { overflow-x: clip; }
 .vt-btn-primary:hover { background: var(--brand-hover); }
 .vt-btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line-2); }
 .vt-btn-ghost:hover { border-color: #9fb0a8; }
-.vt-btn-sm { height: 38px; padding: 0 15px; font-size: 14px; border-radius: 8px; }
+.vt-btn-sm { height: 38px; padding: 0 15px; font-size: 14px; }
 .vt-btn-block { width: 100%; }
 
 /* Logo WhatsApp officiel en masque : il prend la couleur qu'on lui donne. */
@@ -121,7 +132,7 @@ html:has(.site) body { overflow-x: clip; }
 /* ----- Captures dans leur cadre de navigateur ----- */
 .vt-shot { margin: 0; border-radius: var(--r-shot); overflow: hidden; border: 1px solid var(--line-2); background: var(--surface); box-shadow: var(--shot-shadow); }
 .vt-shot-bar { height: 30px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); border-bottom: 1px solid var(--line); }
-.site .vt-shot-bar span { padding: 3px 16px; border-radius: 6px; background: var(--surface); font-family: var(--font-mono); font-size: 11px; color: #69766f; }
+.site .vt-shot-bar span { padding: 3px 16px; border-radius: var(--r-sm); background: var(--surface); font-family: var(--font-mono); font-size: 11px; color: #69766f; }
 .vt-shot picture,
 .vt-shot img { display: block; width: 100%; }
 .vt-shot img { aspect-ratio: 1440 / 900; object-fit: cover; object-position: top; }
@@ -146,8 +157,8 @@ html:has(.site) body { overflow-x: clip; }
 .vt-facts span { display: block; margin-top: 3px; font-size: 14.5px; line-height: 1.45; color: var(--muted); }
 
 /* ----- Parcours (onglets) ----- */
-.vt-tabs { display: inline-flex; gap: 4px; max-width: 100%; margin-top: 44px; padding: 4px; overflow-x: auto; scrollbar-width: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
-.vt-tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border: 0; border-radius: 9px; background: transparent; font-size: 15px; font-weight: 500; color: var(--ink-2); white-space: nowrap; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); }
+.vt-tabs { display: inline-flex; gap: 4px; max-width: 100%; margin-top: 44px; padding: 4px; overflow-x: auto; scrollbar-width: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-shot); }
+.vt-tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border: 0; border-radius: var(--r-sm); background: transparent; font-size: 15px; font-weight: 500; color: var(--ink-2); white-space: nowrap; transition: background-color 0.2s var(--ease), color 0.2s var(--ease); }
 .vt-tab[aria-selected='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 26, 23, 0.08), 0 0 0 1px var(--line); }
 .vt-panel { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 56px; align-items: center; margin-top: 40px; }
 .vt-panel[hidden] { display: none; }
@@ -165,7 +176,7 @@ html:has(.site) body { overflow-x: clip; }
 .vt-docs-points dt { font-size: 16px; font-weight: 600; }
 .vt-docs-points dd { margin-top: 2px; font-size: 15.5px; color: var(--muted); }
 .vt-paper-stage { padding: 44px 44px 0; overflow: hidden; border-radius: var(--r-panel); background: var(--brand-soft); }
-.vt-paper { margin: 0; aspect-ratio: 1640 / 1080; overflow: hidden; border-radius: 8px 8px 0 0; background: #fff; box-shadow: 0 30px 60px -28px rgba(20, 62, 50, 0.35), 0 0 0 1px rgba(20, 62, 50, 0.06); }
+.vt-paper { margin: 0; aspect-ratio: 1640 / 1080; overflow: hidden; border-radius: var(--r-sm) var(--r-sm) 0 0; background: #fff; box-shadow: 0 30px 60px -28px rgba(20, 62, 50, 0.35), 0 0 0 1px rgba(20, 62, 50, 0.06); }
 .vt-paper picture,
 .vt-paper img { width: 100%; height: 100%; }
 .vt-paper img { object-fit: cover; object-position: top; }
@@ -185,13 +196,13 @@ html:has(.site) body { overflow-x: clip; }
    montre plus d'écran, jusqu'au ratio de la capture (390 × 844, soit 168cqi pour
    une largeur de 78cqi) : au-delà, elle serait rognée sur les côtés. */
 .vt-cell-phone p { margin-bottom: 16px; color: var(--on-brand-muted); }
-.vt-phone-shot { align-self: center; flex: 1 0 auto; width: 78%; max-height: 168cqi; margin: auto 0 0; aspect-ratio: 390 / 560; overflow: hidden; border: 6px solid #0f2a22; border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25); }
+.vt-phone-shot { align-self: center; flex: 1 0 auto; width: 78%; max-height: 168cqi; margin: auto 0 0; aspect-ratio: 390 / 560; overflow: hidden; border: 6px solid var(--device-frame); border-bottom: 0; border-radius: var(--r-device) var(--r-device) 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25); }
 .vt-phone-shot picture,
 .vt-phone-shot img { width: 100%; height: 100%; }
 .vt-phone-shot img { object-fit: cover; object-position: top; }
 .vt-cell-roles { grid-area: roles; }
 .vt-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.vt-chips li { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-size: 14px; font-weight: 500; color: var(--ink-2); }
+.vt-chips li { padding: 7px 12px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface-2); font-size: 14px; font-weight: 500; color: var(--ink-2); }
 .vt-cell-money { grid-area: money; background: var(--brand-soft); border-color: var(--brand-soft-2); }
 .vt-cell .vt-amount { margin-top: auto; padding-top: 18px; font-size: 34px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .vt-amount small { font-size: 15px; font-weight: 500; letter-spacing: 0; color: var(--ink-2); }
@@ -246,7 +257,7 @@ html:has(.site) body { overflow-x: clip; }
 .vt-faq details p { padding: 0 48px 24px 0; font-size: 16px; line-height: 1.65; color: var(--ink-2); }
 
 /* ----- Appel final ----- */
-.vt-closing-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: end; padding: 72px 64px; border-radius: 20px; background: var(--brand); }
+.vt-closing-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: end; padding: 72px 64px; border-radius: var(--r-closing); background: var(--brand); }
 .site .vt-closing-panel h2 { max-width: 24ch; color: #fff; }
 .vt-closing-panel .vt-lead { color: var(--on-brand-muted); }
 .vt-closing-ctas { display: flex; flex-direction: column; gap: 12px; min-width: 260px; }
@@ -284,8 +295,8 @@ html:has(.site) body { overflow-x: clip; }
 .vt-auth-card { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 420px; }
 .site .vt-auth-card h2 { font-size: 30px; line-height: 1.15; letter-spacing: -0.03em; }
 .vt-auth-sub { margin-top: 6px; font-size: 15px; color: var(--muted); }
-.vt-auth-switch { display: flex; gap: 4px; padding: 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); }
-.vt-auth-switch button { flex: 1; height: 38px; border: 0; border-radius: 9px; background: transparent; font-size: 15px; font-weight: 500; color: var(--ink-2); }
+.vt-auth-switch { display: flex; gap: 4px; padding: 4px; border-radius: var(--r-shot); border: 1px solid var(--line); background: var(--surface-2); }
+.vt-auth-switch button { flex: 1; height: 38px; border: 0; border-radius: var(--r-sm); background: transparent; font-size: 15px; font-weight: 500; color: var(--ink-2); }
 .vt-auth-switch button[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 26, 23, 0.08), 0 0 0 1px var(--line); }
 .vt-form { display: flex; flex-direction: column; gap: 16px; }
 .vt-field { display: flex; flex-direction: column; gap: 6px; }
@@ -297,7 +308,7 @@ html:has(.site) body { overflow-x: clip; }
 /* 4,62:1 sur blanc : un exemple de saisie reste du texte à lire. */
 .vt-field-control input::placeholder { color: #6e7773; }
 .vt-field-control input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(30, 77, 64, 0.14); }
-.vt-field-toggle { position: absolute; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--muted); }
+.vt-field-toggle { position: absolute; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: var(--r-sm); background: none; color: var(--muted); }
 .vt-field-phone { padding: 4px; border-radius: var(--r-ctl); border: 1px solid var(--field-line); background: var(--surface); }
 .vt-link { align-self: flex-end; padding: 0; border: 0; background: none; font-size: 14px; font-weight: 500; color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
 .vt-link-center { align-self: center; }
@@ -392,8 +403,8 @@ html:has(.site) body { overflow-x: clip; }
   /* Sous 640 px, les captures passent en version téléphone, dans un cadre de téléphone. */
   .vt-shot .vt-shot-bar { display: none; }
   .vt-shot img { aspect-ratio: 390 / 620; }
-  .vt-hero-shot { width: 86%; margin: 8px auto 0; border: 7px solid #13241f; border-bottom: 0; border-radius: 26px 26px 0 0; box-shadow: 0 -12px 40px -10px rgba(20, 62, 50, 0.35); }
-  .vt-panel .vt-shot { width: 78%; margin: 0 auto; border: 6px solid #13241f; border-bottom: 0; border-radius: 22px 22px 0 0; }
+  .vt-hero-shot { width: 86%; margin: 8px auto 0; border: 7px solid var(--device-frame); border-bottom: 0; border-radius: var(--r-device) var(--r-device) 0 0; box-shadow: 0 -12px 40px -10px rgba(20, 62, 50, 0.35); }
+  .vt-panel .vt-shot { width: 78%; margin: 0 auto; border: 6px solid var(--device-frame); border-bottom: 0; border-radius: var(--r-device) var(--r-device) 0 0; }
   .vt-facts ul { grid-template-columns: 1fr 1fr; gap: 0 16px; }
   .vt-facts li { flex-direction: column; gap: 8px; padding: 20px 0; }
   .vt-facts span { font-size: 13.5px; }
@@ -413,7 +424,7 @@ html:has(.site) body { overflow-x: clip; }
   .vt-portrait { max-width: 240px; }
   .vt-faq summary { padding: 18px 0; font-size: 16.5px; }
   .vt-faq details p { padding-right: 0; }
-  .vt-closing-panel { padding: 40px 24px; border-radius: 16px; }
+  .vt-closing-panel { padding: 40px 24px; border-radius: var(--r-panel); }
   .vt-closing-ctas { min-width: 0; }
   .vt-closing-ctas .vt-btn { width: 100%; }
   .vt-footer-grid { grid-template-columns: 1fr 1fr; }
