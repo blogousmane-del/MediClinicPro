@@ -30,14 +30,10 @@ mêmes fichiers :
 
 6. **L'ordonnance imprimée porte le nom d'une autre clinique.** `PatientDetailPage.tsx:316` et
    `OrdonnancesPage.tsx:336` écrivent en dur « CLINIQUE MÉDICALE DE L'AVENIR, Cocody Boulevard de France,
-   Tél: +225 0707080910 ». Le reçu de caisse, lui, est correct depuis `a6396d7`.
-7. **Les modèles d'impression ne sont pas échappés (faille de sécurité).** Les trois modèles (reçu et journal
-   dans `AccountingPage.tsx`, dossier dans `PatientDetailPage.tsx`, ordonnance dans `OrdonnancesPage.tsx`)
-   insèrent noms de patients, motifs, diagnostics, notes et noms de caissiers dans du HTML écrit par
-   `document.write`. La fenêtre ouverte par `window.open('')` partage l'origine de l'application. Un membre
-   de l'équipe qui enregistre un patient nommé `<img src=x onerror=…>` exécute donc du script chez la
-   personne qui imprime ensuite ce dossier : il peut lire `window.opener.localStorage.mediclinic_token` et
-   s'emparer de sa session, administrateur compris.
+   Tél: +225 0707080910 ». Le reçu de caisse, lui, est correct depuis `a6396d7`. Corrigé avant ce chantier,
+   avec le défaut 7.
+7. **Les modèles d'impression n'échappaient pas les valeurs saisies.** Corrigé avant ce chantier par les
+   correctifs de sécurité du 2026-10-05 (`frontend/src/utils/print.ts`, voir CLAUDE.md, « Printed documents »).
 8. **La durée d'essai annoncée peut mentir.** La durée réelle vient du réglage `starter_trial_days`
    (modifiable de 1 à 90 jours dans Platform Admin, lu par `auth.js` à l'inscription). Mais
    `GET /settings/public/plans` renvoie `PLANS` tel quel, donc `trialDays: 7` en dur. Si l'exploitant passe
@@ -51,7 +47,7 @@ Une vitrine qui inspire confiance dès le premier écran et qui ne promet rien q
 - mettre **une personne joignable** à portée de clic (WhatsApp) ;
 - dire **concrètement** ce que fait chaque poste de la clinique, en français, en FCFA ;
 - garder **une seule ambiance** de la vitrine à l'inscription ;
-- corriger les défauts 3, 6, 7 et 8.
+- corriger les défauts 3 et 8 (6 et 7 l'ont été avant ce chantier).
 
 **Hors périmètre** (chantiers suivants, chacun avec sa propre spec) :
 - **Chantier 2, premiers pas :** onboarding aligné sur ce langage visuel, tableau de bord « compte neuf » avec
@@ -96,6 +92,9 @@ Ils ne fuient pas dans l'application.
 | `--brand` | `#1e4d40` | **seule couleur d'accent** (= `--brand-700` de `index.css`) |
 | `--brand-hover` | `#163a30` | survol du bouton principal |
 | `--brand-soft` / `--brand-soft-2` | `#e4eee9` / `#d3e5dc` | fonds teintés, bandeau d'essai |
+
+Toutes les classes de la vitrine portent le préfixe `vt-` : `index.css` définit déjà `.btn` et `.btn-primary`,
+et un nom générique finirait par entrer en collision.
 
 - **Typographie :** Geist (variable) pour tout le texte, Geist Mono pour l'URL des captures et les numéros
   (`FAC-2026-00042`). Les polices sont auto-hébergées via `@fontsource-variable/geist` et
@@ -188,7 +187,8 @@ d'écart, cette spec prévaut.
 5. **« Fait pour les cliniques d'ici. »** (grille asymétrique de 4 cellules) :
    - **Téléphone** (haute, fond `--brand`) : « Sur ordinateur comme sur téléphone », avec la capture mobile.
    - **Rôles** (large) : « Chacun voit ce qui le concerne ». Texte : « Sept rôles, chacun avec ses écrans.
-     Le pharmacien n'a pas accès à la comptabilité, le laborantin ne voit pas la caisse. » Les sept
+     Le pharmacien n'a pas accès à la comptabilité, le laborantin ne voit pas la caisse, et le contenu médical
+     est réservé à l'équipe soignante. » Les sept
      libellés en pastilles neutres.
    - **Prix** (fond `--brand-soft`) : « En FCFA, sans conversion ». Moyens de paiement, puis « dès {prix
      Clinique} FCFA / mois ».
@@ -222,7 +222,8 @@ d'écart, cette spec prévaut.
      l'application. Sans paiement, les dossiers restent consultables 3 jours, puis l'accès est suspendu
      jusqu'au règlement. Les données sont conservées.
    - « Mes données médicales sont-elles protégées ? » Espace propre à chaque clinique, connexion chiffrée,
-     écrans limités au rôle, compte désactivé coupé immédiatement.
+     écrans limités au rôle, contenu médical réservé à l'équipe soignante, compte désactivé coupé
+     immédiatement.
    - « Faut-il une connexion internet en permanence ? » Oui, MediClinic fonctionne en ligne. Une connexion
      mobile suffit.
    - « Combien de personnes peuvent l'utiliser ? » {Starter}, {Clinique} ou sans limite selon la formule.
@@ -251,7 +252,8 @@ et `lab_showcase.png`, générées, sont retirées de la page. `clinic_hero.png`
 
 ### Configuration du site
 
-Nouveau fichier `frontend/src/config/site.ts`, seule source des données de contact et d'identité :
+`frontend/src/config/site.ts` existe depuis les correctifs de sécurité (numéro WhatsApp de la page de
+connexion). Il est étendu et reste la seule source des données de contact et d'identité :
 
 ```ts
 export const SITE = {
@@ -261,6 +263,7 @@ export const SITE = {
     e164: '2250788818118',
     message: 'Bonjour, je souhaite en savoir plus sur MediClinic.',
   },
+  subscriptionPaymentMethods: ['Orange Money', 'MTN MoMo', 'Wave', 'carte bancaire'],
   founder: null as null | { name: string; role: string; photo: string; quote: string },
   legal: null as null | { name: string; rccm: string },
   fieldPhoto: null as null | { src: string; alt: string },
@@ -302,7 +305,8 @@ Nouveau script versionné `frontend/scripts/capture-screens.mjs`, lancé par `np
   développement) et le Chrome installé sur le poste.
 - Chaque appel `/api/*` reçoit une réponse locale tirée de `frontend/scripts/capture-data.mjs` : une clinique
   « Cabinet Médical Les Palmiers » et des patients, soignants, médicaments, analyses et paiements aux noms
-  ivoiriens plausibles. **Aucune requête ne sort du poste.**
+  ivoiriens plausibles. **Aucune requête ne part vers l'API ni vers un service tiers** : seules les polices
+  Google de l'application sont téléchargées, pour que les captures ressemblent à la production.
 - Il produit, en desktop (1440 × 900) et en mobile (390 × 844) à densité 2 :
   - tableau de bord ;
   - registre des patients ;
@@ -318,15 +322,10 @@ Nouveau script versionné `frontend/scripts/capture-screens.mjs`, lancé par `np
 
 ### Correctifs d'impression (défauts 6 et 7)
 
-Nouveau module `frontend/src/utils/print.ts` :
-- `escapeHtml(value)` remplace `& < > " '` par leurs entités ;
-- `clinicHeaderHtml(clinic, subtitle)` reprend l'en-tête du reçu, champs échappés ;
-- `PRINT_STYLES` reprend les styles littéraux de `AccountingPage.tsx`. Une fenêtre `window.open('')` ne voit
-  pas les variables CSS de l'application, d'où les valeurs en dur.
-
-Les trois modèles l'utilisent : `AccountingPage.tsx` (reçu et journal), `PatientDetailPage.tsx`
-(impression d'un élément du dossier) et `OrdonnancesPage.tsx` (ordonnance). **Toute** valeur saisie par
-un utilisateur passe par `escapeHtml`. Les deux en-têtes « Clinique Médicale de l'Avenir » disparaissent.
+Livrés avant ce chantier. `frontend/src/utils/print.ts` sert les quatre impressions, et l'ordonnance porte
+l'en-tête de la clinique connectée. Un écart reste à corriger ici, parce que la section Documents le rendrait
+faux : la facture imprimée à l'encaissement ne nomme pas la personne qui encaisse, seule la réimpression le
+fait.
 
 ### Durée d'essai effective (défaut 8)
 
@@ -339,8 +338,6 @@ couvre deux cas : réglage présent, et table absente ou réglage invalide.
 
 - **Créés :**
   - `frontend/src/styles/site.css`
-  - `frontend/src/config/site.ts`
-  - `frontend/src/utils/print.ts`
   - les composants de la vitrine dans `frontend/src/pages/Landing/`, une section par fichier
   - `frontend/public/brand/whatsapp.svg`
   - `frontend/public/captures/*`
@@ -350,8 +347,9 @@ couvre deux cas : réglage présent, et table absente ou réglage invalide.
   - `backend/tests/public-plans.test.js`
 - **Réécrits :** `frontend/src/pages/LandingPage.tsx`, qui devient l'assemblage des sections.
 - **Modifiés :**
+  - `frontend/src/config/site.ts` (étendu) ;
   - `AuthPage.tsx`, `TermsOfServicePage.tsx` ;
-  - `AccountingPage.tsx`, `PatientDetailPage.tsx`, `OrdonnancesPage.tsx` (impression seulement) ;
+  - `AccountingPage.tsx` (la facture nomme qui encaisse) ;
   - `frontend/index.html`, `robots.txt`, `sitemap.xml`, `frontend/package.json`,
     `frontend/scripts/optimize-images.mjs` ;
   - `backend/routes/settings.js`.
@@ -375,7 +373,9 @@ Chaque phrase de la vitrine qui décrit le produit a été vérifiée dans le co
 | Ordonnance et analyses depuis la consultation | formulaire de consultation de `PatientDetailPage.tsx` |
 | Le stock baisse à la délivrance | `POST /pharmacy/dispense/:id` → `applyStockDelta()` (lignes liées au catalogue) |
 | Reçu numéroté, unique | `POST /financials/checkout` attribue `FAC-<année>-<id>` |
-| Pharmacien sans comptabilité, laborantin sans caisse | `Sidebar.tsx:42-50` |
+| Pharmacien sans comptabilité, laborantin sans caisse | `Sidebar.tsx` et `checkRole` côté serveur (`role-restrictions.test.js`) |
+| Contenu médical réservé à l'équipe soignante | `backend/utils/medicalAccess.js` (`medical-access.test.js`) |
+| Le nom de qui encaisse sur chaque reçu | facture d'encaissement et réimpression, `AccountingPage.tsx` |
 | Compte désactivé coupé immédiatement | `middleware/auth.js` relit `users.active` à chaque requête |
 | Données séparées par clinique | filtre `clinic_id` de toutes les routes |
 | 3 jours en lecture seule, puis suspension, données conservées | `GRACE_PERIOD_DAYS`, `LOCKED_API_PREFIXES` ; seule purge existante : `login_failures` |
@@ -392,8 +392,7 @@ Chaque phrase de la vitrine qui décrit le produit a été vérifiée dans le co
 - Navigation au clavier : ordre de tabulation, focus visible, onglets aux flèches, accordéon au clavier.
 - Contrastes AA vérifiés sur chaque couple texte/fond du tableau des jetons.
 - Lighthouse mobile sur `npm run preview` : performance ≥ 90, LCP < 2,5 s, CLS < 0,1.
-- Impression : un patient nommé `<img src=x onerror=alert(1)>` (données simulées) s'imprime en texte, sans
-  exécution, dans les trois modèles ; l'ordonnance porte l'en-tête de la clinique connectée.
+- Impression : couverte par `utils/print.test.ts` depuis les correctifs de sécurité.
 - Aperçu de partage contrôlé après déploiement avec un débogueur Open Graph.
 - Grille de contrôle finale du skill `design-taste-frontend` (section 14), case par case.
 
