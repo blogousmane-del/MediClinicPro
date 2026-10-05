@@ -14,3 +14,7 @@ __pycache__/
 .eslintcache
 .vscode/
 dist/
+
+# Captures brutes de la vitrine (frontend/scripts/capture-screens.mjs) : seules
+# leurs variantes AVIF et WebP, dans frontend/public/captures/, sont versionnées.
+frontend/scripts/.captures/

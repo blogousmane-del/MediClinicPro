@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "test": "node --test \"src/**/*.test.ts\"",
     "preview": "vite preview",
-    "images": "node scripts/optimize-images.mjs"
+    "images": "node scripts/optimize-images.mjs",
+    "captures": "node scripts/capture-screens.mjs && node scripts/optimize-images.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

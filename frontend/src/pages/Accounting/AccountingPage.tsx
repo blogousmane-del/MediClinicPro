@@ -29,7 +29,7 @@ interface InvoiceService {
 
 export const AccountingPage: React.FC = () => {
   const { showToast } = useNotifications();
-  const { clinic } = useAuth();
+  const { user, clinic } = useAuth();
 
   const [viewMode, setViewMode] = useState<'create' | 'journal'>('create');
 
@@ -194,7 +194,8 @@ export const AccountingPage: React.FC = () => {
         <strong>Patient :</strong> ${escapeHtml(selectedPatient.last_name.toUpperCase())} ${escapeHtml(selectedPatient.first_name)}<br>
         <strong>Date facture :</strong> ${new Date(invoiceDate).toLocaleDateString('fr-FR')} |
         <strong>Échéance :</strong> ${new Date(dueDate).toLocaleDateString('fr-FR')}<br>
-        <strong>Mode de paiement :</strong> ${escapeHtml(paymentMethodLabel(paymentMethod))}
+        <strong>Mode de paiement :</strong> ${escapeHtml(paymentMethodLabel(paymentMethod))}<br>
+        <strong>Encaissé par :</strong> ${escapeHtml(user?.name || '')}
       </div>
       <table>
         <thead><tr><th>Type</th><th>Description</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
@@ -862,7 +863,7 @@ export const AccountingPage: React.FC = () => {
                   ) : (
                     stats.distribution.map((d: any) => (
                       <div key={d.method} className="flex justify-between">
-                        <span style={{ textTransform: 'capitalize' }}>{d.method} :</span>
+                        <span>{paymentMethodLabel(d.method)} :</span>
                         <span>{d.total.toLocaleString()} FCFA</span>
                       </div>
                     ))
