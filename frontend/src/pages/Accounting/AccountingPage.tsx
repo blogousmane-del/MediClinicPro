@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { SkeletonTableRows } from '../../components/Skeleton';
 import { escapeHtml, clinicHeaderHtml, buildPrintDocument, openPrintWindow } from '../../utils/print';
+import { isVatEnabled, computeInvoiceTotals, receiptBreakdown, vatLabel, paymentMethodLabel } from '../../utils/invoice';
 import {
   Search,
   Plus,
@@ -118,8 +119,9 @@ export const AccountingPage: React.FC = () => {
   };
 
   const subtotal = services.reduce((acc, curr) => acc + (curr.quantity * curr.unitPrice), 0);
-  const tva = Math.round(subtotal * 0.18);
-  const total = subtotal + tva;
+  // TVA selon le réglage de la clinique (Paramètres > Clinique), 18 % par défaut.
+  const vatEnabled = isVatEnabled(clinic?.settings);
+  const { vat: tva, total } = computeInvoiceTotals(subtotal, vatEnabled);
 
   const resetInvoiceForm = () => {
     setSelectedPatient(null);
@@ -192,7 +194,7 @@ export const AccountingPage: React.FC = () => {
         <strong>Patient :</strong> ${escapeHtml(selectedPatient.last_name.toUpperCase())} ${escapeHtml(selectedPatient.first_name)}<br>
         <strong>Date facture :</strong> ${new Date(invoiceDate).toLocaleDateString('fr-FR')} |
         <strong>Échéance :</strong> ${new Date(dueDate).toLocaleDateString('fr-FR')}<br>
-        <strong>Mode de paiement :</strong> ${escapeHtml(paymentMethod.toUpperCase())}
+        <strong>Mode de paiement :</strong> ${escapeHtml(paymentMethodLabel(paymentMethod))}
       </div>
       <table>
         <thead><tr><th>Type</th><th>Description</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
@@ -200,7 +202,7 @@ export const AccountingPage: React.FC = () => {
       </table>
       <div class="totals">
         <div><span>Sous-total</span><span>${subtotal.toLocaleString()} FCFA</span></div>
-        <div><span>TVA (18%)</span><span>${tva.toLocaleString()} FCFA</span></div>
+        ${tva > 0 ? `<div><span>${vatLabel(subtotal, tva)}</span><span>${tva.toLocaleString()} FCFA</span></div>` : ''}
         <div class="grand-total"><span>Total</span><span>${total.toLocaleString()} FCFA</span></div>
       </div>
       ${notes ? `<p><strong>Notes :</strong> ${escapeHtml(notes)}</p>` : ''}
@@ -225,6 +227,9 @@ export const AccountingPage: React.FC = () => {
       </tr>
     `).join('');
     const reference = pay.reference_number || `#${pay.id}`;
+    // Le total encaissé inclut la TVA, absente des lignes : sans ce détail, le
+    // reçu affichait 25 000 + 15 600 = 47 908 FCFA.
+    const breakdown = receiptBreakdown(items, pay.amount_total);
 
     printHtml(buildPrintDocument(`Reçu ${reference}`, `
       ${clinicHeaderHtml(clinic, `Reçu ${reference}`)}
@@ -232,10 +237,15 @@ export const AccountingPage: React.FC = () => {
         <strong>Patient :</strong> ${escapeHtml(pay.patient_last_name)} ${escapeHtml(pay.patient_first_name)}<br>
         <strong>Date :</strong> ${new Date(pay.created_at).toLocaleDateString('fr-FR')}<br>
         <strong>Encaissé par :</strong> ${escapeHtml(pay.cashier_name)}<br>
-        <strong>Mode de paiement :</strong> ${escapeHtml(pay.payment_method)}
+        <strong>Mode de paiement :</strong> ${escapeHtml(paymentMethodLabel(pay.payment_method))}
       </p>
       ${rows ? `<table><thead><tr><th>Type</th><th>Description</th><th class="right">Montant</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
-      <p class="right"><strong>Total : ${Number(pay.amount_total).toLocaleString()} FCFA</strong></p>
+      ${breakdown && breakdown.vat > 0 ? `
+      <div class="totals">
+        <div><span>Sous-total</span><span>${breakdown.subtotal.toLocaleString()} FCFA</span></div>
+        <div><span>${vatLabel(breakdown.subtotal, breakdown.vat)}</span><span>${breakdown.vat.toLocaleString()} FCFA</span></div>
+        <div class="grand-total"><span>Total</span><span>${breakdown.total.toLocaleString()} FCFA</span></div>
+      </div>` : `<p class="right"><strong>Total : ${Number(pay.amount_total).toLocaleString()} FCFA</strong></p>`}
     `));
   };
 
@@ -254,7 +264,7 @@ export const AccountingPage: React.FC = () => {
         <td>${new Date(pay.created_at).toLocaleDateString('fr-FR')}</td>
         <td>${escapeHtml(pay.reference_number || `#${pay.id}`)}</td>
         <td>${escapeHtml(pay.patient_last_name)} ${escapeHtml(pay.patient_first_name)}</td>
-        <td>${escapeHtml(pay.payment_method)}</td>
+        <td>${escapeHtml(paymentMethodLabel(pay.payment_method))}</td>
         <td>${escapeHtml(pay.cashier_name)}</td>
         <td class="right">${Number(pay.amount_total).toLocaleString()} FCFA</td>
       </tr>
@@ -724,7 +734,7 @@ export const AccountingPage: React.FC = () => {
                     <span style={{ fontWeight: 600 }}>{subtotal.toLocaleString()} FCFA</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                    <span>TVA (18%)</span>
+                    <span>{vatEnabled ? vatLabel(subtotal, tva) : 'TVA non appliquée'}</span>
                     <span style={{ fontWeight: 600 }}>{tva.toLocaleString()} FCFA</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-soft-ink)', marginTop: '4px' }}>
@@ -890,7 +900,7 @@ export const AccountingPage: React.FC = () => {
                         <td>{new Date(pay.created_at).toLocaleDateString('fr-FR')}</td>
                         <td>{pay.patient_last_name} {pay.patient_first_name}</td>
                         <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>{pay.amount_total.toLocaleString()} FCFA</td>
-                        <td><span className="badge badge-info">{pay.payment_method}</span></td>
+                        <td><span className="badge badge-info">{paymentMethodLabel(pay.payment_method)}</span></td>
                         <td style={{ fontFamily: 'monospace' }}>{pay.reference_number || 'N/A'}</td>
                         <td>{pay.cashier_name}</td>
                         <td style={{ textAlign: 'right' }}>
